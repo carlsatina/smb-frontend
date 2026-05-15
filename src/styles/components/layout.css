@@ -1,0 +1,46 @@
+.panel-state {
+    padding: 1.5rem;
+    text-align: center;
+    color: var(--muted, #64748b);
+    background: #f8fafc;
+    border-radius: 18px;
+}
+
+.table-wrap {
+    overflow-x: auto;
+}
+
+.align-right {
+    text-align: right;
+}
+
+.pagination {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.pagination-size {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8rem;
+    color: var(--muted, #64748b);
+    margin-right: auto;
+}
+
+.pagination-size select {
+    border: 1px solid #e2e8f0;
+    border-radius: 999px;
+    padding: 0.35rem 0.7rem;
+    font-size: 0.8rem;
+    background: #fff;
+    color: inherit;
+}
+
+.pagination-controls {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75rem;
+}

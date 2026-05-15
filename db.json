@@ -1,0 +1,159 @@
+{
+    "services": [
+        {
+            "uuid": "0000:0000:0000:1111",
+            "storeName": "RC Mechanic",
+            "storeLocation": "Minglanilla Cebu",
+            "contactNo": [
+                {
+                    "home":"+639991112222",
+                    "shop":"+639991123333"
+                }
+            ],
+            "address": "6046 Minglanilla, Philippines",
+            "googleMapsPin": "",
+            "servicesOffered": [
+                "OBD2 Scanning",
+                "PMS Checkup",
+                "Car Electrical System",
+                "Engine Tune-up",
+                "Change Oil",
+                "Transmission Service"
+            ],
+            "homeService": true,
+            "youTubeLink": "https://youtu.be/iz_XBAj_3sQ",
+            "tags": [
+                "Mekaniko"
+            ]
+        },
+        {
+            "uuid": "0000:0000:0000:2222",
+            "storeName": "JP Car Wash",
+            "storeLocation": "Banawa Cebu",
+            "contactNo": [
+                {
+                    "home": "+639991114455"
+                }
+            ],
+            "address": "Happy Valley Banawa Cebu City",
+            "googleMapsPin": "",
+            "servicesOffered": [
+                "Car Detailing",
+                "Body Wash",
+                "Vaccuum"
+            ],
+            "homeService": true,
+            "tags": [
+                "Hugas Sakyanan"
+            ]
+        },
+        {
+            "uuid": "0000:0000:0000:3333",
+            "storeName": "Aircon Cleaning",
+            "storeLocation": "Lapu-Lapu",
+            "contactNo": [
+                {
+                    "home": "+639998881234"
+                }
+            ],
+            "address": "Lapu-Lapu City",
+            "googleMapsPin": "",
+            "servicesOffered": [
+                "Aircon Cleaning"
+            ],
+            "homeService": true,
+            "tags": [
+                "Limpyo Aircon",
+                "Hugas Aircon"
+            ]
+        },
+        {
+            "uuid": "0000:0000:0000:4444",
+            "storeName": "English Tutorial",
+            "storeLocation": "Mandaue",
+            "contactNo": [
+                {
+                    "home": "+639998871212"
+                }
+            ],
+            "address": "Pooc Mandaue City Cebu",
+            "googleMapsPin": "",
+            "servicesOffered": [
+                "English Tutorial",
+                "Math Tutorial"
+            ],
+            "homeService": true,
+            "tags": [
+                "Maestra"
+            ]
+        },
+        {
+            "uuid": "0000:0000:0000:5555",
+            "storeName": "Jude's Upholstery",
+            "storeLocation": "yati Liloan",
+            "contactNo": [
+                {
+                    "home": "+639995535566"
+                }
+            ],
+            "address": "Purok Tambis Yati Liloan",
+            "googleMapsPin": "",
+            "servicesOffered": [
+                "Car Upholstery",
+                "Tables and Chairs Upholstery"
+            ],
+            "homeService": false,
+            "tags": [
+                "Cover Sala Set",
+                "Cover Sakyanan",
+                "Sofa Cover",
+                "Leather Sofa"
+            ]
+        },
+        {
+            "uuid": "0000:0000:0000:6666",
+            "storeName": "RC's Photography",
+            "storeLocation": "Banawa",
+            "contactNo": [
+                {
+                    "home":"+639998881122"
+                }
+            ],
+            "address": "Goldenvile Subd Banawa Cebu City",
+            "googleMapsPin": "",
+            "servicesOffered": [
+                "Wedding Photograpy",
+                "Debut Photography",
+                "Pre-nup Photography",
+                "Product Photography"
+            ],
+            "homeService": true,
+            "tags": [
+                "Kasal",
+                "Picture"
+            ]
+        },
+        {
+            "uuid": "0000:0000:0000:7777",
+            "storeName": "DJ's Equipment Rental",
+            "storeLocation": "Mabolo",
+            "contactNo": [
+                {
+                    "home":"+631238888989"
+                }
+            ],
+            "address": "Panagda-it Mabolo Cebu City",
+            "googleMapsPin": "",
+            "servicesOffered": [
+                "Miter Saw Equipment Rental",
+                "Backhoe Rental",
+                "Woho Rental"
+            ],
+            "homeService": true,
+            "tags": [
+                "Pison",
+                "Gabas"
+            ]
+        }
+    ]
+}

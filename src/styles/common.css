@@ -1,0 +1,15 @@
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;600&family=Space+Grotesk:wght@400;600;700&display=swap');
+@import './components/buttons.css';
+@import './components/status-pills.css';
+@import './components/layout.css';
+@import './components/empty-state.css';
+@import './components/card-system.css';
+@import './components/tables.css';
+
+:root {
+    --app-font-sans: 'Space Grotesk', 'Manrope', sans-serif;
+}
+
+body {
+    font-family: var(--app-font-sans);
+}

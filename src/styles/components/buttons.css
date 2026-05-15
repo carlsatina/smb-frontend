@@ -1,0 +1,97 @@
+.primary-button,
+.secondary-button,
+.ghost-button,
+.submit-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    border-radius: 8px;
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+    font-family: inherit;
+    white-space: nowrap;
+}
+
+.primary-button,
+.submit-button {
+    background: #0d9488;
+    border: none;
+    color: #ffffff;
+}
+
+.primary-button:hover:not(:disabled),
+.submit-button:hover:not(:disabled) {
+    background: #0f766e;
+}
+
+.primary-button:disabled,
+.submit-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.secondary-button {
+    background: transparent;
+    border: 1px solid #e2e8f0;
+    color: #475569;
+}
+
+.secondary-button:hover:not(:disabled) {
+    background: #f1f5f9;
+    border-color: #cbd5e1;
+}
+
+.secondary-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.secondary-button.danger {
+    color: #b91c1c;
+    border-color: #fecaca;
+}
+
+.secondary-button.danger:hover:not(:disabled) {
+    background: #fff5f5;
+    border-color: #fca5a5;
+}
+
+.ghost-button {
+    background: transparent;
+    border: 1px solid #e2e8f0;
+    color: #475569;
+}
+
+.ghost-button:hover:not(:disabled) {
+    background: #f1f5f9;
+    border-color: #cbd5e1;
+}
+
+.ghost-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.ghost-button.danger {
+    color: #b91c1c;
+    border-color: #fecaca;
+}
+
+.ghost-button.danger:hover:not(:disabled) {
+    background: #fff5f5;
+    border-color: #fca5a5;
+}
+
+.button-compact {
+    padding: 0.35rem 0.75rem;
+    font-size: 0.8rem;
+}
+
+.ghost-button--compact {
+    padding: 0.35rem 0.75rem;
+    font-size: 0.8rem;
+}

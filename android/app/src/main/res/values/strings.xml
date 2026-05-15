@@ -1,0 +1,8 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Quickworks</string>
+    <string name="title_activity_main">Quickworks</string>
+    <string name="package_name">com.rolero.quickworks</string>
+    <string name="custom_url_scheme">com.rolero.quickworks</string>
+    <string name="server_client_id">1030438905076-4pgaqbi73u4sarm2c9o365g39s39tknm.apps.googleusercontent.com</string>
+</resources>
