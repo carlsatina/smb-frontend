@@ -630,6 +630,7 @@ watch(() => storeContext.currentStoreId, async () => {
     display: flex;
     flex-direction: column;
     gap: 1rem;
+    min-width: 0;
 }
 
 .panel-state {
@@ -649,7 +650,7 @@ watch(() => storeContext.currentStoreId, async () => {
 /* ============================================================
    TABLE
 ============================================================ */
-.table-wrap { overflow-x: auto; }
+.table-wrap { overflow-x: auto; min-width: 0; }
 
 .product-table {
     width: 100%;
@@ -1016,14 +1017,90 @@ watch(() => storeContext.currentStoreId, async () => {
 }
 
 @media (max-width: 768px) {
-    .prod-toolbar { flex-direction: column; align-items: flex-start; }
-    .toolbar-right { width: 100%; justify-content: flex-end; }
+    .prod-toolbar { flex-direction: column; align-items: stretch; }
+    .toolbar-left { flex-direction: column; align-items: stretch; }
+    .toolbar-right { width: 100%; }
+    .toolbar-right .primary-button { width: 100%; justify-content: center; }
     .search-input { min-width: 0; width: 100%; }
+    .filter-pills { width: 100%; }
 }
 
 @media (max-width: 640px) {
-    .product-page { padding: 1.25rem 1rem 2.5rem; }
+    .product-page { padding: 1rem 0.875rem 2.5rem; }
     .product-title h1 { font-size: 1.5rem; }
-    .filter-pills { flex-wrap: wrap; }
+    .product-panel { padding: 0 0 1rem; border-radius: 12px; }
+
+    /* ── Table → card view ── */
+    .product-table thead { display: none; }
+    .product-table,
+    .product-table tbody { display: block; }
+
+    .product-table tbody tr {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        grid-template-rows: auto auto auto;
+        padding: 0.875rem 1rem;
+        gap: 0.1rem 0.625rem;
+        border-bottom: 1px solid var(--c-border);
+    }
+    .product-table tbody tr:last-child { border-bottom: none; }
+    .product-table tbody tr:hover { background: #f8fafc; }
+
+    .product-table tbody td {
+        padding: 0;
+        border: none;
+        vertical-align: top;
+    }
+
+    /* Name + category */
+    .product-table tbody td:nth-child(1) { grid-column: 1; grid-row: 1; }
+
+    /* Type — shown inline below name */
+    .product-table tbody td:nth-child(2) {
+        grid-column: 1;
+        grid-row: 2;
+        font-size: 0.72rem;
+        color: var(--c-muted);
+        font-weight: 500;
+        padding-top: 0.1rem;
+    }
+
+    /* SKU — hidden (already in name meta area if needed) */
+    .product-table tbody td:nth-child(3) { display: none; }
+
+    /* Price */
+    .product-table tbody td:nth-child(4) {
+        grid-column: 2;
+        grid-row: 1;
+        text-align: right;
+        font-weight: 700;
+        font-size: 0.95rem;
+        white-space: nowrap;
+    }
+
+    /* Status */
+    .product-table tbody td:nth-child(5) {
+        grid-column: 2;
+        grid-row: 2;
+        display: flex;
+        justify-content: flex-end;
+        padding-top: 0.15rem;
+    }
+
+    /* Actions row */
+    .product-table tbody td.table-actions {
+        grid-column: 1 / -1;
+        grid-row: 3;
+        justify-content: flex-start;
+        padding-top: 0.5rem;
+        margin-top: 0.35rem;
+        border-top: 1px solid rgba(226, 232, 240, 0.6);
+    }
+
+    /* Empty state */
+    .product-table tbody td.empty-state { grid-column: 1 / -1; }
+
+    /* Pagination tighter */
+    .pagination { flex-direction: column; align-items: flex-start; gap: 0.5rem; }
 }
 </style>

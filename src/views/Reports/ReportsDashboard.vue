@@ -552,7 +552,7 @@
                         No sales data yet.
                     </div>
                     <div v-else class="table-wrap">
-                        <table class="low-stock-table table-compact table-compact--bordered">
+                        <table class="low-stock-table table-compact table-compact--bordered table--employee">
                             <thead>
                                 <tr>
                                     <th>Staff</th>
@@ -1541,6 +1541,7 @@ watch(
     display: flex;
     flex-direction: column;
     gap: 1.25rem;
+    min-width: 0; /* grid item must opt out of min-width:auto so overflow-x:auto works */
 }
 
 .report-card--wide {
@@ -1839,6 +1840,7 @@ watch(
 ============================================================ */
 .table-wrap {
     overflow-x: auto;
+    min-width: 0; /* flex item must opt out of min-width:auto so overflow-x:auto fires */
 }
 
 .low-stock-table {
@@ -2006,35 +2008,61 @@ watch(
    RESPONSIVE
 ============================================================ */
 @media (max-width: 960px) {
-    .reports-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .report-card--wide {
-        grid-column: span 1;
-    }
-
-    .charts-row {
-        grid-template-columns: 1fr;
-    }
+    .reports-grid { grid-template-columns: 1fr; }
+    .report-card--wide { grid-column: span 1; }
+    .charts-row { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 640px) {
-    .reports-page {
-        padding: 1.25rem 1rem 2.5rem;
+    /* ── Page & shell ── */
+    .reports-page { padding: 1rem 0.875rem 2.5rem; }
+    .reports-shell { gap: 1.25rem; }
+
+    /* ── Header ── */
+    .reports-header { flex-direction: column; gap: 0.875rem; }
+    .reports-title h1 { font-size: 1.4rem; }
+    .reports-title p { font-size: 0.84rem; }
+
+    /* ── Controls ── */
+    .reports-controls { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+    .date-popover {
+        left: 0;
+        transform: none;
+        width: min(260px, calc(100vw - 1.75rem));
     }
 
-    .reports-title h1 {
-        font-size: 1.5rem;
+    /* ── KPI strip → 2-column grid ── */
+    .reports-kpis {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.5rem;
     }
+    .kpi-card { min-width: 0; padding: 0.75rem 0.875rem; }
+    .kpi-value { font-size: 1.25rem; }
 
-    .reports-controls {
-        flex-direction: column;
-        align-items: flex-start;
-    }
+    /* ── Cards ── */
+    .report-card { padding: 1rem; gap: 1rem; border-radius: 12px; }
+    .charts-row.report-card { padding: 0.875rem; }
+    .card-header h2 { font-size: 0.9rem; }
+    .card-header p { font-size: 0.78rem; }
 
-    .kpi-card {
-        min-width: 110px;
-    }
+    /* ── Supplier metrics → 2 columns ── */
+    .supplier-metrics { grid-template-columns: 1fr 1fr; }
+    .metric-card strong { font-size: 0.95rem; }
+
+    /* ── Charts ── */
+    .chart-panel { min-height: 120px; }
+    .y-axis { min-width: 30px; font-size: 0.55rem; }
+    .chart-labels { padding-left: 36px; font-size: 0.6rem; }
+
+    /* ── Tables: min-width so overflow-x actually scrolls ── */
+    .low-stock-table { min-width: 360px; }
+    .low-stock-table.table-compact--bordered { min-width: 440px; }
+    .low-stock-table.table--employee { min-width: 640px; }
+
+    /* ── List items ── */
+    .top-item, .daypart-row { padding: 0.55rem 0.7rem; }
+    .item-name { font-size: 0.82rem; }
+    .item-metrics strong { font-size: 0.85rem; }
 }
 </style>

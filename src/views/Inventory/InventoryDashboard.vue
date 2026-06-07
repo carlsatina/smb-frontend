@@ -651,6 +651,7 @@ watch(
     display: flex;
     flex-direction: column;
     gap: 1rem;
+    min-width: 0;
 }
 
 .panel-state {
@@ -665,7 +666,7 @@ watch(
 /* ============================================================
    TABLE
 ============================================================ */
-.table-wrap { overflow-x: auto; }
+.table-wrap { overflow-x: auto; min-width: 0; }
 
 .inventory-table {
     width: 100%;
@@ -1044,20 +1045,92 @@ watch(
    RESPONSIVE
 ============================================================ */
 @media (max-width: 960px) {
-    .inventory-content {
-        grid-template-columns: 1fr;
-    }
+    .inventory-content { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 768px) {
-    .inv-toolbar { flex-direction: column; align-items: flex-start; }
-    .toolbar-right { width: 100%; justify-content: flex-end; }
+    .inv-toolbar { flex-direction: column; align-items: stretch; }
+    .toolbar-left { flex-direction: column; align-items: stretch; }
+    .toolbar-right {
+        width: 100%;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.5rem;
+    }
+    .toolbar-right .ghost-button,
+    .toolbar-right .primary-button {
+        width: 100%;
+        justify-content: center;
+    }
     .search-input { min-width: 0; width: 100%; }
+    .filter-pills { width: 100%; }
 }
 
 @media (max-width: 640px) {
-    .inventory-page { padding: 1.25rem 1rem 2.5rem; }
+    .inventory-page { padding: 1rem 0.875rem 2.5rem; }
     .inventory-title h1 { font-size: 1.5rem; }
-    .filter-pills { flex-wrap: wrap; }
+    .inventory-panel { padding: 0 0 1rem; border-radius: 12px; }
+
+    /* ── Table → card view ── */
+    .inventory-table thead { display: none; }
+    .inventory-table,
+    .inventory-table tbody { display: block; }
+
+    .inventory-table tbody tr {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        grid-template-rows: auto auto auto;
+        padding: 0.875rem 1rem;
+        gap: 0.1rem 0.625rem;
+        border-bottom: 1px solid var(--c-border);
+    }
+    .inventory-table tbody tr:last-child { border-bottom: none; }
+    .inventory-table tbody tr.row-low-stock { background: rgba(251, 191, 36, 0.04); }
+    .inventory-table tbody tr.row-out-of-stock { background: rgba(239, 68, 68, 0.04); }
+
+    .inventory-table tbody td {
+        padding: 0;
+        border: none;
+        vertical-align: top;
+    }
+
+    /* Item name */
+    .inventory-table tbody td:nth-child(1) { grid-column: 1; grid-row: 1; }
+
+    /* Type — shown inline */
+    .inventory-table tbody td:nth-child(2) {
+        grid-column: 1;
+        grid-row: 2;
+        font-size: 0.72rem;
+        color: var(--c-muted);
+        font-weight: 500;
+        padding-top: 0.1rem;
+    }
+
+    /* Unit — hide (shown in stock label) */
+    .inventory-table tbody td:nth-child(3) { display: none; }
+
+    /* Stock bar — full width below name */
+    .inventory-table tbody td:nth-child(4) {
+        grid-column: 1 / -1;
+        grid-row: 3;
+        padding-top: 0.5rem;
+    }
+    .inventory-table tbody td:nth-child(4) .stock-bar-wrap { max-width: none; }
+
+    /* Status */
+    .inventory-table tbody td:nth-child(5) {
+        grid-column: 2;
+        grid-row: 1;
+        display: flex;
+        justify-content: flex-end;
+        align-items: flex-start;
+    }
+
+    /* Empty state */
+    .inventory-table tbody td.empty-state { grid-column: 1 / -1; }
+
+    /* Pagination tighter */
+    .pagination { flex-direction: column; align-items: flex-start; gap: 0.5rem; }
 }
 </style>
