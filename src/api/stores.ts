@@ -1,3 +1,4 @@
+import type { PlanTier } from '@/utils/planAccess';
 import { apiClient } from './client';
 
 export const listStores = () => {
@@ -5,6 +6,7 @@ export const listStores = () => {
         stores: Array<{
             id: string;
             name: string;
+            storeType: 'RETAIL' | 'WAREHOUSE';
             timezone: string;
             currency: string;
             allowNegativeStock: boolean;
@@ -14,7 +16,7 @@ export const listStores = () => {
             defaultTaxRate: number;
             defaultDiscount: number;
             role: string;
-            ownerPlanTier: string;
+            ownerPlanTier: PlanTier;
             ownerSubscriptionActive: boolean;
         }>;
     }>('/api/v1/stores');
@@ -39,6 +41,7 @@ export const updateStore = (
     storeId: string,
     payload: {
         name?: string;
+        storeType?: 'RETAIL' | 'WAREHOUSE';
         timezone?: string;
         currency?: string;
         allowNegativeStock?: boolean;

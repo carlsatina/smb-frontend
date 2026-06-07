@@ -96,8 +96,18 @@
                     <option value="GROWTH">Growth</option>
                 </select>
 
-                <label class="au-label au-label--mt">Expiry (optional)</label>
-                <input v-model="grantModal.until" type="date" class="au-input" placeholder="Leave blank for permanent" />
+                <label class="au-label au-label--mt">Expiry</label>
+                <label class="au-forever-toggle">
+                    <input type="checkbox" v-model="grantModal.forever" />
+                    <span class="au-forever-track"></span>
+                    <span class="au-forever-label">No expiry — grant forever</span>
+                </label>
+                <input
+                    v-if="!grantModal.forever"
+                    v-model="grantModal.until"
+                    type="date"
+                    class="au-input au-input--mt"
+                />
 
                 <div class="au-modal-footer">
                     <button class="au-btn au-btn--ghost" @click="grantModal.open = false">Cancel</button>
@@ -132,6 +142,7 @@ const grantModal = reactive({
     user: null as AdminUser | null,
     plan: 'GROWTH' as PlanTier,
     until: '',
+    forever: true,
     saving: false,
 });
 
@@ -177,6 +188,7 @@ const openGrantModal = (user: AdminUser) => {
     grantModal.user = user;
     grantModal.plan = 'GROWTH';
     grantModal.until = '';
+    grantModal.forever = true;
     grantModal.open = true;
 };
 
@@ -184,9 +196,9 @@ const submitGrant = async () => {
     if (!grantModal.user) return;
     grantModal.saving = true;
     try {
-        const grantedUntil = grantModal.until
-            ? new Date(grantModal.until).toISOString()
-            : null;
+        const grantedUntil = grantModal.forever || !grantModal.until
+            ? null
+            : new Date(grantModal.until).toISOString();
         const updated = await grantUserPlan(grantModal.user.id, grantModal.plan, grantedUntil);
         const idx = users.value.findIndex((u) => u.id === grantModal.user!.id);
         if (idx !== -1) Object.assign(users.value[idx], updated.user);
@@ -418,6 +430,61 @@ onMounted(() => loadPage(1));
     color: #0f172a;
     background: #f8fafc;
     box-sizing: border-box;
+}
+
+.au-input--mt { margin-top: 0.5rem; }
+
+.au-forever-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    cursor: pointer;
+    margin-top: 0.4rem;
+    user-select: none;
+}
+
+.au-forever-toggle input[type="checkbox"] {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.au-forever-track {
+    position: relative;
+    width: 36px;
+    height: 20px;
+    background: #e2e8f0;
+    border-radius: 999px;
+    flex-shrink: 0;
+    transition: background 0.15s;
+}
+
+.au-forever-track::after {
+    content: '';
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #fff;
+    transition: transform 0.15s;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+}
+
+.au-forever-toggle input:checked ~ .au-forever-track {
+    background: #0d9488;
+}
+
+.au-forever-toggle input:checked ~ .au-forever-track::after {
+    transform: translateX(16px);
+}
+
+.au-forever-label {
+    font-size: 0.875rem;
+    color: #0f172a;
+    font-weight: 500;
 }
 
 .au-modal-footer {

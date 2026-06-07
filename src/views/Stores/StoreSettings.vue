@@ -44,6 +44,14 @@
                         </label>
 
                         <label class="st-field">
+                            Store type
+                            <select v-model="storeForm.storeType" :disabled="!canEdit">
+                                <option value="RETAIL">Retail (point of sale)</option>
+                                <option value="WAREHOUSE">Warehouse (stock holding)</option>
+                            </select>
+                        </label>
+
+                        <label class="st-field">
                             Timezone
                             <select v-model="storeForm.timezone" :disabled="!canEdit">
                                 <option v-for="timezone in timezoneOptions" :key="timezone" :value="timezone">
@@ -274,6 +282,7 @@ const { showToast } = useToast();
 
 const storeForm = reactive({
     name: '',
+    storeType: 'RETAIL' as 'RETAIL' | 'WAREHOUSE',
     timezone: 'Asia/Manila',
     currency: 'PHP',
     allowNegativeStock: false,
@@ -357,6 +366,7 @@ const normalizeOptions = (options: string[], fallback: string[]) => {
 const resetForm = () => {
     if (!currentStore.value) return;
     storeForm.name = currentStore.value.name;
+    storeForm.storeType = currentStore.value.storeType ?? 'RETAIL';
     storeForm.timezone = currentStore.value.timezone;
     storeForm.currency = currentStore.value.currency;
     storeForm.allowNegativeStock = currentStore.value.allowNegativeStock;

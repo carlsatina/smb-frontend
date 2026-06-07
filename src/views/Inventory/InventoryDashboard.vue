@@ -73,6 +73,14 @@
                             <button class="ghost-button" :disabled="!storeContext.currentStoreId" @click="goToMovements">
                                 Movement history
                             </button>
+                            <button
+                                v-if="otherStores.length > 0 && canAdjust"
+                                class="ghost-button ghost-button--transfer"
+                                :disabled="!storeContext.currentStoreId"
+                                @click="openTransferModal"
+                            >
+                                Transfer stock
+                            </button>
                             <button class="primary-button" :disabled="!storeContext.currentStoreId || !canAdjust" @click="goToAdjustments">
                                 Stock adjustment
                             </button>
@@ -194,6 +202,13 @@
                     <div class="insight-card insight-card--actions">
                         <h3>Quick actions</h3>
                         <button class="secondary-button" :disabled="!canAdjust" @click="goToAdjustments">New adjustment</button>
+                        <button
+                            v-if="otherStores.length > 0 && canAdjust"
+                            class="secondary-button"
+                            @click="openTransferModal"
+                        >
+                            Transfer stock
+                        </button>
                         <button class="secondary-button" @click="goToMovements">Movement history</button>
                         <button class="secondary-button" @click="goToProducts">Manage products</button>
                         <button v-if="showIngredients" class="secondary-button" @click="goToIngredients">Manage ingredients</button>
@@ -202,12 +217,120 @@
             </div>
         </div>
     </section>
+
+    <!-- TRANSFER MODAL -->
+    <Teleport to="body">
+        <div v-if="showTransferModal" class="modal-backdrop" @click.self="closeTransferModal">
+            <div class="modal-box modal-box--wide" role="dialog" aria-modal="true">
+                <div class="modal-header">
+                    <h2>Transfer stock</h2>
+                    <button class="modal-close" @click="closeTransferModal" aria-label="Close">
+                        <mdicon name="close" size="20" />
+                    </button>
+                </div>
+
+                <div class="modal-body">
+                    <!-- Destination -->
+                    <div class="form-field">
+                        <label>Destination store</label>
+                        <select v-model="transferDestStoreId" class="form-select">
+                            <option value="" disabled>Select destination…</option>
+                            <option v-for="s in otherStores" :key="s.id" :value="s.id">
+                                {{ s.name }}{{ s.storeType === 'WAREHOUSE' ? ' (Warehouse)' : '' }}
+                            </option>
+                        </select>
+                    </div>
+
+                    <!-- Item cart -->
+                    <div class="form-field">
+                        <div class="cart-header">
+                            <label>Items to transfer</label>
+                            <span class="cart-count" v-if="transferCart.length > 0">{{ transferCart.length }} item{{ transferCart.length !== 1 ? 's' : '' }}</span>
+                        </div>
+
+                        <!-- Cart rows -->
+                        <div v-if="transferCart.length > 0" class="cart-list">
+                            <div
+                                v-for="(row, idx) in transferCart"
+                                :key="`${row.item.itemType}-${row.item.itemId}`"
+                                class="cart-row"
+                            >
+                                <div class="cart-row-info">
+                                    <span class="cart-row-name">{{ row.item.name }}</span>
+                                    <span class="cart-row-avail">{{ formatQty(row.item.currentQty) }} {{ row.item.unit }} available</span>
+                                </div>
+                                <input
+                                    v-model.number="row.qty"
+                                    type="number"
+                                    class="cart-qty-input"
+                                    min="0.001"
+                                    step="any"
+                                    placeholder="Qty"
+                                    :class="{ 'cart-qty-input--error': cartRowError(row) }"
+                                />
+                                <button class="cart-remove" @click="removeCartRow(idx)" title="Remove">
+                                    <mdicon name="close" size="16" />
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Add item search -->
+                        <div class="search-select-wrap">
+                            <input
+                                v-model="transferItemSearch"
+                                type="text"
+                                class="form-input"
+                                :placeholder="transferCart.length === 0 ? 'Search items to add…' : 'Add another item…'"
+                                @focus="transferItemDropdown = true"
+                                @blur="onTransferItemBlur"
+                            />
+                            <ul v-if="transferItemDropdown && availableTransferItems.length > 0" class="dropdown-list">
+                                <li
+                                    v-for="item in availableTransferItems.slice(0, 12)"
+                                    :key="`${item.itemType}-${item.itemId}`"
+                                    @mousedown.prevent="addToCart(item)"
+                                    class="dropdown-item"
+                                >
+                                    <span class="di-name">{{ item.name }}</span>
+                                    <span class="di-meta">{{ formatQty(item.currentQty) }} {{ item.unit }}</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Note -->
+                    <div class="form-field">
+                        <label>Note <span class="label-opt">(optional)</span></label>
+                        <textarea
+                            v-model="transferNote"
+                            class="form-textarea"
+                            rows="2"
+                            placeholder="Reason or reference…"
+                        ></textarea>
+                    </div>
+
+                    <p v-if="transferError" class="modal-error">{{ transferError }}</p>
+                </div>
+
+                <div class="modal-footer">
+                    <button class="ghost-button" @click="closeTransferModal">Cancel</button>
+                    <button
+                        class="primary-button"
+                        :disabled="!canSubmitTransfer || isTransferring"
+                        @click="submitTransfer"
+                    >
+                        {{ isTransferring ? 'Transferring…' : `Transfer ${transferCart.length > 0 ? transferCart.length + ' item' + (transferCart.length !== 1 ? 's' : '') : ''}` }}
+                    </button>
+                </div>
+            </div>
+        </div>
+    </Teleport>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { listStock, StockItem } from '@/api/inventory';
+import { batchTransferStock, listStock, StockItem } from '@/api/inventory';
 import { useStoreContextStore } from '@/stores/storeContext';
 import { canAccess } from '@/utils/roleAccess';
 import { hasPlanFeature } from '@/utils/planAccess';
@@ -301,6 +424,99 @@ const currentStoreLabel = computed(() => {
 });
 
 const canAdjust = computed(() => canAccess(storeContext.currentStore?.role, 'inventoryAdjustments'));
+
+const otherStores = computed(() =>
+    storeContext.stores.filter((s) => s.id !== storeContext.currentStoreId)
+);
+
+// ── Transfer modal ──────────────────────────────────────────
+type CartRow = { item: StockItem; qty: number | null };
+
+const showTransferModal = ref(false);
+const transferItemSearch = ref('');
+const transferItemDropdown = ref(false);
+const transferDestStoreId = ref('');
+const transferCart = ref<CartRow[]>([]);
+const transferNote = ref('');
+const isTransferring = ref(false);
+const transferError = ref('');
+
+const cartItemIds = computed(() => new Set(transferCart.value.map((r) => `${r.item.itemType}-${r.item.itemId}`)));
+
+const availableTransferItems = computed(() => {
+    const q = transferItemSearch.value.trim().toLowerCase();
+    return stockItems.value.filter((item) => {
+        if (cartItemIds.value.has(`${item.itemType}-${item.itemId}`)) return false;
+        if (!q) return true;
+        return item.name.toLowerCase().includes(q) || (item.sku || '').toLowerCase().includes(q);
+    });
+});
+
+const cartRowError = (row: CartRow) => {
+    if (row.qty === null || row.qty === undefined) return false;
+    const store = storeContext.currentStore;
+    if (store?.allowNegativeStock) return false;
+    return row.qty > row.item.currentQty;
+};
+
+const canSubmitTransfer = computed(() => {
+    if (!transferDestStoreId.value || transferCart.value.length === 0) return false;
+    return transferCart.value.every(
+        (r) => typeof r.qty === 'number' && r.qty > 0 && !cartRowError(r)
+    );
+});
+
+const openTransferModal = () => {
+    transferItemSearch.value = '';
+    transferItemDropdown.value = false;
+    transferDestStoreId.value = '';
+    transferCart.value = [];
+    transferNote.value = '';
+    transferError.value = '';
+    showTransferModal.value = true;
+};
+
+const closeTransferModal = () => {
+    showTransferModal.value = false;
+};
+
+const addToCart = (item: StockItem) => {
+    transferCart.value.push({ item, qty: null });
+    transferItemSearch.value = '';
+    transferItemDropdown.value = false;
+};
+
+const removeCartRow = (idx: number) => {
+    transferCart.value.splice(idx, 1);
+};
+
+const onTransferItemBlur = () => {
+    setTimeout(() => { transferItemDropdown.value = false; }, 150);
+};
+
+const submitTransfer = async () => {
+    if (!canSubmitTransfer.value || !storeContext.currentStoreId) return;
+    transferError.value = '';
+    isTransferring.value = true;
+    try {
+        await batchTransferStock(storeContext.currentStoreId, {
+            destinationStoreId: transferDestStoreId.value,
+            items: transferCart.value.map((r) => ({
+                itemType: r.item.itemType,
+                itemId: r.item.itemId,
+                qty: r.qty!,
+            })),
+            note: transferNote.value || null,
+        });
+        showTransferModal.value = false;
+        await loadStock();
+    } catch (err: unknown) {
+        const e = err as { message?: string };
+        transferError.value = e?.message ?? 'Transfer failed. Please try again.';
+    } finally {
+        isTransferring.value = false;
+    }
+};
 
 const formatQty = (value: number) => {
     if (!Number.isFinite(value)) return '0';
@@ -1133,4 +1349,305 @@ watch(
     /* Pagination tighter */
     .pagination { flex-direction: column; align-items: flex-start; gap: 0.5rem; }
 }
+
+/* ============================================================
+   TRANSFER BUTTON VARIANT
+============================================================ */
+.ghost-button--transfer {
+    border-color: #6366f1;
+    color: #4338ca;
+}
+.ghost-button--transfer:hover:not(:disabled) {
+    border-color: #4338ca;
+    background: rgba(99, 102, 241, 0.06);
+    color: #3730a3;
+}
+
+/* ============================================================
+   TRANSFER MODAL
+============================================================ */
+.modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.45);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    padding: 1rem;
+}
+
+.modal-box {
+    background: #ffffff;
+    border-radius: 18px;
+    box-shadow: 0 24px 60px rgba(15, 23, 42, 0.18);
+    width: 100%;
+    max-width: 480px;
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100vh - 2rem);
+    overflow-y: auto;
+}
+
+.modal-box--wide {
+    max-width: 600px;
+}
+
+.modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.5rem 1.75rem 0;
+}
+
+.modal-header h2 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--c-text);
+    margin: 0;
+}
+
+.modal-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: none;
+    background: #f1f5f9;
+    color: var(--c-muted);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.15s, color 0.15s;
+}
+.modal-close:hover { background: #e2e8f0; color: var(--c-text); }
+
+.modal-body {
+    padding: 1.25rem 1.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.modal-footer {
+    padding: 0 1.75rem 1.5rem;
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+}
+
+.form-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.form-field label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--c-text);
+}
+
+.label-opt {
+    font-weight: 400;
+    color: var(--c-muted);
+}
+
+.form-input,
+.form-select,
+.form-textarea {
+    border: 1.5px solid var(--c-border);
+    border-radius: 8px;
+    padding: 0.6rem 0.875rem;
+    font-size: 0.875rem;
+    font-family: 'Inter', -apple-system, sans-serif;
+    color: var(--c-text);
+    background: var(--c-surface);
+    transition: border-color 0.15s, box-shadow 0.15s;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.form-input:focus,
+.form-select:focus,
+.form-textarea:focus {
+    outline: none;
+    border-color: var(--c-accent);
+    box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.12);
+}
+
+.form-textarea { resize: vertical; }
+
+.field-hint {
+    font-size: 0.78rem;
+    color: var(--c-muted);
+    margin: 0;
+}
+
+.search-select-wrap {
+    position: relative;
+}
+
+.dropdown-list {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    background: var(--c-surface);
+    border: 1.5px solid var(--c-border);
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+    list-style: none;
+    margin: 0;
+    padding: 0.35rem;
+    z-index: 10;
+    max-height: 220px;
+    overflow-y: auto;
+}
+
+.dropdown-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem 0.75rem;
+    border-radius: 7px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    gap: 0.5rem;
+    transition: background 0.1s;
+}
+.dropdown-item:hover { background: #f1f5f9; }
+
+.di-name {
+    font-weight: 600;
+    color: var(--c-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.di-meta {
+    font-size: 0.75rem;
+    color: var(--c-muted);
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.modal-error {
+    font-size: 0.82rem;
+    color: #b91c1c;
+    background: #fef2f2;
+    border: 1px solid #fca5a5;
+    border-radius: 8px;
+    padding: 0.6rem 0.875rem;
+    margin: 0;
+}
+
+/* ============================================================
+   TRANSFER CART
+============================================================ */
+.cart-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.35rem;
+}
+
+.cart-count {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--c-accent-dark);
+    background: rgba(13, 148, 136, 0.1);
+    padding: 0.15rem 0.55rem;
+    border-radius: 999px;
+}
+
+.cart-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    margin-bottom: 0.5rem;
+    border: 1.5px solid var(--c-border);
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.cart-row {
+    display: grid;
+    grid-template-columns: 1fr 90px 32px;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 0.75rem;
+    background: #f8fafc;
+    border-bottom: 1px solid var(--c-border);
+}
+
+.cart-row:last-child { border-bottom: none; }
+
+.cart-row-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    min-width: 0;
+}
+
+.cart-row-name {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--c-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.cart-row-avail {
+    font-size: 0.72rem;
+    color: var(--c-muted);
+}
+
+.cart-qty-input {
+    border: 1.5px solid var(--c-border);
+    border-radius: 7px;
+    padding: 0.4rem 0.5rem;
+    font-size: 0.875rem;
+    font-family: 'Inter', -apple-system, sans-serif;
+    color: var(--c-text);
+    background: #fff;
+    text-align: right;
+    width: 100%;
+    box-sizing: border-box;
+    transition: border-color 0.15s;
+}
+
+.cart-qty-input:focus {
+    outline: none;
+    border-color: var(--c-accent);
+    box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.12);
+}
+
+.cart-qty-input--error {
+    border-color: #ef4444;
+    background: #fef2f2;
+}
+.cart-qty-input--error:focus {
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.12);
+}
+
+.cart-remove {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    border: none;
+    background: transparent;
+    color: var(--c-muted);
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s;
+    flex-shrink: 0;
+}
+.cart-remove:hover { background: #fef2f2; color: #ef4444; }
 </style>

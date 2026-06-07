@@ -17,8 +17,12 @@ export type AdminUser = {
 export type AdminStore = {
     id: string;
     name: string;
+    storeType: 'RETAIL' | 'WAREHOUSE';
     currency: string;
     createdAt: string;
+    totalSales: number;
+    totalReceipts: number;
+    salesThisMonth: number;
     owner: {
         id: string;
         email: string;
@@ -41,10 +45,14 @@ export const getAdminUsers = (page = 1) =>
         `/api/v1/admin/users?page=${page}`
     );
 
-export const getAdminStores = (page = 1) =>
-    apiClient.request<{ stores: AdminStore[]; total: number; page: number; pageSize: number }>(
-        `/api/v1/admin/stores?page=${page}`
+export const getAdminStores = (page = 1, month?: number, year?: number) => {
+    const params = new URLSearchParams({ page: String(page) });
+    if (month) params.set('month', String(month));
+    if (year) params.set('year', String(year));
+    return apiClient.request<{ stores: AdminStore[]; total: number; page: number; pageSize: number; month: number; year: number }>(
+        `/api/v1/admin/stores?${params}`
     );
+};
 
 export type PlatformStats = {
     totalUsers: number;

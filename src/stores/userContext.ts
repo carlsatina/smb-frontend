@@ -22,12 +22,17 @@ export const useUserContextStore = defineStore('userContext', {
     }),
     getters: {
         effectivePlan: (state): PlanTier => {
-            if (state.grantedPlan) {
-                if (!state.grantedUntil || new Date(state.grantedUntil) > new Date()) {
-                    return state.grantedPlan;
-                }
+            const TIER_ORDER: Record<PlanTier, number> = { STARTER: 0, STANDARD: 1, GROWTH: 2 };
+            const grantTier =
+                state.grantedPlan &&
+                (!state.grantedUntil || new Date(state.grantedUntil) > new Date())
+                    ? state.grantedPlan
+                    : null;
+            const paidTier = state.subscriptionActive && state.planTier ? state.planTier : null;
+            if (grantTier && paidTier) {
+                return TIER_ORDER[grantTier] >= TIER_ORDER[paidTier] ? grantTier : paidTier;
             }
-            return state.planTier ?? 'STARTER';
+            return grantTier ?? paidTier ?? 'STARTER';
         },
     },
     actions: {

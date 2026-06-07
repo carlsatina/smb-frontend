@@ -145,6 +145,7 @@
                             <div class="store-card-header">
                                 <div class="store-title-row">
                                     <h3>{{ store.name }}</h3>
+                                    <span v-if="store.storeType === 'WAREHOUSE'" class="store-warehouse-badge">Warehouse</span>
                                 </div>
                                 <div class="store-meta-row">
                                     <span class="store-pill">{{ store.role }}</span>
@@ -964,6 +965,19 @@ watch(
 .store-chip {
     font-size: 0.72rem;
     color: var(--c-muted);
+    flex-shrink: 0;
+}
+
+.store-warehouse-badge {
+    margin-left: 0.5rem;
+    padding: 0.15rem 0.55rem;
+    border-radius: 999px;
+    font-size: 0.62rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    background: rgba(99, 102, 241, 0.1);
+    color: #4338ca;
     flex-shrink: 0;
 }
 

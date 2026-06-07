@@ -268,10 +268,10 @@ const isSubmitting = ref(false);
 const displaySettingsRef = ref<HTMLDetailsElement | null>(null);
 
 const displaySettings = reactive<DisplaySettings>({
-    showSku: true,
-    showType: true,
+    showSku: false,
+    showType: false,
     showCategory: true,
-    useCategoryColor: false,
+    useCategoryColor: true,
     categoryColors: {} as Record<string, string>,
 });
 
@@ -1009,6 +1009,7 @@ watch(
     display: flex;
     flex-direction: column;
     gap: 0.4rem;
+    overflow: hidden;
     transition: border-color 0.15s, box-shadow 0.15s, transform 0.12s;
     cursor: pointer;
 }
@@ -1046,10 +1047,11 @@ watch(
 
 .product-card-top {
     display: flex;
-    justify-content: space-between;
+    flex-wrap: wrap;
     align-items: center;
     gap: 0.4rem;
     min-height: 18px;
+    overflow: hidden;
 }
 
 .product-pill {

@@ -2,9 +2,12 @@ import { defineStore } from 'pinia';
 import { listStores } from '@/api/stores';
 import type { PlanTier } from '@/utils/planAccess';
 
+export type StoreType = 'RETAIL' | 'WAREHOUSE';
+
 export type StoreSummary = {
     id: string;
     name: string;
+    storeType: StoreType;
     timezone: string;
     currency: string;
     allowNegativeStock: boolean;

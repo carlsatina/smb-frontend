@@ -192,6 +192,18 @@
                                 </span>
                             </button>
 
+                            <!-- Manage / create stores -->
+                            <RouterLink
+                                to="/stores"
+                                class="topnav__pd-item"
+                                @click="closeProfile"
+                            >
+                                <span class="topnav__pd-item-icon">
+                                    <mdicon name="store-plus-outline" size="16" />
+                                </span>
+                                <span class="topnav__pd-item-label">Manage Stores</span>
+                            </RouterLink>
+
                             <RouterLink
                                 to="/account/plan"
                                 class="topnav__pd-item"
@@ -308,7 +320,10 @@
                                 <mdicon name="store-outline" size="20" />
                             </span>
                             <span class="ss-store-info">
-                                <span class="ss-store-name">{{ store.name }}</span>
+                                <span class="ss-store-name">
+                                    {{ store.name }}
+                                    <span v-if="store.storeType === 'WAREHOUSE'" class="ss-warehouse-tag">WH</span>
+                                </span>
                                 <span class="ss-store-meta">{{ store.currency }} &bull; {{ store.role }}</span>
                             </span>
                             <span v-if="store.id === currentStoreId" class="ss-store-check">
@@ -347,11 +362,12 @@ const showVerifyEmail = computed(() => Boolean(userContext.profile) && !isEmailV
 // ── Store / nav ───────────────────────────────────────────
 const currentStoreId = computed(() => storeContext.currentStoreId);
 const currentStoreName = computed(() => storeContext.currentStore?.name ?? 'No store');
+const isWarehouse = computed(() => storeContext.currentStore?.storeType === 'WAREHOUSE');
 const canViewProducts = computed(() => canAccess(storeContext.currentStore?.role, 'products'));
 const canViewInventory = computed(() => canAccess(storeContext.currentStore?.role, 'inventory'));
 const canViewPurchaseOrders = computed(() => canAccess(storeContext.currentStore?.role, 'purchaseOrders'));
 const canViewSuppliers = computed(() => canAccess(storeContext.currentStore?.role, 'purchaseOrders'));
-const canViewPos = computed(() => canAccess(storeContext.currentStore?.role, 'salesPos'));
+const canViewPos = computed(() => !isWarehouse.value && canAccess(storeContext.currentStore?.role, 'salesPos'));
 const canViewReports = computed(() => canAccess(storeContext.currentStore?.role, 'reports'));
 const canViewSettings = computed(() => canAccess(storeContext.currentStore?.role, 'storeSettings'));
 const planKnown = computed(() => userContext.planTier !== null);
@@ -1096,9 +1112,23 @@ onBeforeUnmount(() => {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
 }
 
 .ss-store--active .ss-store-name { color: #fff; }
+
+.ss-warehouse-tag {
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    padding: 0.1rem 0.4rem;
+    border-radius: 4px;
+    background: rgba(99, 102, 241, 0.25);
+    color: #a5b4fc;
+    flex-shrink: 0;
+}
 
 .ss-store-meta {
     font-size: 0.72rem;

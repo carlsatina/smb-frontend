@@ -33,6 +33,18 @@ export type MovementRecord = {
         fullName?: string | null;
         email: string;
     } | null;
+    counterpartStoreId?: string | null;
+    counterpartStoreName?: string | null;
+    counterpartStoreType?: string | null;
+    counterpartMovementId?: string | null;
+};
+
+export type TransferStockPayload = {
+    destinationStoreId: string;
+    itemType: 'PRODUCT' | 'INGREDIENT';
+    itemId: string;
+    qty: number;
+    note?: string | null;
 };
 
 export type StockAdjustmentPayload = {
@@ -111,4 +123,32 @@ export const createStockAdjustment = (storeId: string, payload: StockAdjustmentP
             body: payload,
         }
     );
+};
+
+export const transferStock = (storeId: string, payload: TransferStockPayload) => {
+    return apiClient.request<{
+        out: MovementRecord;
+        inMovementId: string;
+        destinationStoreName: string;
+    }>(`/api/v1/stores/${storeId}/inventory/transfers`, {
+        method: 'POST',
+        body: payload,
+    });
+};
+
+export type BatchTransferPayload = {
+    destinationStoreId: string;
+    items: Array<{ itemType: 'PRODUCT' | 'INGREDIENT'; itemId: string; qty: number }>;
+    note?: string | null;
+};
+
+export const batchTransferStock = (storeId: string, payload: BatchTransferPayload) => {
+    return apiClient.request<{
+        transferred: number;
+        destinationStoreName: string;
+        movements: MovementRecord[];
+    }>(`/api/v1/stores/${storeId}/inventory/transfers/batch`, {
+        method: 'POST',
+        body: payload,
+    });
 };

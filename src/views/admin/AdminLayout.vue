@@ -13,6 +13,10 @@
                     <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/></svg>
                     Users
                 </RouterLink>
+                <RouterLink class="adm-nav-item" :to="{ name: 'admin-stores' }" active-class="adm-nav-item--active">
+                    <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4zm2 0v12h8V4H6zm2 2h4v2H8V6zm0 4h4v2H8v-2z" clip-rule="evenodd"/></svg>
+                    Stores
+                </RouterLink>
             </nav>
             <div class="adm-sidebar-footer">
                 <RouterLink class="adm-back-link" :to="{ name: 'stores' }">

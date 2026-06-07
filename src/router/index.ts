@@ -28,6 +28,7 @@ import { canAccess, FeatureKey, getDefaultRouteForRole } from '@/utils/roleAcces
 import AdminLayout from '@/views/admin/AdminLayout.vue'
 import AdminDashboard from '@/views/admin/AdminDashboard.vue'
 import AdminUsers from '@/views/admin/AdminUsers.vue'
+import AdminStores from '@/views/admin/AdminStores.vue'
 import AdminLogin from '@/views/admin/AdminLogin.vue'
 
 // Auth 
@@ -202,6 +203,11 @@ const routes: Array<RouteRecordRaw> = [
         name: 'admin-users',
         component: AdminUsers,
       },
+      {
+        path: 'stores',
+        name: 'admin-stores',
+        component: AdminStores,
+      },
     ],
   },
   {
@@ -302,6 +308,10 @@ router.beforeEach(async (to) => {
         return { name: fallbackRoute, params: { storeId } }
       }
       return { name: 'stores' }
+    }
+    const warehouseBlockedFeatures: string[] = ['salesPos', 'salesHistory']
+    if (store.storeType === 'WAREHOUSE' && warehouseBlockedFeatures.includes(feature as string)) {
+      return { name: 'inventory', params: { storeId } }
     }
   }
 
