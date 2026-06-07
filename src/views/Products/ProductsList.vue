@@ -68,6 +68,21 @@
                             />
                         </div>
                         <div class="toolbar-right">
+                            <template v-if="canImportExport && storeContext.currentStoreId">
+                                <button class="ghost-button" :disabled="isExporting" @click="handleExport">
+                                    {{ isExporting ? 'Exporting…' : 'Export CSV' }}
+                                </button>
+                                <button v-if="canWrite" class="ghost-button" @click="triggerImport">
+                                    Import CSV
+                                </button>
+                                <input
+                                    ref="importFileInput"
+                                    type="file"
+                                    accept=".csv,text/csv"
+                                    style="display:none"
+                                    @change="handleImportFileSelected"
+                                />
+                            </template>
                             <button
                                 v-if="canWrite"
                                 class="primary-button"
@@ -76,8 +91,19 @@
                             >
                                 + New product
                             </button>
-                            <span v-else-if="storeContext.currentStoreId" class="panel-note">View-only access</span>
+                            <span v-else-if="storeContext.currentStoreId && !canImportExport" class="panel-note">View-only access</span>
                         </div>
+                    </div>
+
+                    <!-- IMPORT RESULT -->
+                    <div v-if="importResult" class="import-result" :class="importResult.failed > 0 ? 'import-result--warn' : 'import-result--ok'">
+                        <div class="import-result__summary">
+                            <span>Import complete: <strong>{{ importResult.imported }}</strong> added{{ importResult.failed > 0 ? `, ${importResult.failed} failed` : '' }}.</span>
+                            <button class="import-result__close" @click="importResult = null">✕</button>
+                        </div>
+                        <ul v-if="importResult.errors.length > 0" class="import-result__errors">
+                            <li v-for="err in importResult.errors" :key="err.row">Row {{ err.row }}: {{ err.message }}</li>
+                        </ul>
                     </div>
 
                     <!-- TABLE PANEL -->
@@ -211,9 +237,11 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { deleteProduct, listProducts } from '@/api/products';
+import { deleteProduct, exportProducts, importProducts, ImportResult, listProducts } from '@/api/products';
 import { useStoreContextStore } from '@/stores/storeContext';
+import { useUserContextStore } from '@/stores/userContext';
 import { canAccess } from '@/utils/roleAccess';
+import { hasPlanFeature } from '@/utils/planAccess';
 import ConfirmModal from '@/components/ConfirmModal.vue';
 
 type ProductRow = {
@@ -231,6 +259,7 @@ type ProductRow = {
 const router = useRouter();
 const route = useRoute();
 const storeContext = useStoreContextStore();
+const userContext = useUserContextStore();
 const products = ref<ProductRow[]>([]);
 const isLoading = ref(false);
 const searchQuery = ref('');
@@ -239,10 +268,49 @@ const page = ref(1);
 const pageSize = ref(10);
 const pageSizeOptions = [10, 20, 50];
 const canWrite = computed(() => canAccess(storeContext.currentStore?.role, 'productsWrite'));
+const canImportExport = computed(() => hasPlanFeature(userContext.effectivePlan, 'importExport'));
 
 const showDeleteModal = ref(false);
 const productToDelete = ref<ProductRow | null>(null);
 const isDeleting = ref(false);
+const isExporting = ref(false);
+const importFileInput = ref<HTMLInputElement | null>(null);
+const importResult = ref<ImportResult | null>(null);
+
+const handleExport = async () => {
+    const storeId = storeContext.currentStoreId;
+    if (!storeId) return;
+    isExporting.value = true;
+    try {
+        const { blob, filename } = await exportProducts(storeId);
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(url);
+    } finally {
+        isExporting.value = false;
+    }
+};
+
+const triggerImport = () => {
+    importResult.value = null;
+    importFileInput.value?.click();
+};
+
+const handleImportFileSelected = async (event: Event) => {
+    const file = (event.target as HTMLInputElement).files?.[0];
+    if (!file || !storeContext.currentStoreId) return;
+    (event.target as HTMLInputElement).value = '';
+    try {
+        const result = await importProducts(storeContext.currentStoreId, file);
+        importResult.value = result;
+        if (result.imported > 0) await loadProducts();
+    } catch {
+        importResult.value = { imported: 0, failed: 1, errors: [{ row: 0, message: 'Upload failed. Check the file and try again.' }] };
+    }
+};
 
 const loadProducts = async () => {
     const storeId = storeContext.currentStoreId;
@@ -388,6 +456,19 @@ watch(() => storeContext.currentStoreId, async () => {
 
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+.import-result {
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    font-size: 0.875rem;
+    margin-bottom: 0.5rem;
+}
+.import-result--ok { background: #f0fdf4; border: 1px solid #86efac; color: #15803d; }
+.import-result--warn { background: #fffbeb; border: 1px solid #fcd34d; color: #92400e; }
+.import-result__summary { display: flex; justify-content: space-between; align-items: center; }
+.import-result__close { background: none; border: none; cursor: pointer; font-size: 1rem; opacity: 0.6; }
+.import-result__close:hover { opacity: 1; }
+.import-result__errors { margin: 0.5rem 0 0; padding-left: 1.25rem; display: flex; flex-direction: column; gap: 0.2rem; }
 
 /* ============================================================
    TOKENS

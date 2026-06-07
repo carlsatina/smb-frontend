@@ -126,3 +126,18 @@ export const voidSale = async (storeId: string, saleId: string) => {
         method: 'POST',
     });
 };
+
+export const exportSales = (
+    storeId: string,
+    params: {
+        status?: string;
+        from?: string;
+        to?: string;
+        cashierId?: string;
+        paymentMethod?: string;
+        productId?: string;
+    } = {}
+) => {
+    const query = buildQuery(params as Record<string, string | number | undefined>);
+    return apiClient.download(`/api/v1/stores/${storeId}/sales/export${query}`);
+};

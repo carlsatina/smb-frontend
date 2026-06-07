@@ -195,4 +195,40 @@ export const apiClient = {
 
         return { blob, filename };
     },
+    async upload<T>(path: string, body: FormData): Promise<T> {
+        const token = localStorage.getItem('accessToken') ?? localStorage.getItem('token');
+        const csrfCookieName = (import.meta as any).env?.VITE_CSRF_COOKIE_NAME || 'csrfToken';
+        const getCsrfToken = () => {
+            const csrfFromStorage = localStorage.getItem('csrfToken');
+            if (csrfFromStorage) return csrfFromStorage;
+            const cookies = document.cookie.split(';').map((c) => c.trim());
+            const match = cookies.find((c) => c.startsWith(`${csrfCookieName}=`));
+            return match ? decodeURIComponent(match.substring(csrfCookieName.length + 1)) : null;
+        };
+        const headers: Record<string, string> = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+        const csrfToken = getCsrfToken();
+        if (csrfToken) headers['x-csrf-token'] = csrfToken;
+
+        const response = await fetch(`${baseUrl}${path}`, {
+            method: 'POST',
+            headers,
+            body,
+            credentials: 'include',
+        });
+
+        if (!response.ok) {
+            let errorBody: any = null;
+            try { errorBody = await response.json(); } catch { errorBody = null; }
+            const errorCode = errorBody?.error?.code;
+            if (typeof window !== 'undefined' && (errorCode === 'PLAN_LIMIT' || errorCode === 'SUBSCRIPTION_REQUIRED')) {
+                window.dispatchEvent(new CustomEvent('plan:upgrade', {
+                    detail: { message: errorBody?.error?.message || 'Upgrade required to access this feature.' },
+                }));
+            }
+            throw { status: response.status, body: errorBody };
+        }
+
+        return response.json() as Promise<T>;
+    },
 };

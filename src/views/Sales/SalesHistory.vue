@@ -54,6 +54,9 @@
                             />
                         </div>
                         <div class="toolbar-right">
+                            <button v-if="canImportExport" class="ghost-button" :disabled="isExporting" @click="handleExport">
+                                {{ isExporting ? 'Exporting…' : 'Export CSV' }}
+                            </button>
                             <button class="ghost-button" @click="goToPos">Back to POS</button>
                         </div>
                     </div>
@@ -262,16 +265,21 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { listProducts, ProductResponse } from '@/api/products';
-import { getSale, listSales, SaleDetail, SaleSummary, voidSale } from '@/api/sales';
+import { exportSales, getSale, listSales, SaleDetail, SaleSummary, voidSale } from '@/api/sales';
 import { listStoreMembers, StoreMember } from '@/api/storeMembers';
 import { useToast } from '@/composables/useToast';
 import { useStoreContextStore } from '@/stores/storeContext';
+import { useUserContextStore } from '@/stores/userContext';
 import { canAccess } from '@/utils/roleAccess';
+import { hasPlanFeature } from '@/utils/planAccess';
 
 const router = useRouter();
 const route = useRoute();
 const storeContext = useStoreContextStore();
+const userContext = useUserContextStore();
 const { showToast } = useToast();
+const canImportExport = computed(() => hasPlanFeature(userContext.effectivePlan, 'importExport'));
+const isExporting = ref(false);
 
 const sales = ref<SaleSummary[]>([]);
 const isLoading = ref(false);
@@ -738,6 +746,35 @@ const statusClass = (status: string) => {
 const goToPos = () => {
     if (!storeContext.currentStoreId) return;
     router.push(`/stores/${storeContext.currentStoreId}/pos`);
+};
+
+const handleExport = async () => {
+    const storeId = storeContext.currentStoreId;
+    if (!storeId) return;
+    isExporting.value = true;
+    try {
+        const params: Record<string, string> = {};
+        if (statusFilter.value && statusFilter.value !== 'ALL') params.status = statusFilter.value;
+        if (fromDate.value) params.from = new Date(fromDate.value).toISOString();
+        if (toDate.value) {
+            const end = new Date(toDate.value);
+            end.setHours(23, 59, 59, 999);
+            params.to = end.toISOString();
+        }
+        if (cashierFilter.value) params.cashierId = cashierFilter.value;
+        if (paymentMethodFilter.value) params.paymentMethod = paymentMethodFilter.value;
+        if (productFilter.value) params.productId = productFilter.value;
+
+        const { blob, filename } = await exportSales(storeId, params);
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(url);
+    } finally {
+        isExporting.value = false;
+    }
 };
 
 onMounted(async () => {

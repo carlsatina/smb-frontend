@@ -57,3 +57,19 @@ export const deleteProduct = (storeId: string, productId: string) => {
         method: 'DELETE',
     });
 };
+
+export const exportProducts = (storeId: string) => {
+    return apiClient.download(`/api/v1/stores/${storeId}/products/export`);
+};
+
+export type ImportResult = {
+    imported: number;
+    failed: number;
+    errors: Array<{ row: number; message: string }>;
+};
+
+export const importProducts = (storeId: string, file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return apiClient.upload<ImportResult>(`/api/v1/stores/${storeId}/products/import`, formData);
+};
