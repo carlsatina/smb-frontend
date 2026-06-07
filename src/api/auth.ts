@@ -8,6 +8,9 @@ export type MeResponse = {
         emailVerified?: boolean;
         subscriptionActive?: boolean;
         planTier?: 'STARTER' | 'STANDARD' | 'GROWTH';
+        grantedPlan?: 'STARTER' | 'STANDARD' | 'GROWTH' | null;
+        grantedUntil?: string | null;
+        isSuperAdmin?: boolean;
     };
 };
 
@@ -50,10 +53,3 @@ export const resendVerification = (email: string) => {
     });
 };
 
-// TODO(production): Remove before going live — no payment gate.
-export const devUpgradePlan = (planTier: 'STARTER' | 'STANDARD' | 'GROWTH') => {
-    return apiClient.request<{ user: { planTier: string; subscriptionActive: boolean } }>(
-        '/api/v1/auth/plan',
-        { method: 'PATCH', body: { planTier } }
-    );
-};

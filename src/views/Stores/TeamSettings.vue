@@ -13,121 +13,153 @@
                 </div>
             </header>
 
-            <!-- Members -->
-            <section class="tm-panel">
-                <div class="tm-panel-header">
-                    <div>
-                        <h2 class="tm-panel-title">Members</h2>
-                        <p class="tm-panel-sub">Roles update immediately upon change.</p>
-                    </div>
-                    <span class="tm-badge">{{ members.length }} {{ members.length === 1 ? 'member' : 'members' }}</span>
-                </div>
+            <!-- Tabs -->
+            <div class="tm-tabs">
+                <button
+                    class="tm-tab"
+                    :class="{ 'tm-tab--active': activeTab === 'members' }"
+                    @click="activeTab = 'members'"
+                >
+                    Members
+                    <span class="tm-tab-count">{{ members.length }}</span>
+                </button>
+                <button
+                    class="tm-tab"
+                    :class="{ 'tm-tab--active': activeTab === 'invites' }"
+                    @click="activeTab = 'invites'"
+                >
+                    Invites
+                    <span v-if="pendingInvites.length" class="tm-tab-count tm-tab-count--pending">
+                        {{ pendingInvites.length }}
+                    </span>
+                </button>
+            </div>
 
-                <div v-if="isTeamLoading" class="tm-state">Loading team...</div>
-                <div v-else-if="!currentStore" class="tm-state">Select a store to view members.</div>
-                <div v-else-if="members.length === 0" class="tm-empty">No members yet.</div>
-                <div v-else class="tm-member-list">
-                    <div v-for="member in members" :key="member.id" class="tm-member-row">
-                        <div class="tm-member-info">
-                            <div class="tm-member-name">{{ member.fullName || member.email }}</div>
-                            <div class="tm-member-meta">{{ member.email }}</div>
-                        </div>
-                        <div class="tm-member-actions">
-                            <select
-                                class="tm-role-select"
-                                :value="member.role"
-                                :disabled="!canManageMembers || isOwnerLocked(member) || isUpdatingMember(member.id)"
-                                @change="changeMemberRole(member, $event)"
-                            >
-                                <option v-for="role in roleOptions" :key="role" :value="role">{{ role }}</option>
-                            </select>
-                            <button
-                                class="tm-btn-ghost tm-btn-ghost--danger"
-                                type="button"
-                                :disabled="!canManageMembers || isOwnerLocked(member) || isRemovingMember(member.id) || member.userId === currentUserId"
-                                @click="removeMember(member)"
-                            >
-                                Remove
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Invite member -->
-            <section class="tm-panel">
-                <div class="tm-panel-header">
-                    <div>
-                        <h2 class="tm-panel-title">Invite member</h2>
-                        <p class="tm-panel-sub">Share the generated link to onboard a new teammate.</p>
-                    </div>
-                </div>
-
-                <form v-if="canManageMembers" class="tm-invite-form" @submit.prevent="createInvite">
-                    <label class="tm-field">
-                        Email
-                        <input v-model="inviteForm.email" type="email" placeholder="teammate@shop.com" required />
-                    </label>
-                    <label class="tm-field">
-                        Role
-                        <select v-model="inviteForm.role">
-                            <option v-for="role in inviteRoleOptions" :key="role" :value="role">{{ role }}</option>
-                        </select>
-                    </label>
-                    <label class="tm-field">
-                        Expires (days)
-                        <input v-model.number="inviteForm.expiresInDays" type="number" min="1" max="30" />
-                    </label>
-                    <div class="tm-invite-action">
-                        <button class="tm-btn-primary" type="submit" :disabled="isInviting || !inviteForm.email">
-                            {{ isInviting ? 'Creating...' : 'Create invite' }}
-                        </button>
-                    </div>
-                </form>
-                <p v-else class="tm-permission-note">Only owners or admins can invite new members.</p>
-
-                <div v-if="recentInviteLink" class="tm-invite-link-card">
-                    <span class="tm-invite-link-label">Invite link</span>
-                    <div class="tm-invite-link">
-                        <input type="text" readonly :value="recentInviteLink" />
-                        <button class="tm-btn-ghost" type="button" @click="copyInviteLink">Copy</button>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Pending invites -->
-            <section class="tm-panel">
-                <div class="tm-panel-header">
-                    <div>
-                        <h2 class="tm-panel-title">Pending invites</h2>
-                        <p class="tm-panel-sub">Track and revoke outstanding invitations.</p>
-                    </div>
-                    <span v-if="invites.length" class="tm-badge">{{ invites.length }} pending</span>
-                </div>
-
-                <div v-if="isTeamLoading" class="tm-state">Loading invites...</div>
-                <div v-else-if="invites.length === 0" class="tm-empty">No active invites.</div>
-                <div v-else class="tm-invite-list">
-                    <div v-for="invite in invites" :key="invite.id" class="tm-invite-row">
+            <!-- Members tab -->
+            <template v-if="activeTab === 'members'">
+                <section class="tm-panel">
+                    <div class="tm-panel-header">
                         <div>
-                            <div class="tm-member-name">{{ invite.email }}</div>
-                            <div class="tm-member-meta">{{ invite.role }} &ndash; expires {{ formatDate(invite.expiresAt) }}</div>
-                        </div>
-                        <div class="tm-invite-actions">
-                            <span class="tm-status-pill" :class="statusClass(invite.status)">{{ invite.status }}</span>
-                            <button
-                                v-if="canManageMembers && invite.status === 'PENDING'"
-                                class="tm-btn-ghost tm-btn-ghost--danger"
-                                type="button"
-                                :disabled="isRevokingInvite(invite.id)"
-                                @click="revokeInvite(invite)"
-                            >
-                                Revoke
-                            </button>
+                            <h2 class="tm-panel-title">Members</h2>
+                            <p class="tm-panel-sub">Roles update immediately upon change.</p>
                         </div>
                     </div>
-                </div>
-            </section>
+
+                    <div v-if="isTeamLoading" class="tm-state">Loading team...</div>
+                    <div v-else-if="!currentStore" class="tm-state">Select a store to view members.</div>
+                    <div v-else-if="members.length === 0" class="tm-empty">No members yet.</div>
+                    <div v-else class="tm-member-list">
+                        <div v-for="member in members" :key="member.id" class="tm-member-row">
+                            <div class="tm-member-info">
+                                <div class="tm-member-name">{{ member.fullName || member.email }}</div>
+                                <div class="tm-member-meta">{{ member.email }}</div>
+                            </div>
+                            <div class="tm-member-actions">
+                                <select
+                                    class="tm-role-select"
+                                    :value="member.role"
+                                    :disabled="!canManageMembers || isOwnerLocked(member) || isUpdatingMember(member.id)"
+                                    @change="changeMemberRole(member, $event)"
+                                >
+                                    <option v-for="role in roleOptions" :key="role" :value="role">{{ role }}</option>
+                                </select>
+                                <button
+                                    class="tm-btn-ghost tm-btn-ghost--danger"
+                                    type="button"
+                                    :disabled="!canManageMembers || isOwnerLocked(member) || isRemovingMember(member.id) || member.userId === currentUserId"
+                                    @click="removeMember(member)"
+                                >
+                                    Remove
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </template>
+
+            <!-- Invites tab -->
+            <template v-if="activeTab === 'invites'">
+
+                <!-- Invite form -->
+                <section class="tm-panel">
+                    <div class="tm-panel-header">
+                        <div>
+                            <h2 class="tm-panel-title">Invite member</h2>
+                            <p class="tm-panel-sub">Share the generated link to onboard a new teammate.</p>
+                        </div>
+                    </div>
+
+                    <form v-if="canManageMembers" class="tm-invite-form" @submit.prevent="createInvite">
+                        <label class="tm-field">
+                            Email
+                            <input v-model="inviteForm.email" type="email" placeholder="teammate@shop.com" required />
+                        </label>
+                        <label class="tm-field">
+                            Role
+                            <select v-model="inviteForm.role">
+                                <option v-for="role in inviteRoleOptions" :key="role" :value="role">{{ role }}</option>
+                            </select>
+                        </label>
+                        <label class="tm-field">
+                            Expires (days)
+                            <input v-model.number="inviteForm.expiresInDays" type="number" min="1" max="30" />
+                        </label>
+                        <div class="tm-invite-action">
+                            <button class="tm-btn-primary" type="submit" :disabled="isInviting || !inviteForm.email">
+                                {{ isInviting ? 'Creating...' : 'Create invite' }}
+                            </button>
+                        </div>
+                    </form>
+                    <p v-else class="tm-permission-note">Only owners or admins can invite new members.</p>
+
+                    <div v-if="recentInviteLink" class="tm-invite-link-card">
+                        <span class="tm-invite-link-label">Invite link</span>
+                        <div class="tm-invite-link">
+                            <input type="text" readonly :value="recentInviteLink" />
+                            <button class="tm-btn-ghost" type="button" @click="copyInviteLink">Copy</button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Pending invites -->
+                <section class="tm-panel">
+                    <div class="tm-panel-header">
+                        <div>
+                            <h2 class="tm-panel-title">Pending invites</h2>
+                            <p class="tm-panel-sub">Track and revoke outstanding invitations.</p>
+                        </div>
+                        <span v-if="pendingInvites.length" class="tm-badge">{{ pendingInvites.length }} pending</span>
+                    </div>
+
+                    <div v-if="isTeamLoading" class="tm-state">Loading invites...</div>
+                    <div v-else-if="pendingInvites.length === 0" class="tm-empty">No pending invites.</div>
+                    <div v-else class="tm-invite-list">
+                        <div v-for="invite in pendingInvites" :key="invite.id" class="tm-invite-row">
+                            <div>
+                                <div class="tm-member-name">{{ invite.email }}</div>
+                                <div class="tm-member-meta">
+                                    {{ invite.role }}
+                                    <span v-if="invite.status === 'EXPIRED'"> &ndash; expired {{ formatDate(invite.expiresAt) }}</span>
+                                    <span v-else> &ndash; expires {{ formatDate(invite.expiresAt) }}</span>
+                                </div>
+                            </div>
+                            <div class="tm-invite-actions">
+                                <span class="tm-status-pill" :class="statusClass(invite.status)">{{ invite.status }}</span>
+                                <button
+                                    v-if="canManageMembers && invite.status === 'PENDING'"
+                                    class="tm-btn-ghost tm-btn-ghost--danger"
+                                    type="button"
+                                    :disabled="isRevokingInvite(invite.id)"
+                                    @click="revokeInvite(invite)"
+                                >
+                                    Revoke
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+            </template>
 
         </div>
     </section>
@@ -154,6 +186,8 @@ const router = useRouter();
 const route = useRoute();
 const storeContext = useStoreContextStore();
 const { showToast } = useToast();
+
+const activeTab = ref<'members' | 'invites'>('members');
 
 const isTeamLoading = ref(false);
 const isInviting = ref(false);
@@ -188,6 +222,11 @@ const canManageMembers = computed(() => canEdit.value);
 const canManageOwners = computed(() => currentStore.value?.role === 'OWNER');
 const inviteRoleOptions = computed(() =>
     canManageOwners.value ? roleOptions : roleOptions.filter((role) => role !== 'OWNER')
+);
+
+// Only show non-accepted invites — accepted ones are already team members
+const pendingInvites = computed(() =>
+    invites.value.filter((invite) => invite.status !== 'ACCEPTED')
 );
 
 const pageTitle = computed(() => currentStore.value?.name ? `${currentStore.value.name} — Team` : 'Team');
@@ -343,7 +382,7 @@ const formatDate = (value: string) => {
 const statusClass = (status: string) => {
     if (status === 'PENDING') return 'tm-status-pill--pending';
     if (status === 'ACCEPTED') return 'tm-status-pill--accepted';
-    return 'tm-status-pill--inactive';
+    return 'tm-status-pill--expired';
 };
 
 onMounted(async () => {
@@ -450,6 +489,60 @@ watch(
     gap: 0.6rem;
     flex-shrink: 0;
     padding-top: 0.25rem;
+}
+
+/* ── Tabs ── */
+.tm-tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 2px solid var(--c-border);
+    margin-bottom: -0.75rem;
+}
+
+.tm-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.65rem 1.25rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    font-family: 'Inter', sans-serif;
+    color: var(--c-muted);
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+    white-space: nowrap;
+}
+
+.tm-tab:hover {
+    color: var(--c-text);
+}
+
+.tm-tab--active {
+    color: var(--c-accent-dark);
+    border-bottom-color: var(--c-accent);
+}
+
+.tm-tab-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.25rem;
+    height: 1.25rem;
+    padding: 0 0.35rem;
+    border-radius: 999px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    background: #e2e8f0;
+    color: #475569;
+}
+
+.tm-tab-count--pending {
+    background: rgba(234, 179, 8, 0.15);
+    color: #92400e;
 }
 
 /* ── Panels ── */
@@ -769,7 +862,7 @@ watch(
     color: #047857;
 }
 
-.tm-status-pill--inactive {
+.tm-status-pill--expired {
     background: #f1f5f9;
     color: #64748b;
 }

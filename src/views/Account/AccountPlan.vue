@@ -144,7 +144,6 @@ import { useStoreContextStore } from '@/stores/storeContext';
 import { useUserContextStore } from '@/stores/userContext';
 import { getPlanConfig, planTierOrder, planConfigs, PlanTier } from '@/utils/planAccess';
 import { useToast } from '@/composables/useToast';
-import { devUpgradePlan } from '@/api/auth';
 
 const router = useRouter();
 const storeContext = useStoreContextStore();
@@ -192,19 +191,8 @@ const advancedFeatures = [
 
 const isUpgrading = ref(false);
 
-const handlePlanAction = async (plan: typeof allPlans.value[0]) => {
-    if (isUpgrading.value) return;
-    isUpgrading.value = true;
-    try {
-        await devUpgradePlan(plan.tier);
-        await userContext.fetchMe();
-        showToast(`Plan updated to ${plan.label}.`, 'success');
-    } catch (error: any) {
-        const message = error?.body?.error?.message || 'Unable to update plan.';
-        showToast(message, 'error');
-    } finally {
-        isUpgrading.value = false;
-    }
+const handlePlanAction = (plan: typeof allPlans.value[0]) => {
+    showToast(`To switch to ${plan.label}, contact us at support@arshii.app.`, 'info');
 };
 
 const goToStores = () => router.push('/stores');

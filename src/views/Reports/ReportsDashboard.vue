@@ -8,43 +8,87 @@
                     <p>Track sales momentum, top performers, and inventory risks for {{ currentStoreLabel }}.</p>
                 </div>
                 <div class="reports-controls">
-                    <div class="range-buttons">
+                    <!-- Date range nav -->
+                    <div class="range-nav">
                         <button
-                            class="ghost-button button-compact"
-                            :class="{ active: activeRange === 'TODAY' }"
                             type="button"
-                            @click="setQuickRange('TODAY')"
+                            class="range-nav-btn"
+                            title="Previous period"
+                            :disabled="isLoading"
+                            @click="traverseRange(-1)"
                         >
-                            Today
+                            <mdicon name="chevron-left" size="16" />
                         </button>
+
+                        <div ref="datePopoverRef" class="range-trigger-wrap">
+                            <button
+                                type="button"
+                                class="range-trigger"
+                                :class="{ 'range-trigger--open': showDatePopover }"
+                                @click="toggleDatePopover"
+                            >
+                                <mdicon name="calendar-range-outline" size="15" />
+                                <span>{{ rangeLabel }}</span>
+                                <mdicon :name="showDatePopover ? 'chevron-up' : 'chevron-down'" size="13" class="range-trigger-chevron" />
+                            </button>
+
+                            <Transition name="dropdown">
+                                <div v-if="showDatePopover" class="date-popover">
+                                    <div class="date-popover-section">
+                                        <div class="date-popover-label">Quick range</div>
+                                        <div class="date-popover-quick">
+                                            <button
+                                                type="button"
+                                                class="date-popover-quick-btn"
+                                                :class="{ active: activeRange === 'TODAY' }"
+                                                @click="applyQuickRange('TODAY')"
+                                            >Today</button>
+                                            <button
+                                                type="button"
+                                                class="date-popover-quick-btn"
+                                                :class="{ active: activeRange === 'LAST_7' }"
+                                                @click="applyQuickRange('LAST_7')"
+                                            >Last 7 days</button>
+                                            <button
+                                                type="button"
+                                                class="date-popover-quick-btn"
+                                                :class="{ active: activeRange === 'LAST_30' }"
+                                                @click="applyQuickRange('LAST_30')"
+                                            >Last 30 days</button>
+                                        </div>
+                                    </div>
+                                    <div class="date-popover-divider"></div>
+                                    <div class="date-popover-section">
+                                        <div class="date-popover-label">Custom range</div>
+                                        <div class="date-popover-inputs">
+                                            <label class="date-popover-field">
+                                                <span>From</span>
+                                                <input v-model="draftFrom" type="date" />
+                                            </label>
+                                            <label class="date-popover-field">
+                                                <span>To</span>
+                                                <input v-model="draftTo" type="date" />
+                                            </label>
+                                        </div>
+                                        <button type="button" class="date-popover-apply" @click="applyCustomRange">
+                                            Apply range
+                                        </button>
+                                    </div>
+                                </div>
+                            </Transition>
+                        </div>
+
                         <button
-                            class="ghost-button button-compact"
-                            :class="{ active: activeRange === 'LAST_7' }"
                             type="button"
-                            @click="setQuickRange('LAST_7')"
+                            class="range-nav-btn"
+                            title="Next period"
+                            :disabled="isLoading"
+                            @click="traverseRange(1)"
                         >
-                            Last 7 days
-                        </button>
-                        <button
-                            class="ghost-button button-compact"
-                            :class="{ active: activeRange === 'LAST_30' }"
-                            type="button"
-                            @click="setQuickRange('LAST_30')"
-                        >
-                            Last 30 days
+                            <mdicon name="chevron-right" size="16" />
                         </button>
                     </div>
-                    <label class="date-field">
-                        <span>From</span>
-                        <input v-model="filters.from" type="date" />
-                    </label>
-                    <label class="date-field">
-                        <span>To</span>
-                        <input v-model="filters.to" type="date" />
-                    </label>
-                    <button class="secondary-button button-compact" type="button" :disabled="isLoading" @click="loadReports">
-                        Refresh
-                    </button>
+
                     <div ref="cardSettingsRef" class="card-settings-wrap">
                         <button
                             class="icon-button"
@@ -671,9 +715,58 @@ watch(visibleCards, (val) => {
 const showCardSettings = ref(false);
 const cardSettingsRef = ref<HTMLElement | null>(null);
 
+const showDatePopover = ref(false);
+const datePopoverRef = ref<HTMLElement | null>(null);
+const draftFrom = ref(filters.from);
+const draftTo = ref(filters.to);
+
+const toggleDatePopover = () => {
+    if (!showDatePopover.value) {
+        draftFrom.value = filters.from;
+        draftTo.value = filters.to;
+    }
+    showDatePopover.value = !showDatePopover.value;
+    showCardSettings.value = false;
+};
+
+const closeDatePopover = () => { showDatePopover.value = false; };
+
+const applyQuickRange = async (range: 'TODAY' | 'LAST_7' | 'LAST_30') => {
+    closeDatePopover();
+    await setQuickRange(range);
+};
+
+const applyCustomRange = () => {
+    if (!draftFrom.value || !draftTo.value) return;
+    if (draftTo.value < draftFrom.value) return;
+    closeDatePopover();
+    isSettingRange.value = true;
+    activeRange.value = null;
+    filters.from = draftFrom.value;
+    filters.to = draftTo.value;
+    nextTick(() => { isSettingRange.value = false; });
+};
+
+const traverseRange = (direction: 1 | -1) => {
+    const MS_PER_DAY = 86400000;
+    const fromDate = new Date(filters.from + 'T00:00:00');
+    const toDate = new Date(filters.to + 'T00:00:00');
+    const daysInRange = Math.round((toDate.getTime() - fromDate.getTime()) / MS_PER_DAY) + 1;
+    const shift = direction * daysInRange * MS_PER_DAY;
+    isSettingRange.value = true;
+    activeRange.value = null;
+    filters.from = buildDateInput(new Date(fromDate.getTime() + shift));
+    filters.to = buildDateInput(new Date(toDate.getTime() + shift));
+    nextTick(() => { isSettingRange.value = false; });
+};
+
 const onClickOutsideSettings = (e: MouseEvent) => {
-    if (showCardSettings.value && cardSettingsRef.value && !cardSettingsRef.value.contains(e.target as Node)) {
+    const target = e.target as Node;
+    if (showCardSettings.value && cardSettingsRef.value && !cardSettingsRef.value.contains(target)) {
         showCardSettings.value = false;
+    }
+    if (showDatePopover.value && datePopoverRef.value && !datePopoverRef.value.contains(target)) {
+        showDatePopover.value = false;
     }
 };
 
@@ -1078,63 +1171,199 @@ watch(
     align-items: flex-end;
 }
 
-.range-buttons {
+/* ── Range nav ── */
+.range-nav {
     display: inline-flex;
-    background: #f1f5f9;
-    border-radius: 8px;
-    padding: 0.2rem;
-    gap: 0.15rem;
-    border: 1px solid var(--c-border);
+    align-items: center;
+    gap: 0.25rem;
+    background: var(--c-surface);
+    border: 1.5px solid var(--c-border);
+    border-radius: 10px;
+    padding: 0.25rem;
 }
 
-.range-buttons .ghost-button {
+.range-nav-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 7px;
     border: none;
     background: transparent;
-    padding: 0.35rem 0.8rem;
-    border-radius: 6px;
-    font-size: 0.78rem;
-    font-weight: 600;
-    font-family: 'Inter', -apple-system, sans-serif;
     color: var(--c-muted);
     cursor: pointer;
-    transition: all 0.15s;
+    transition: background 0.15s, color 0.15s;
+    flex-shrink: 0;
 }
 
-.range-buttons .ghost-button:hover {
+.range-nav-btn:hover:not(:disabled) {
+    background: #f1f5f9;
     color: var(--c-text);
 }
 
-.range-buttons .ghost-button.active {
-    background: var(--c-surface);
-    color: var(--c-accent-dark);
-    box-shadow: 0 1px 4px rgba(15, 23, 42, 0.1);
+.range-nav-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
 }
 
-.date-field {
-    display: grid;
-    gap: 0.3rem;
-    font-size: 0.7rem;
+.range-trigger-wrap {
+    position: relative;
+}
+
+.range-trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.35rem 0.65rem;
+    border-radius: 7px;
+    border: none;
+    background: transparent;
+    color: var(--c-text);
+    font-size: 0.82rem;
+    font-weight: 600;
+    font-family: 'Inter', -apple-system, sans-serif;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    white-space: nowrap;
+    min-width: 140px;
+    justify-content: center;
+}
+
+.range-trigger:hover,
+.range-trigger--open {
+    background: rgba(13, 148, 136, 0.08);
+    color: var(--c-accent-dark);
+}
+
+.range-trigger-chevron {
+    color: var(--c-muted);
+    flex-shrink: 0;
+}
+
+/* ── Date popover ── */
+.date-popover {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%);
+    width: 260px;
+    background: var(--c-surface);
+    border: 1.5px solid var(--c-border);
+    border-radius: 14px;
+    box-shadow: 0 12px 40px rgba(15, 23, 42, 0.12);
+    z-index: 200;
+    overflow: hidden;
+}
+
+.date-popover-section {
+    padding: 0.875rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+
+.date-popover-label {
+    font-size: 0.65rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.1em;
     color: var(--c-muted);
 }
 
-.date-field input {
-    border-radius: 8px;
-    border: 1.5px solid var(--c-border);
-    padding: 0.55rem 0.8rem;
-    font-size: 0.875rem;
-    font-family: 'Inter', -apple-system, sans-serif;
-    color: var(--c-text);
-    background: var(--c-surface);
-    transition: border-color 0.15s, box-shadow 0.15s;
+.date-popover-quick {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
 }
 
-.date-field input:focus {
+.date-popover-quick-btn {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    padding: 0.45rem 0.65rem;
+    border-radius: 8px;
+    border: none;
+    background: transparent;
+    font-size: 0.84rem;
+    font-weight: 500;
+    font-family: 'Inter', -apple-system, sans-serif;
+    color: var(--c-text);
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s;
+    text-align: left;
+}
+
+.date-popover-quick-btn:hover {
+    background: #f1f5f9;
+}
+
+.date-popover-quick-btn.active {
+    background: rgba(13, 148, 136, 0.1);
+    color: var(--c-accent-dark);
+    font-weight: 600;
+}
+
+.date-popover-divider {
+    height: 1px;
+    background: var(--c-border);
+    margin: 0;
+}
+
+.date-popover-inputs {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.date-popover-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--c-muted);
+}
+
+.date-popover-field input {
+    border-radius: 8px;
+    border: 1.5px solid var(--c-border);
+    padding: 0.45rem 0.65rem;
+    font-size: 0.84rem;
+    font-family: 'Inter', -apple-system, sans-serif;
+    color: var(--c-text);
+    background: #f8fafc;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.date-popover-field input:focus {
     outline: none;
     border-color: var(--c-accent);
-    box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.12);
+    box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
+    background: var(--c-surface);
+}
+
+.date-popover-apply {
+    width: 100%;
+    padding: 0.55rem 1rem;
+    border-radius: 8px;
+    border: none;
+    background: var(--c-accent);
+    color: #fff;
+    font-size: 0.84rem;
+    font-weight: 600;
+    font-family: 'Inter', -apple-system, sans-serif;
+    cursor: pointer;
+    transition: background 0.15s;
+    margin-top: 0.15rem;
+}
+
+.date-popover-apply:hover {
+    background: var(--c-accent-dark);
 }
 
 .card-settings-wrap {

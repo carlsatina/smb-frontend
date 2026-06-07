@@ -16,7 +16,7 @@
                                 class="search-input"
                                 placeholder="Search name, SKU, category"
                             />
-                            <details class="display-settings">
+                            <details ref="displaySettingsRef" class="display-settings">
                                 <summary>Display</summary>
                                 <div class="display-panel">
                                     <div class="display-row">
@@ -215,7 +215,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { listProducts } from '@/api/products';
 import { finalizeSale } from '@/api/sales';
@@ -264,6 +264,8 @@ const paymentMethod = ref('CASH');
 const discountEnabled = ref(false);
 const isLoading = ref(false);
 const isSubmitting = ref(false);
+
+const displaySettingsRef = ref<HTMLDetailsElement | null>(null);
 
 const displaySettings = reactive<DisplaySettings>({
     showSku: true,
@@ -568,7 +570,18 @@ const finalizeTicket = async () => {
     }
 };
 
+const handleDisplayClickOutside = (event: MouseEvent) => {
+    if (displaySettingsRef.value?.open && !displaySettingsRef.value.contains(event.target as Node)) {
+        displaySettingsRef.value.open = false;
+    }
+};
+
+onBeforeUnmount(() => {
+    document.removeEventListener('click', handleDisplayClickOutside);
+});
+
 onMounted(async () => {
+    document.addEventListener('click', handleDisplayClickOutside);
     await storeContext.fetchStores();
     const routeStoreId = route.params.storeId as string | undefined;
     if (routeStoreId && routeStoreId !== storeContext.currentStoreId) {

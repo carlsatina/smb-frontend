@@ -23,7 +23,12 @@ import ReportsDashboard from '@/views/Reports/ReportsDashboard.vue'
 import TeamSettings from '@/views/Stores/TeamSettings.vue'
 import AccountPlan from '@/views/Account/AccountPlan.vue'
 import { useStoreContextStore } from '@/stores/storeContext'
+import { useUserContextStore } from '@/stores/userContext'
 import { canAccess, FeatureKey, getDefaultRouteForRole } from '@/utils/roleAccess'
+import AdminLayout from '@/views/admin/AdminLayout.vue'
+import AdminDashboard from '@/views/admin/AdminDashboard.vue'
+import AdminUsers from '@/views/admin/AdminUsers.vue'
+import AdminLogin from '@/views/admin/AdminLogin.vue'
 
 // Auth 
 import Login from '@/views/LandingPage/Login.vue'
@@ -178,6 +183,28 @@ const routes: Array<RouteRecordRaw> = [
     meta: { requiresAuth: true }
   },
   {
+    path: '/admin/login',
+    name: 'admin-login',
+    component: AdminLogin,
+  },
+  {
+    path: '/admin',
+    component: AdminLayout,
+    meta: { requiresAuth: true, requiresSuperAdmin: true },
+    children: [
+      {
+        path: '',
+        name: 'admin-dashboard',
+        component: AdminDashboard,
+      },
+      {
+        path: 'users',
+        name: 'admin-users',
+        component: AdminUsers,
+      },
+    ],
+  },
+  {
     path: '/login',
     name: 'login',
     component: Login
@@ -211,7 +238,7 @@ const routes: Array<RouteRecordRaw> = [
 ]
 
 // Public routes that don't require authentication
-const publicRoutes = ['home', 'login', 'register', 'forgot-password', 'reset-password', 'verify-email', 'not-found']
+const publicRoutes = ['home', 'login', 'register', 'forgot-password', 'reset-password', 'verify-email', 'not-found', 'admin-login']
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -232,6 +259,27 @@ router.beforeEach(async (to) => {
   // Redirect to stores if already logged in and trying to access auth routes
   if (isAuthRoute && token) {
     return { name: 'stores' }
+  }
+
+  if (to.name === 'admin-login') {
+    const userContext = useUserContextStore()
+    if (token) {
+      if (!userContext.hasLoaded) await userContext.fetchMe()
+      if (userContext.profile?.isSuperAdmin) {
+        return { name: 'admin-dashboard' }
+      }
+    }
+    return true
+  }
+
+  if (to.meta.requiresSuperAdmin) {
+    const userContext = useUserContextStore()
+    if (!userContext.hasLoaded) {
+      await userContext.fetchMe()
+    }
+    if (!userContext.profile?.isSuperAdmin) {
+      return { name: 'admin-login' }
+    }
   }
 
   if (feature) {
