@@ -111,6 +111,14 @@
                         </button>
                     </div>
 
+                    <!-- IMPORT PROGRESS -->
+                    <div v-if="isImporting" class="import-progress">
+                        <div class="import-progress__label">Importing… {{ Math.round(importProgress) }}%</div>
+                        <div class="import-progress__track">
+                            <div class="import-progress__fill" :style="{ width: importProgress + '%' }"></div>
+                        </div>
+                    </div>
+
                     <!-- IMPORT RESULT -->
                     <div v-if="importResult" class="import-result" :class="importResult.failed > 0 ? 'import-result--warn' : 'import-result--ok'">
                         <div class="import-result__summary">
@@ -118,8 +126,9 @@
                             <button class="import-result__close" @click="importResult = null">✕</button>
                         </div>
                         <ul v-if="importResult.errors.length > 0" class="import-result__errors">
-                            <li v-for="err in importResult.errors.slice(0, 10)" :key="err.saleId">Sale {{ err.saleId }}: {{ err.message }}</li>
-                            <li v-if="importResult.errors.length > 10" class="import-result__more">… and {{ importResult.errors.length - 10 }} more</li>
+                            <li v-for="err in importResult.errors" :key="err.saleId + err.message">
+                                <strong>Sale {{ err.saleId }}</strong> — {{ err.message }}
+                            </li>
                         </ul>
                     </div>
 
@@ -305,8 +314,32 @@ const { showToast } = useToast();
 const canImportExport = computed(() => hasPlanFeature(userContext.effectivePlan, 'importExport'));
 const isExporting = ref(false);
 const isImporting = ref(false);
+const importProgress = ref(0);
 const importFileInput = ref<HTMLInputElement | null>(null);
 const importResult = ref<SalesImportResult | null>(null);
+let progressTimer: ReturnType<typeof setInterval> | null = null;
+
+const startImportProgress = () => {
+    importProgress.value = 0;
+    isImporting.value = true;
+    progressTimer = setInterval(() => {
+        if (importProgress.value < 85) {
+            const remaining = 85 - importProgress.value;
+            importProgress.value = Math.min(85, importProgress.value + Math.max(0.8, remaining * 0.06));
+        }
+    }, 120);
+};
+
+const finishImportProgress = () =>
+    new Promise<void>((resolve) => {
+        if (progressTimer) { clearInterval(progressTimer); progressTimer = null; }
+        importProgress.value = 100;
+        setTimeout(() => {
+            isImporting.value = false;
+            importProgress.value = 0;
+            resolve();
+        }, 500);
+    });
 
 const sales = ref<SaleSummary[]>([]);
 const isLoading = ref(false);
@@ -784,15 +817,15 @@ const handleImportFileSelected = async (event: Event) => {
     const file = (event.target as HTMLInputElement).files?.[0];
     if (!file || !storeContext.currentStoreId) return;
     (event.target as HTMLInputElement).value = '';
-    isImporting.value = true;
+    startImportProgress();
     try {
         const result = await importSales(storeContext.currentStoreId, file);
+        await finishImportProgress();
         importResult.value = result;
         if (result.imported > 0) await loadSales();
     } catch {
+        await finishImportProgress();
         importResult.value = { imported: 0, failed: 1, errors: [{ saleId: '—', message: 'Upload failed. Check the file and try again.' }] };
-    } finally {
-        isImporting.value = false;
     }
 };
 
@@ -879,6 +912,34 @@ watch(
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
+.import-progress {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    padding: 0.75rem 1rem;
+    background: rgba(13, 148, 136, 0.06);
+    border: 1px solid rgba(13, 148, 136, 0.22);
+    border-radius: 8px;
+    margin-bottom: 0.5rem;
+}
+.import-progress__label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #0f766e;
+}
+.import-progress__track {
+    height: 6px;
+    background: rgba(13, 148, 136, 0.15);
+    border-radius: 999px;
+    overflow: hidden;
+}
+.import-progress__fill {
+    height: 100%;
+    background: #0d9488;
+    border-radius: 999px;
+    transition: width 0.15s ease;
+}
+
 .import-result {
     border-radius: 8px;
     padding: 0.75rem 1rem;
@@ -890,8 +951,7 @@ watch(
 .import-result__summary { display: flex; justify-content: space-between; align-items: center; }
 .import-result__close { background: none; border: none; cursor: pointer; font-size: 1rem; opacity: 0.6; }
 .import-result__close:hover { opacity: 1; }
-.import-result__errors { margin: 0.5rem 0 0; padding-left: 1.25rem; display: flex; flex-direction: column; gap: 0.2rem; }
-.import-result__more { opacity: 0.7; font-style: italic; }
+.import-result__errors { margin: 0.5rem 0 0; padding-left: 1.25rem; display: flex; flex-direction: column; gap: 0.2rem; max-height: 220px; overflow-y: auto; }
 
 /* ============================================================
    TOKENS

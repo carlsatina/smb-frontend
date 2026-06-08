@@ -72,8 +72,8 @@
                                 <button class="ghost-button" :disabled="isExporting" @click="handleExport">
                                     {{ isExporting ? 'Exporting…' : 'Export CSV' }}
                                 </button>
-                                <button v-if="canWrite" class="ghost-button" @click="triggerImport">
-                                    Import CSV
+                                <button v-if="canWrite" class="ghost-button" :disabled="isImporting" @click="triggerImport">
+                                    {{ isImporting ? 'Importing…' : 'Import CSV' }}
                                 </button>
                                 <input
                                     ref="importFileInput"
@@ -92,6 +92,14 @@
                                 + New product
                             </button>
                             <span v-else-if="storeContext.currentStoreId && !canImportExport" class="panel-note">View-only access</span>
+                        </div>
+                    </div>
+
+                    <!-- IMPORT PROGRESS -->
+                    <div v-if="isImporting" class="import-progress">
+                        <div class="import-progress__label">Importing… {{ Math.round(importProgress) }}%</div>
+                        <div class="import-progress__track">
+                            <div class="import-progress__fill" :style="{ width: importProgress + '%' }"></div>
                         </div>
                     </div>
 
@@ -276,6 +284,31 @@ const isDeleting = ref(false);
 const isExporting = ref(false);
 const importFileInput = ref<HTMLInputElement | null>(null);
 const importResult = ref<ImportResult | null>(null);
+const isImporting = ref(false);
+const importProgress = ref(0);
+let progressTimer: ReturnType<typeof setInterval> | null = null;
+
+const startImportProgress = () => {
+    importProgress.value = 0;
+    isImporting.value = true;
+    progressTimer = setInterval(() => {
+        if (importProgress.value < 85) {
+            const remaining = 85 - importProgress.value;
+            importProgress.value = Math.min(85, importProgress.value + Math.max(0.8, remaining * 0.06));
+        }
+    }, 120);
+};
+
+const finishImportProgress = () =>
+    new Promise<void>((resolve) => {
+        if (progressTimer) { clearInterval(progressTimer); progressTimer = null; }
+        importProgress.value = 100;
+        setTimeout(() => {
+            isImporting.value = false;
+            importProgress.value = 0;
+            resolve();
+        }, 500);
+    });
 
 const handleExport = async () => {
     const storeId = storeContext.currentStoreId;
@@ -303,11 +336,14 @@ const handleImportFileSelected = async (event: Event) => {
     const file = (event.target as HTMLInputElement).files?.[0];
     if (!file || !storeContext.currentStoreId) return;
     (event.target as HTMLInputElement).value = '';
+    startImportProgress();
     try {
         const result = await importProducts(storeContext.currentStoreId, file);
+        await finishImportProgress();
         importResult.value = result;
         if (result.imported > 0) await loadProducts();
     } catch {
+        await finishImportProgress();
         importResult.value = { imported: 0, failed: 1, errors: [{ row: 0, message: 'Upload failed. Check the file and try again.' }] };
     }
 };
@@ -456,6 +492,34 @@ watch(() => storeContext.currentStoreId, async () => {
 
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+.import-progress {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    padding: 0.75rem 1rem;
+    background: rgba(13, 148, 136, 0.06);
+    border: 1px solid rgba(13, 148, 136, 0.22);
+    border-radius: 8px;
+    margin-bottom: 0.5rem;
+}
+.import-progress__label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #0f766e;
+}
+.import-progress__track {
+    height: 6px;
+    background: rgba(13, 148, 136, 0.15);
+    border-radius: 999px;
+    overflow: hidden;
+}
+.import-progress__fill {
+    height: 100%;
+    background: #0d9488;
+    border-radius: 999px;
+    transition: width 0.15s ease;
+}
 
 .import-result {
     border-radius: 8px;
