@@ -11,6 +11,7 @@ export type MeResponse = {
         grantedPlan?: 'STARTER' | 'STANDARD' | 'GROWTH' | null;
         grantedUntil?: string | null;
         isSuperAdmin?: boolean;
+        features?: string[];
     };
 };
 

@@ -101,11 +101,14 @@
                             </div>
                         </div>
 
-                        <button type="submit" class="auth-button">Create account</button>
+                        <button type="submit" class="auth-button" :disabled="isLoading">
+                            <span v-if="isLoading" class="auth-spinner" aria-hidden="true"></span>
+                            {{ isLoading ? 'Creating account…' : 'Create account' }}
+                        </button>
 
                         <div class="auth-links">
                             <span>Already have an account?</span>
-                            <span class="auth-link accent" @click="router.push('/login')">Sign in</span>
+                            <span class="auth-link accent" @click="router.push(route.query.redirect ? `/login?redirect=${encodeURIComponent(route.query.redirect)}` : '/login')">Sign in</span>
                         </div>
                     </form>
                 </div>
@@ -115,8 +118,8 @@
 </template>
 
 <script>
-import { ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import register from '@/composables/auth/register'
 import store from '@/store'
 import getProfile from '@/composables/getProfile'
@@ -125,6 +128,7 @@ export default {
     name: "RegisterMobile",
     setup() {
         const router = useRouter()
+        const route = useRoute()
         const validated = ref(null)
         const userInfo = ref({
             full_name: '',
@@ -135,6 +139,21 @@ export default {
         })
         const errorMsg = ref({email: '', password: ''})
         const hasError = ref(false)
+        const isLoading = ref(false)
+
+        onMounted(() => {
+            if (typeof route.query.email === 'string' && route.query.email) {
+                userInfo.value.email = route.query.email
+            } else {
+                try {
+                    const pending = sessionStorage.getItem('pendingInvite')
+                    if (pending) {
+                        const { email } = JSON.parse(pending)
+                        if (email) userInfo.value.email = email
+                    }
+                } catch { /* ignore */ }
+            }
+        })
 
         const handleRegister = async() => {
             hasError.value = false
@@ -159,12 +178,14 @@ export default {
                 return
             }
 
-            { 
+            isLoading.value = true
+            try {
                 const { response, error } = await register(userInfo.value)
                 if (error.value === null) {
                     if (response.value?.error) {
                         hasError.value = true
                         errorMsg.value.password = response.value.error.message || 'Registration failed'
+                        isLoading.value = false
                     } else if (response.value?.accessToken) {
                         store.methods.loginUser(response.value.accessToken, response.value.csrfToken)
                         getProfile(response.value.accessToken)
@@ -174,13 +195,25 @@ export default {
                                 }
                             })
                         const isVerified = response.value?.user?.emailVerified === true
-                        const nextRoute = isVerified ? '/stores' : `/verify-email?email=${encodeURIComponent(userInfo.value.email)}`
-                        router.push(nextRoute)
+                        const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : null
+                        if (redirect) {
+                            router.push(redirect)
+                        } else {
+                            const nextRoute = isVerified ? '/stores' : `/verify-email?email=${encodeURIComponent(userInfo.value.email)}`
+                            router.push(nextRoute)
+                        }
                     } else {
                         hasError.value = true
                         errorMsg.value.password = 'Registration failed'
+                        isLoading.value = false
                     }
+                } else {
+                    isLoading.value = false
                 }
+            } catch {
+                hasError.value = true
+                errorMsg.value.password = 'Something went wrong. Please try again.'
+                isLoading.value = false
             }
         }
 
@@ -198,13 +231,15 @@ export default {
         })
         return {
             router,
+            route,
             userInfo,
             handleRegister,
             isStrongPassword,
             hasMinimumChar,
             isValidEmailFormat,
             errorMsg,
-            hasError
+            hasError,
+            isLoading,
         }
     }
 }
@@ -411,9 +446,30 @@ export default {
     transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-.auth-button:hover {
+.auth-button:hover:not(:disabled) {
     transform: translateY(-1px);
     box-shadow: 0 12px 30px rgba(15, 118, 110, 0.25);
+}
+
+.auth-button:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+.auth-spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(255, 255, 255, 0.4);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    vertical-align: middle;
+    margin-right: 6px;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
 }
 
 .auth-links {

@@ -197,7 +197,7 @@
                         <div v-if="!storeContext.currentStoreId" class="panel-state">
                             Select or create a store to view sales history.
                         </div>
-                        <div v-else-if="isLoading" class="panel-state">Loading sales...</div>
+                        <SkeletonLoader v-else-if="isLoading" :rows="8" label="Loading sales…" />
                         <div v-else class="table-wrap">
                             <table class="sales-table">
                                 <thead>
@@ -297,6 +297,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import SkeletonLoader from '@/components/SkeletonLoader.vue';
 import { listProducts, ProductResponse } from '@/api/products';
 import { exportSales, getSale, importSales, listSales, SaleDetail, SalesImportResult, SaleSummary, voidSale } from '@/api/sales';
 import { listStoreMembers, StoreMember } from '@/api/storeMembers';

@@ -119,7 +119,7 @@
                         <div v-if="!storeContext.currentStoreId" class="panel-state">
                             Select or create a store to view products.
                         </div>
-                        <div v-else-if="isLoading" class="panel-state">Loading products...</div>
+                        <SkeletonLoader v-else-if="isLoading" :rows="8" label="Loading products…" />
                         <div v-else class="table-wrap">
                             <table class="product-table">
                                 <thead>
@@ -251,6 +251,7 @@ import { useUserContextStore } from '@/stores/userContext';
 import { canAccess } from '@/utils/roleAccess';
 import { hasPlanFeature } from '@/utils/planAccess';
 import ConfirmModal from '@/components/ConfirmModal.vue';
+import SkeletonLoader from '@/components/SkeletonLoader.vue';
 
 type ProductRow = {
     id: string;

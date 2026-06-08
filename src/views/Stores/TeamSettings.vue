@@ -45,7 +45,7 @@
                         </div>
                     </div>
 
-                    <div v-if="isTeamLoading" class="tm-state">Loading team...</div>
+                    <SkeletonLoader v-if="isTeamLoading" :rows="4" label="Loading team…" />
                     <div v-else-if="!currentStore" class="tm-state">Select a store to view members.</div>
                     <div v-else-if="members.length === 0" class="tm-empty">No members yet.</div>
                     <div v-else class="tm-member-list">
@@ -131,7 +131,7 @@
                         <span v-if="pendingInvites.length" class="tm-badge">{{ pendingInvites.length }} pending</span>
                     </div>
 
-                    <div v-if="isTeamLoading" class="tm-state">Loading invites...</div>
+                    <SkeletonLoader v-if="isTeamLoading" :rows="3" label="Loading invites…" />
                     <div v-else-if="pendingInvites.length === 0" class="tm-empty">No pending invites.</div>
                     <div v-else class="tm-invite-list">
                         <div v-for="invite in pendingInvites" :key="invite.id" class="tm-invite-row">
@@ -168,6 +168,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import SkeletonLoader from '@/components/SkeletonLoader.vue';
 import { getMe } from '@/api/auth';
 import {
     createStoreInvite,

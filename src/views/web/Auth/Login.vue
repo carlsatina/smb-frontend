@@ -91,7 +91,10 @@
                         <span>{{ errorMsg }}</span>
                     </div>
 
-                    <button type="submit" class="auth-button">Log in</button>
+                    <button type="submit" class="auth-button" :disabled="loadingModal">
+                        <span v-if="loadingModal" class="auth-spinner" aria-hidden="true"></span>
+                        {{ loadingModal ? 'Signing in…' : 'Log in' }}
+                    </button>
 
                     <div class="auth-links">
                         <span class="auth-link" @click="router.push('/forgot-password')">Forgot password?</span>
@@ -101,25 +104,20 @@
             </div>
         </div>
 
-        <Loading v-if="loadingModal" />
     </div>
 </template>
 
 
 <script>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import login from '@/composables/auth/login'
 import store from '@/store'
 import getProfile from '@/composables/getProfile'
-import Loading from '@/components/Loading.vue'
 import brandLogo from '@/assets/SmB-PoS.png'
 
 export default {
     name: "LoginWeb",
-    components: {
-        Loading,
-    },
     setup() {
         const router = useRouter()
         const route = useRoute()
@@ -129,6 +127,12 @@ export default {
         const hasError = ref(false)
         const errorMsg = ref('')
         const loadingModal = ref(false)
+
+        onMounted(() => {
+            if (typeof route.query.email === 'string' && route.query.email) {
+                email.value = route.query.email
+            }
+        })
 
         const handleLogin = async() => {
             hasError.value = false
@@ -463,10 +467,33 @@ export default {
     box-shadow: 0 4px 12px rgba(13, 148, 136, 0.28);
 }
 
-.auth-button:hover {
+.auth-button:hover:not(:disabled) {
     background: var(--c-accent-dark);
     transform: translateY(-1px);
     box-shadow: 0 6px 18px rgba(13, 148, 136, 0.38);
+}
+
+.auth-button:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+.auth-spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(255, 255, 255, 0.4);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    vertical-align: middle;
+    margin-right: 6px;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
 }
 
 .auth-links {

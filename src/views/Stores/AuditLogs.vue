@@ -119,10 +119,7 @@
             </div>
 
             <div class="audit-content">
-                <div v-if="auditLoading" class="audit-empty">
-                    <mdicon name="loading" size="32" class="spin" />
-                    <span>Loading...</span>
-                </div>
+                <SkeletonLoader v-if="auditLoading" :rows="8" label="Loading audit logs…" />
 
                 <div v-else-if="!currentStore" class="audit-empty">
                     <mdicon name="store-outline" size="40" />
@@ -238,6 +235,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
+import SkeletonLoader from '@/components/SkeletonLoader.vue';
 import { useRoute, useRouter } from 'vue-router';
 import { AuditLogRecord, exportAuditLogs, listAuditLogs } from '@/api/auditLogs';
 import { useToast } from '@/composables/useToast';

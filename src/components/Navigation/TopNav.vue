@@ -45,6 +45,15 @@
                         <mdicon name="chart-line" size="16" />
                         <span>Reports</span>
                     </RouterLink>
+                    <RouterLink
+                        v-if="canViewDailySales"
+                        :to="`/stores/${currentStoreId}/daily-sales`"
+                        class="topnav__item"
+                        active-class="topnav__item--active"
+                    >
+                        <mdicon name="cash-register" size="16" />
+                        <span>Daily Sales</span>
+                    </RouterLink>
                     <div v-if="showMoreMenu" ref="moreMenuRef" class="topnav__more">
                         <button
                             type="button"
@@ -266,6 +275,9 @@
                     <RouterLink v-if="canViewReports" :to="`/stores/${currentStoreId}/reports`" class="topnav__mobile-item" @click="closeMobileMenu">
                         <mdicon name="chart-line" size="20" /><span>Reports</span>
                     </RouterLink>
+                    <RouterLink v-if="canViewDailySales" :to="`/stores/${currentStoreId}/daily-sales`" class="topnav__mobile-item" @click="closeMobileMenu">
+                        <mdicon name="cash-register" size="20" /><span>Daily Sales</span>
+                    </RouterLink>
                     <RouterLink v-if="canViewPurchaseOrders && !isPurchaseOrdersLocked" :to="`/stores/${currentStoreId}/purchase-orders`" class="topnav__mobile-item" @click="closeMobileMenu">
                         <mdicon name="truck-delivery" size="20" /><span>Purchase Orders</span>
                     </RouterLink>
@@ -370,6 +382,10 @@ const canViewSuppliers = computed(() => canAccess(storeContext.currentStore?.rol
 const canViewPos = computed(() => !isWarehouse.value && canAccess(storeContext.currentStore?.role, 'salesPos'));
 const canViewReports = computed(() => canAccess(storeContext.currentStore?.role, 'reports'));
 const canViewSettings = computed(() => canAccess(storeContext.currentStore?.role, 'storeSettings'));
+const canViewDailySales = computed(() =>
+    userContext.features.includes('DAILY_SALES') &&
+    ['OWNER', 'CASHIER'].includes(storeContext.currentStore?.role ?? '')
+);
 const planKnown = computed(() => userContext.planTier !== null);
 const isPurchaseOrdersLocked = computed(() => planKnown.value && !hasPlanFeature(userContext.effectivePlan, 'purchaseOrders'));
 const showMoreMenu = computed(() => Boolean(currentStoreId.value) && (canViewPurchaseOrders.value || canViewSuppliers.value || canViewSettings.value));
@@ -542,6 +558,7 @@ onBeforeUnmount(() => {
     background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15);
+    font-family: var(--app-font-sans);
 }
 
 .topnav__container {

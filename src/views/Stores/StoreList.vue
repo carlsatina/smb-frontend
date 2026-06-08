@@ -663,6 +663,20 @@ onMounted(async () => {
         storeContext.fetchStores(),
         userContext.fetchMe(),
     ]);
+
+    const pendingRaw = sessionStorage.getItem('pendingInvite');
+    if (pendingRaw) {
+        try {
+            const { storeId, token } = JSON.parse(pendingRaw);
+            if (storeId && token) {
+                router.push(`/stores/${storeId}/invites/accept?token=${encodeURIComponent(token)}`);
+                return;
+            }
+        } catch {
+            sessionStorage.removeItem('pendingInvite');
+        }
+    }
+
     await nextTick();
     computeAllLayouts();
 });

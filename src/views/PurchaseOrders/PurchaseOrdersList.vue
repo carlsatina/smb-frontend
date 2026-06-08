@@ -86,7 +86,7 @@
                     <div v-if="!storeContext.currentStoreId" class="panel-state">
                         Select or create a store to manage purchase orders.
                     </div>
-                    <div v-else-if="isLoading" class="panel-state">Loading purchase orders...</div>
+                    <SkeletonLoader v-else-if="isLoading" :rows="6" label="Loading purchase orders…" />
                     <div v-else class="table-wrap">
                         <table class="po-table">
                             <thead>
@@ -181,6 +181,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import SkeletonLoader from '@/components/SkeletonLoader.vue';
 import { listPurchaseOrders, PurchaseOrderSummary } from '@/api/purchaseOrders';
 import { listSuppliers, Supplier } from '@/api/suppliers';
 import { useStoreContextStore } from '@/stores/storeContext';

@@ -20,6 +20,7 @@ import PurchaseReceiptsList from '@/views/PurchaseOrders/PurchaseReceiptsList.vu
 import SupplierDetail from '@/views/PurchaseOrders/SupplierDetail.vue'
 import SuppliersList from '@/views/PurchaseOrders/SuppliersList.vue'
 import ReportsDashboard from '@/views/Reports/ReportsDashboard.vue'
+import DailySalesView from '@/views/Sales/DailySalesView.vue'
 import TeamSettings from '@/views/Stores/TeamSettings.vue'
 import AccountPlan from '@/views/Account/AccountPlan.vue'
 import { useStoreContextStore } from '@/stores/storeContext'
@@ -67,7 +68,6 @@ const routes: Array<RouteRecordRaw> = [
     path: '/stores/:storeId/invites/accept',
     name: 'invite-accept',
     component: InviteAccept,
-    meta: { requiresAuth: true }
   },
   {
     path: '/stores/:storeId/products',
@@ -172,6 +172,12 @@ const routes: Array<RouteRecordRaw> = [
     meta: { requiresAuth: true, feature: 'reports' }
   },
   {
+    path: '/stores/:storeId/daily-sales',
+    name: 'daily-sales',
+    component: DailySalesView,
+    meta: { requiresAuth: true }
+  },
+  {
     path: '/stores/:storeId/team',
     name: 'store-team',
     component: TeamSettings,
@@ -244,7 +250,7 @@ const routes: Array<RouteRecordRaw> = [
 ]
 
 // Public routes that don't require authentication
-const publicRoutes = ['home', 'login', 'register', 'forgot-password', 'reset-password', 'verify-email', 'not-found', 'admin-login']
+const publicRoutes = ['home', 'login', 'register', 'forgot-password', 'reset-password', 'verify-email', 'not-found', 'admin-login', 'invite-accept']
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -288,19 +294,29 @@ router.beforeEach(async (to) => {
     }
   }
 
-  if (feature) {
-    const storeId = to.params.storeId as string | undefined
-    if (!storeId) {
-      return { name: 'stores' }
-    }
+  // For any authenticated store-scoped route, ensure stores are loaded and current store is synced
+  const storeIdParam = to.params.storeId as string | undefined
+  if (token && storeIdParam && to.meta.requiresAuth) {
     const storeContext = useStoreContextStore()
     if (storeContext.stores.length === 0) {
       try {
         await storeContext.fetchStores()
-      } catch (error) {
-        return { name: 'stores' }
+      } catch {
+        // ignore — feature block below will handle redirect if needed
       }
     }
+    // Sync currentStoreId to match the URL so TopNav and components show the right store
+    if (storeContext.stores.some(s => s.id === storeIdParam)) {
+      storeContext.setCurrentStore(storeIdParam)
+    }
+  }
+
+  if (feature) {
+    const storeId = storeIdParam
+    if (!storeId) {
+      return { name: 'stores' }
+    }
+    const storeContext = useStoreContextStore()
     const store = storeContext.stores.find((entry) => entry.id === storeId)
     if (!store || !canAccess(store.role, feature)) {
       const fallbackRoute = store ? getDefaultRouteForRole(store.role) : null

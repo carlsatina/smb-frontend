@@ -17,51 +17,103 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { acceptStoreInvite } from '@/api/storeMembers';
+import { acceptStoreInvite, previewStoreInvite } from '@/api/storeMembers';
 import { useStoreContextStore } from '@/stores/storeContext';
+import { useUserContextStore } from '@/stores/userContext';
+import { getDefaultRouteForRole } from '@/utils/roleAccess';
 
 const route = useRoute();
 const router = useRouter();
 const storeContext = useStoreContextStore();
+const userContext = useUserContextStore();
 
-const status = ref<'idle' | 'success' | 'error'>('idle');
+const status = ref<'idle' | 'accepting' | 'success' | 'error'>('idle');
 const errorMessage = ref('');
+const invitedEmail = ref('');
 
-const storeId = computed(() => route.params.storeId as string | undefined);
-const token = computed(() => route.query.token as string | undefined);
+const storeId = computed<string | undefined>(() => {
+    const fromRoute = route.params.storeId as string | undefined;
+    if (fromRoute) return fromRoute;
+    const m = window.location.pathname.match(/\/stores\/([^/]+)\/invites\/accept/);
+    return m?.[1] || undefined;
+});
+
+const token = computed<string | undefined>(() => {
+    const fromRoute = route.query.token as string | undefined;
+    if (fromRoute) return fromRoute;
+    return new URLSearchParams(window.location.search).get('token') || undefined;
+});
+
+const isAuthenticated = computed(() =>
+    !!(localStorage.getItem('accessToken') || localStorage.getItem('token'))
+);
+
 
 const title = computed(() => {
-    if (status.value === 'success') return 'Invite accepted';
-    if (status.value === 'error') return 'Invite failed';
-    return 'Accepting invite...';
+    if (status.value === 'accepting' || status.value === 'idle') return 'Accepting invite…';
+    if (status.value === 'success') return 'Invite accepted!';
+    return 'Invite failed';
 });
 
 const description = computed(() => {
+    if (status.value === 'accepting' || status.value === 'idle') return 'Please wait while we add you to the store.';
     if (status.value === 'success') return 'You now have access to this store.';
-    if (status.value === 'error') return 'We could not accept this invite.';
-    return 'Please wait while we add you to the store.';
+    return 'We could not accept this invite.';
 });
 
-const goToStores = () => {
-    router.push('/stores');
-};
+const goToStores = () => router.push('/stores');
 
-onMounted(async () => {
+const acceptInvite = async () => {
     if (!storeId.value || !token.value) {
         status.value = 'error';
         errorMessage.value = 'Invite link is missing required details.';
         return;
     }
+    status.value = 'accepting';
     try {
         await acceptStoreInvite(storeId.value, token.value);
-        await storeContext.fetchStores();
+        sessionStorage.removeItem('pendingInvite');
+        await Promise.all([storeContext.fetchStores(), userContext.fetchMe()]);
         storeContext.setCurrentStore(storeId.value);
         status.value = 'success';
-        router.push(`/stores/${storeId.value}/settings`);
+        const joinedStore = storeContext.stores.find(s => s.id === storeId.value);
+        const defaultRoute = joinedStore ? getDefaultRouteForRole(joinedStore.role) : null;
+        if (defaultRoute) {
+            router.push({ name: defaultRoute, params: { storeId: storeId.value } });
+        } else {
+            router.push('/stores');
+        }
     } catch (error: any) {
+        sessionStorage.removeItem('pendingInvite');
         status.value = 'error';
         errorMessage.value = error?.body?.error?.message || 'Unable to accept this invite.';
     }
+};
+
+onMounted(async () => {
+    if (isAuthenticated.value) {
+        acceptInvite();
+        return;
+    }
+
+    // Fetch the invited email so register can pre-fill it
+    if (storeId.value && token.value) {
+        try {
+            const res = await previewStoreInvite(storeId.value, token.value);
+            invitedEmail.value = res.preview.email;
+        } catch {
+            // Non-fatal — redirect without email pre-fill
+        }
+    }
+
+    // Persist invite (+ email) so it survives the register/login redirect chain
+    sessionStorage.setItem('pendingInvite', JSON.stringify({ storeId: storeId.value, token: token.value, email: invitedEmail.value || null }));
+
+    // Redirect straight to register; user can switch to login from there
+    const redirectPath = `/stores/${storeId.value}/invites/accept?token=${encodeURIComponent(token.value ?? '')}`;
+    const params = new URLSearchParams({ redirect: redirectPath });
+    if (invitedEmail.value) params.set('email', invitedEmail.value);
+    router.replace(`/register?${params.toString()}`);
 });
 </script>
 
@@ -121,6 +173,13 @@ onMounted(async () => {
     font-size: 0.9rem;
 }
 
+.invite-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    margin-top: 0.25rem;
+}
+
 .invite-error {
     background: #fff5f5;
     border: 1px solid #fecaca;
@@ -128,27 +187,34 @@ onMounted(async () => {
     border-radius: 8px;
     padding: 0.75rem 1rem;
     font-size: 0.875rem;
+    text-align: left;
 }
 
-.secondary-button {
+.primary-button, .secondary-button {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    background: transparent;
-    border: 1px solid #e2e8f0;
     border-radius: 8px;
-    padding: 0.55rem 1.25rem;
+    padding: 0.6rem 1.25rem;
     font-size: 0.875rem;
     font-weight: 600;
-    color: #475569;
     cursor: pointer;
     font-family: 'Inter', sans-serif;
     transition: background 0.15s, border-color 0.15s;
-    margin: 0 auto;
+    text-decoration: none;
 }
 
-.secondary-button:hover {
-    background: #f1f5f9;
-    border-color: #cbd5e1;
+.primary-button {
+    background: #0d9488;
+    border: none;
+    color: #ffffff;
 }
+.primary-button:hover { background: #0f766e; }
+
+.secondary-button {
+    background: transparent;
+    border: 1px solid #e2e8f0;
+    color: #475569;
+}
+.secondary-button:hover { background: #f1f5f9; border-color: #cbd5e1; }
 </style>

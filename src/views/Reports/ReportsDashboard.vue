@@ -173,7 +173,7 @@
                             <h3>Sales by day</h3>
                             <span class="chart-total">{{ formatMoney(salesSummary.netSales) }}</span>
                         </div>
-                        <div v-if="isLoading" class="panel-state panel-state--small">Loading...</div>
+                        <SkeletonLoader v-if="isLoading" :rows="3" />
                         <div v-else class="chart-with-axis">
                             <div class="y-axis">
                                 <span>{{ formatCompactMoney(chartMax) }}</span>
@@ -211,7 +211,7 @@
                             <h3>Sales by hour</h3>
                             <span class="chart-total">{{ salesSummary.orderCount }} orders</span>
                         </div>
-                        <div v-if="isLoading" class="panel-state panel-state--small">Loading...</div>
+                        <SkeletonLoader v-if="isLoading" :rows="3" />
                         <div v-else class="chart-with-axis">
                             <div class="y-axis">
                                 <span>{{ formatCompactMoney(hourlyMax) }}</span>
@@ -258,7 +258,7 @@
                         </div>
                     </div>
 
-                    <div v-if="isLoading" class="panel-state">Loading daypart mix...</div>
+                    <SkeletonLoader v-if="isLoading" :rows="4" label="Loading daypart mix…" />
                     <div v-else-if="daypartSummary.length === 0" class="panel-state">
                         No sales data yet.
                     </div>
@@ -286,7 +286,7 @@
                         </div>
                     </div>
 
-                    <div v-if="isLoading" class="panel-state">Loading payment methods...</div>
+                    <SkeletonLoader v-if="isLoading" :rows="4" label="Loading payment methods…" />
                     <div v-else-if="paymentMethods.length === 0" class="panel-state">
                         No sales data yet.
                     </div>
@@ -314,7 +314,7 @@
                         </div>
                     </div>
 
-                    <div v-if="isLoading" class="panel-state">Loading top products...</div>
+                    <SkeletonLoader v-if="isLoading" :rows="5" label="Loading top products…" />
                     <div v-else-if="topProducts.length === 0" class="panel-state">
                         No sales data yet.
                     </div>
@@ -346,7 +346,7 @@
                         </div>
                     </div>
 
-                    <div v-if="isLoading" class="panel-state">Loading margins...</div>
+                    <SkeletonLoader v-if="isLoading" :rows="5" label="Loading margins…" />
                     <div v-else-if="productMargins.length === 0" class="panel-state">
                         No margin data yet.
                     </div>
@@ -399,7 +399,7 @@
                         </div>
                     </div>
 
-                    <div v-if="isLoading" class="panel-state">Loading ingredient usage...</div>
+                    <SkeletonLoader v-if="isLoading" :rows="5" label="Loading ingredient usage…" />
                     <div v-else-if="ingredientUsage.length === 0" class="panel-state">
                         No recipe usage tracked yet.
                     </div>
@@ -430,7 +430,7 @@
                         </div>
                     </div>
 
-                    <div v-if="isLoading" class="panel-state">Loading supplier analytics...</div>
+                    <SkeletonLoader v-if="isLoading" :rows="4" label="Loading supplier analytics…" />
                     <div v-else class="supplier-metrics">
                         <div class="metric-card">
                             <span class="metric-label">Total spend</span>
@@ -463,7 +463,7 @@
                         </div>
                     </div>
 
-                    <div v-if="isLoading" class="panel-state">Loading low stock...</div>
+                    <SkeletonLoader v-if="isLoading" :rows="5" label="Loading low stock…" />
                     <div v-else-if="lowStockItems.length === 0" class="panel-state">
                         All tracked items are above their thresholds.
                     </div>
@@ -509,7 +509,7 @@
                         </div>
                     </div>
 
-                    <div v-if="isLoading" class="panel-state">Loading purchase spend...</div>
+                    <SkeletonLoader v-if="isLoading" :rows="4" label="Loading purchase spend…" />
                     <div v-else-if="purchaseSpend.length === 0" class="panel-state">
                         No receipts recorded in this range.
                     </div>
@@ -547,7 +547,7 @@
                         </div>
                     </div>
 
-                    <div v-if="isLoading" class="panel-state">Loading employee sales...</div>
+                    <SkeletonLoader v-if="isLoading" :rows="4" label="Loading employee sales…" />
                     <div v-else-if="employeeSales.length === 0" class="panel-state">
                         No sales data yet.
                     </div>
@@ -623,6 +623,7 @@ import { useUserContextStore } from '@/stores/userContext';
 import { canAccess } from '@/utils/roleAccess';
 import { hasPlanFeature } from '@/utils/planAccess';
 import type { PlanFeature } from '@/utils/planAccess';
+import SkeletonLoader from '@/components/SkeletonLoader.vue';
 
 const route = useRoute();
 const router = useRouter();

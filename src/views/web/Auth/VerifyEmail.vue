@@ -47,57 +47,77 @@
         <!-- RIGHT FORM PANEL -->
         <div class="auth-panel">
             <div class="auth-form-wrap">
-                <div class="auth-title">Verify your email</div>
-                <p class="auth-copy">
-                    {{ token ? 'Confirming your email address…' : 'Enter your email to resend the verification link.' }}
-                </p>
-
-                <div v-if="isVerifying" class="auth-info">
-                    <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16" style="flex-shrink:0">
-                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd" />
-                    </svg>
-                    <span>Checking verification link…</span>
-                </div>
-
-                <div v-if="hasError" class="auth-error">
-                    <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16" style="flex-shrink:0">
-                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
-                    </svg>
-                    <span>{{ errorMsg }}</span>
-                </div>
-
-                <div v-if="successMsg" class="auth-success">
-                    <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16" style="flex-shrink:0">
-                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
-                    </svg>
-                    <span>{{ successMsg }}</span>
-                </div>
-
-                <form class="auth-form" @submit.prevent="handleResend" v-if="showResend">
-                    <label class="auth-label">
-                        Email address
-                        <input
-                            type="email"
-                            class="auth-input"
-                            placeholder="you@shop.com"
-                            v-model="email"
-                            autocomplete="email"
-                        />
-                    </label>
-
-                    <button type="submit" class="auth-button" :disabled="!email || isSubmitting">
-                        {{ isSubmitting ? 'Sending…' : resendLabel }}
-                    </button>
-
-                    <div class="auth-links">
-                        <span>Remembered your password?</span>
-                        <router-link to="/login" class="auth-link-accent">Sign in</router-link>
+                <!-- Verifying token from link -->
+                <template v-if="token">
+                    <div class="auth-title">Verifying…</div>
+                    <p class="auth-copy">Confirming your email address, please wait.</p>
+                    <div v-if="isVerifying" class="auth-info">
+                        <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16" style="flex-shrink:0"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd" /></svg>
+                        <span>Checking verification link…</span>
                     </div>
-                </form>
+                    <div v-if="hasError" class="auth-error">
+                        <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16" style="flex-shrink:0"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" /></svg>
+                        <span>{{ errorMsg }}</span>
+                    </div>
+                    <div v-if="successMsg" class="auth-success">
+                        <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16" style="flex-shrink:0"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>
+                        <span>{{ successMsg }}</span>
+                    </div>
+                    <div v-if="!isVerifying" class="auth-links">
+                        <router-link to="/login" class="auth-link-accent">← Back to sign in</router-link>
+                    </div>
+                </template>
 
-                <div v-if="!showResend && !isVerifying" class="auth-links">
-                    <router-link to="/login" class="auth-link-accent">← Back to sign in</router-link>
-                </div>
+                <!-- Check inbox (arrived from registration — email already sent) -->
+                <template v-else-if="showCheckInbox">
+                    <div class="auth-title">Check your inbox</div>
+                    <p class="auth-copy">
+                        We sent a verification link to <strong>{{ email }}</strong>. Click it to activate your account.
+                    </p>
+                    <div v-if="successMsg" class="auth-success">
+                        <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16" style="flex-shrink:0"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>
+                        <span>{{ successMsg }}</span>
+                    </div>
+                    <div v-if="hasError" class="auth-error">
+                        <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16" style="flex-shrink:0"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" /></svg>
+                        <span>{{ errorMsg }}</span>
+                    </div>
+                    <div class="auth-links" style="flex-direction: column; gap: 0.75rem; align-items: flex-start;">
+                        <span style="color: var(--c-muted); font-size: 0.85rem;">Didn't receive it?
+                            <button class="auth-link-accent" style="background:none;border:none;cursor:pointer;font-size:inherit;padding:0;" :disabled="isSubmitting" @click="handleResend">
+                                {{ isSubmitting ? 'Sending…' : 'Resend link' }}
+                            </button>
+                        </span>
+                        <router-link to="/login" class="auth-link-accent">← Back to sign in</router-link>
+                    </div>
+                </template>
+
+                <!-- Manual resend (arrived directly, no prefill) -->
+                <template v-else>
+                    <div class="auth-title">Verify your email</div>
+                    <p class="auth-copy">Enter your email to resend the verification link.</p>
+                    <div v-if="successMsg" class="auth-success">
+                        <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16" style="flex-shrink:0"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>
+                        <span>{{ successMsg }}</span>
+                    </div>
+                    <div v-if="hasError" class="auth-error">
+                        <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16" style="flex-shrink:0"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" /></svg>
+                        <span>{{ errorMsg }}</span>
+                    </div>
+                    <form class="auth-form" @submit.prevent="handleResend">
+                        <label class="auth-label">
+                            Email address
+                            <input type="email" class="auth-input" placeholder="you@shop.com" v-model="email" autocomplete="email" />
+                        </label>
+                        <button type="submit" class="auth-button" :disabled="!email || isSubmitting">
+                            {{ isSubmitting ? 'Sending…' : 'Send verification link' }}
+                        </button>
+                        <div class="auth-links">
+                            <span>Remembered your password?</span>
+                            <router-link to="/login" class="auth-link-accent">Sign in</router-link>
+                        </div>
+                    </form>
+                </template>
             </div>
         </div>
 
@@ -122,9 +142,9 @@ const successMsg = ref('')
 const userContext = useUserContextStore()
 
 const token = computed(() => typeof route.query.token === 'string' ? route.query.token : '')
-const showResend = computed(() => !token.value || hasError.value)
 const prefillEmail = computed(() => typeof route.query.email === 'string' ? route.query.email : '')
-const resendLabel = computed(() => successMsg.value ? 'Resend link' : 'Send verification link')
+// "Check inbox" mode: arrived from registration with a pre-filled email (email already sent)
+const showCheckInbox = computed(() => !token.value && !!prefillEmail.value)
 
 const runVerify = async () => {
     if (!token.value) return

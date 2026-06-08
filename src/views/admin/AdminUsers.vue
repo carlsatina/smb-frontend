@@ -69,6 +69,16 @@
                                         class="au-btn-sm au-btn-sm--ghost au-btn-sm--danger"
                                         @click="onRemoveAdmin(user)"
                                     >Remove admin</button>
+                                    <button
+                                        v-if="!hasDailySales(user)"
+                                        class="au-btn-sm"
+                                        @click="onGrantDailySales(user)"
+                                    >Grant Daily Sales</button>
+                                    <button
+                                        v-else
+                                        class="au-btn-sm au-btn-sm--danger"
+                                        @click="onRevokeDailySales(user)"
+                                    >Revoke Daily Sales</button>
                                 </div>
                             </td>
                         </tr>
@@ -124,6 +134,7 @@
 import { onMounted, ref, computed, reactive } from 'vue';
 import { getAdminUsers, updateUserPlan, grantUserPlan, revokeUserGrant, updateSuperAdmin } from '@/api/admin';
 import type { AdminUser } from '@/api/admin';
+import { grantDailySalesFeature, revokeDailySalesFeature, getUserFeatures } from '@/api/dailySales';
 import type { PlanTier } from '@/utils/planAccess';
 import { useToast } from '@/composables/useToast';
 
@@ -132,6 +143,7 @@ const { showToast } = useToast();
 const loading = ref(false);
 const error = ref<string | null>(null);
 const users = ref<AdminUser[]>([]);
+const userDailySalesFeatures = ref<Set<string>>(new Set());
 const page = ref(1);
 const total = ref(0);
 const pageSize = ref(50);
@@ -148,6 +160,8 @@ const grantModal = reactive({
 
 const formatDate = (iso: string) => new Date(iso).toLocaleDateString();
 
+const hasDailySales = (user: AdminUser) => userDailySalesFeatures.value.has(user.id);
+
 const loadPage = async (p: number) => {
     loading.value = true;
     error.value = null;
@@ -157,10 +171,44 @@ const loadPage = async (p: number) => {
         total.value = data.total;
         pageSize.value = data.pageSize;
         page.value = data.page;
+
+        // Load Daily Sales feature grants for all users in parallel
+        const featureResults = await Promise.allSettled(
+            data.users.map((u) => getUserFeatures(u.id))
+        );
+        const granted = new Set<string>();
+        featureResults.forEach((r, i) => {
+            if (r.status === 'fulfilled' && r.value.features.some((f: { feature: string }) => f.feature === 'DAILY_SALES')) {
+                granted.add(data.users[i].id);
+            }
+        });
+        userDailySalesFeatures.value = granted;
     } catch (e: any) {
         error.value = e?.body?.error?.message || 'Failed to load users.';
     } finally {
         loading.value = false;
+    }
+};
+
+const onGrantDailySales = async (user: AdminUser) => {
+    try {
+        await grantDailySalesFeature(user.id);
+        userDailySalesFeatures.value = new Set([...userDailySalesFeatures.value, user.id]);
+        showToast(`Daily Sales granted to ${user.email}.`, 'success');
+    } catch (e: any) {
+        showToast(e?.body?.error?.message || 'Failed to grant feature.', 'error');
+    }
+};
+
+const onRevokeDailySales = async (user: AdminUser) => {
+    try {
+        await revokeDailySalesFeature(user.id);
+        const next = new Set(userDailySalesFeatures.value);
+        next.delete(user.id);
+        userDailySalesFeatures.value = next;
+        showToast(`Daily Sales revoked from ${user.email}.`, 'success');
+    } catch (e: any) {
+        showToast(e?.body?.error?.message || 'Failed to revoke feature.', 'error');
     }
 };
 

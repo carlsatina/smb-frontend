@@ -92,7 +92,7 @@
                         <div v-if="!storeContext.currentStoreId" class="panel-state">
                             Select or create a store to view inventory.
                         </div>
-                        <div v-else-if="isLoading" class="panel-state">Loading inventory...</div>
+                        <SkeletonLoader v-else-if="isLoading" :rows="8" label="Loading inventory…" />
                         <div v-else class="table-wrap">
                             <table class="inventory-table">
                                 <thead>
@@ -330,6 +330,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import SkeletonLoader from '@/components/SkeletonLoader.vue';
 import { batchTransferStock, listStock, StockItem } from '@/api/inventory';
 import { useStoreContextStore } from '@/stores/storeContext';
 import { canAccess } from '@/utils/roleAccess';

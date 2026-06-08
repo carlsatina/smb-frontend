@@ -64,6 +64,12 @@ export const revokeStoreInvite = (storeId: string, inviteId: string) => {
     });
 };
 
+export const previewStoreInvite = (storeId: string, token: string) => {
+    return apiClient.request<{ preview: { email: string; role: string; invitedBy: string | null; expiresAt: string } }>(
+        `/api/v1/stores/${storeId}/invites/preview?token=${encodeURIComponent(token)}`
+    );
+};
+
 export const acceptStoreInvite = (storeId: string, token: string) => {
     return apiClient.request<{ membership: StoreMember }>(`/api/v1/stores/${storeId}/invites/accept`, {
         method: 'POST',

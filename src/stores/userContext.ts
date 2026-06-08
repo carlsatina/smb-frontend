@@ -17,6 +17,7 @@ export const useUserContextStore = defineStore('userContext', {
         planTier: null as PlanTier | null,
         grantedPlan: null as PlanTier | null,
         grantedUntil: null as string | null,
+        features: [] as string[],
         isLoading: false,
         hasLoaded: false,
     }),
@@ -59,6 +60,7 @@ export const useUserContextStore = defineStore('userContext', {
                 this.planTier = (data.user.planTier as PlanTier) || 'STARTER';
                 this.grantedPlan = (data.user.grantedPlan as PlanTier) ?? null;
                 this.grantedUntil = data.user.grantedUntil ?? null;
+                this.features = (data.user.features as string[]) ?? [];
                 this.hasLoaded = true;
             } catch (error) {
                 this.profile = null;
@@ -66,6 +68,7 @@ export const useUserContextStore = defineStore('userContext', {
                 this.planTier = null;
                 this.grantedPlan = null;
                 this.grantedUntil = null;
+                this.features = [];
                 this.hasLoaded = false;
             } finally {
                 this.isLoading = false;
