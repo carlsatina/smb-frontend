@@ -32,7 +32,15 @@
                                             <input v-model="displaySettings.showCategory" type="checkbox" />
                                             Category
                                         </label>
+                                        <label class="check-pill">
+                                            <input v-model="displaySettings.showPrice" type="checkbox" />
+                                            Price
+                                        </label>
                                     </div>
+                                    <label class="check-pill">
+                                        <input v-model="displaySettings.groupByCategory" type="checkbox" />
+                                        Group by category
+                                    </label>
                                     <label class="check-pill">
                                         <input v-model="displaySettings.useCategoryColor" type="checkbox" />
                                         Color by category
@@ -48,6 +56,13 @@
                                     </div>
                                 </div>
                             </details>
+                            <button
+                                class="ghost-button"
+                                :class="{ 'ghost-button--active': isRearranging }"
+                                @click="isRearranging = !isRearranging"
+                            >
+                                {{ isRearranging ? 'Done' : 'Rearrange' }}
+                            </button>
                             <button class="ghost-button" @click="goToSalesHistory">Sales history</button>
                         </div>
                     </div>
@@ -83,41 +98,106 @@
 
                     <div v-else-if="isLoading" class="panel-state">Loading products...</div>
 
-                    <div v-else class="product-grid">
-                        <button
-                            v-for="product in filteredProducts"
-                            :key="product.id"
-                            type="button"
-                            class="product-card"
-                            :class="{ 'product-card--in-cart': cartQtyMap[product.id] }"
-                            :style="getCardStyle(product)"
-                            @click="addToCart(product)"
-                        >
-                            <span v-if="cartQtyMap[product.id]" class="in-cart-badge">×{{ cartQtyMap[product.id] }}</span>
-                            <div class="product-card-top">
-                                <span v-if="displaySettings.showType" class="product-pill">{{ formatProductType(product.type) }}</span>
-                                <span
-                                    v-if="displaySettings.showCategory && product.category"
-                                    class="product-tag"
-                                >
-                                    {{ product.category }}
-                                </span>
+                    <template v-else>
+                        <!-- Rearrange mode banner -->
+                        <div v-if="isRearranging" class="rearrange-banner">
+                            <span>Drag cards to reorder. Order is saved automatically.</span>
+                            <div class="rearrange-banner-actions">
+                                <button class="ghost-button ghost-button--sm" @click="resetOrder">Reset order</button>
+                                <button class="ghost-button ghost-button--sm ghost-button--accent" @click="isRearranging = false">Done</button>
                             </div>
-                            <h3>{{ product.name }}</h3>
-                            <p v-if="displaySettings.showSku" class="product-sub">
-                                {{ product.sku ? `SKU ${product.sku}` : product.unit }}
-                            </p>
-                            <div class="product-price-row">
-                                <span class="product-price">{{ formatMoney(product.price) }}</span>
-                                <span v-if="!displaySettings.showSku" class="product-unit">
-                                    {{ product.unit }}
-                                </span>
-                            </div>
-                        </button>
-                        <div v-if="filteredProducts.length === 0" class="panel-state">
-                            No active products match your search.
                         </div>
-                    </div>
+
+                        <!-- Grouped view -->
+                        <div v-if="displaySettings.groupByCategory && !isRearranging" class="product-sections">
+                            <div
+                                v-for="[category, categoryProducts] in groupedFilteredProducts"
+                                :key="category"
+                                class="category-section"
+                            >
+                                <h4 class="category-section-title">{{ category }}</h4>
+                                <div class="product-grid">
+                                    <button
+                                        v-for="product in categoryProducts"
+                                        :key="product.id"
+                                        type="button"
+                                        class="product-card"
+                                        :class="{ 'product-card--in-cart': cartQtyMap[product.id] }"
+                                        :style="getCardStyle(product)"
+                                        @click="addToCart(product)"
+                                    >
+                                        <span v-if="cartQtyMap[product.id]" class="in-cart-badge">×{{ cartQtyMap[product.id] }}</span>
+                                        <div
+                                            v-if="displaySettings.showType || (displaySettings.showCategory && product.category)"
+                                            class="product-card-top"
+                                        >
+                                            <span v-if="displaySettings.showType" class="product-pill">{{ formatProductType(product.type) }}</span>
+                                            <span v-if="displaySettings.showCategory && product.category" class="product-tag">
+                                                {{ product.category }}
+                                            </span>
+                                        </div>
+                                        <h3>{{ product.name }}</h3>
+                                        <p v-if="displaySettings.showSku" class="product-sub">
+                                            {{ product.sku ? `SKU ${product.sku}` : product.unit }}
+                                        </p>
+                                        <div v-if="displaySettings.showPrice" class="product-price-row">
+                                            <span class="product-price">{{ formatMoney(product.price) }}</span>
+                                            <span v-if="!displaySettings.showSku" class="product-unit">{{ product.unit }}</span>
+                                        </div>
+                                    </button>
+                                </div>
+                            </div>
+                            <div v-if="filteredProducts.length === 0" class="panel-state">
+                                No active products match your search.
+                            </div>
+                        </div>
+
+                        <!-- Flat grid (default + rearrange mode) -->
+                        <div v-else class="product-grid">
+                            <button
+                                v-for="product in filteredProducts"
+                                :key="product.id"
+                                type="button"
+                                class="product-card"
+                                :class="{
+                                    'product-card--in-cart': cartQtyMap[product.id] && !isRearranging,
+                                    'product-card--rearrange': isRearranging,
+                                    'product-card--dragging': draggedId === product.id,
+                                    'product-card--drag-over': dragOverId === product.id,
+                                }"
+                                :style="getCardStyle(product)"
+                                :draggable="isRearranging"
+                                @click="isRearranging ? undefined : addToCart(product)"
+                                @dragstart="onDragStart($event, product.id)"
+                                @dragover="onDragOver($event, product.id)"
+                                @dragleave="onDragLeave"
+                                @drop="onDrop($event, product.id)"
+                                @dragend="onDragEnd"
+                            >
+                                <span v-if="cartQtyMap[product.id] && !isRearranging" class="in-cart-badge">×{{ cartQtyMap[product.id] }}</span>
+                                <div
+                                    v-if="displaySettings.showType || (displaySettings.showCategory && product.category)"
+                                    class="product-card-top"
+                                >
+                                    <span v-if="displaySettings.showType" class="product-pill">{{ formatProductType(product.type) }}</span>
+                                    <span v-if="displaySettings.showCategory && product.category" class="product-tag">
+                                        {{ product.category }}
+                                    </span>
+                                </div>
+                                <h3>{{ product.name }}</h3>
+                                <p v-if="displaySettings.showSku" class="product-sub">
+                                    {{ product.sku ? `SKU ${product.sku}` : product.unit }}
+                                </p>
+                                <div v-if="displaySettings.showPrice" class="product-price-row">
+                                    <span class="product-price">{{ formatMoney(product.price) }}</span>
+                                    <span v-if="!displaySettings.showSku" class="product-unit">{{ product.unit }}</span>
+                                </div>
+                            </button>
+                            <div v-if="filteredProducts.length === 0" class="panel-state">
+                                No active products match your search.
+                            </div>
+                        </div>
+                    </template>
                 </section>
 
                 <aside class="cart-panel">
@@ -247,8 +327,10 @@ type DisplaySettings = {
     showSku: boolean;
     showType: boolean;
     showCategory: boolean;
+    showPrice: boolean;
     useCategoryColor: boolean;
     categoryColors: Record<string, string>;
+    groupByCategory: boolean;
 };
 
 const router = useRouter();
@@ -271,9 +353,16 @@ const displaySettings = reactive<DisplaySettings>({
     showSku: false,
     showType: false,
     showCategory: true,
+    showPrice: false,
     useCategoryColor: true,
     categoryColors: {} as Record<string, string>,
+    groupByCategory: false,
 });
+
+const isRearranging = ref(false);
+const productOrder = ref<string[]>([]);
+const draggedId = ref<string | null>(null);
+const dragOverId = ref<string | null>(null);
 
 const categoryPalette = [
     '#fef3c7',
@@ -357,9 +446,19 @@ const goToSalesHistory = () => {
     router.push(`/stores/${storeContext.currentStoreId}/sales`);
 };
 
+const orderedProducts = computed(() => {
+    if (productOrder.value.length === 0) return products.value;
+    const orderMap = new Map(productOrder.value.map((id, i) => [id, i]));
+    return [...products.value].sort((a, b) => {
+        const ai = orderMap.has(a.id) ? orderMap.get(a.id)! : Infinity;
+        const bi = orderMap.has(b.id) ? orderMap.get(b.id)! : Infinity;
+        return ai - bi;
+    });
+});
+
 const filteredProducts = computed(() => {
     const query = searchQuery.value.trim().toLowerCase();
-    return products.value.filter((product) => {
+    return orderedProducts.value.filter((product) => {
         const matchesCategory =
             activeCategory.value === 'ALL' || product.category === activeCategory.value;
         const matchesQuery =
@@ -369,6 +468,16 @@ const filteredProducts = computed(() => {
             (product.category || '').toLowerCase().includes(query)
         return matchesCategory && matchesQuery;
     });
+});
+
+const groupedFilteredProducts = computed(() => {
+    const groups = new Map<string, Product[]>();
+    for (const product of filteredProducts.value) {
+        const key = product.category || 'Uncategorized';
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key)!.push(product);
+    }
+    return groups;
 });
 
 const categoryList = computed(() => {
@@ -500,6 +609,75 @@ const getCategoryPillStyle = (category: string, isActive: boolean) => {
     } as Record<string, string>;
 };
 
+const onDragStart = (e: DragEvent, productId: string) => {
+    if (!isRearranging.value) return;
+    draggedId.value = productId;
+    if (e.dataTransfer) {
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', productId);
+    }
+};
+
+const onDragOver = (e: DragEvent, productId: string) => {
+    if (!isRearranging.value) return;
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+    if (draggedId.value !== productId) dragOverId.value = productId;
+};
+
+const onDragLeave = () => {
+    dragOverId.value = null;
+};
+
+const onDrop = (e: DragEvent, targetId: string) => {
+    if (!isRearranging.value) return;
+    e.preventDefault();
+    if (!draggedId.value || draggedId.value === targetId) {
+        draggedId.value = null;
+        dragOverId.value = null;
+        return;
+    }
+    const currentOrder = orderedProducts.value.map((p) => p.id);
+    const fromIdx = currentOrder.indexOf(draggedId.value);
+    const toIdx = currentOrder.indexOf(targetId);
+    if (fromIdx !== -1 && toIdx !== -1) {
+        currentOrder.splice(fromIdx, 1);
+        currentOrder.splice(toIdx, 0, draggedId.value);
+        productOrder.value = currentOrder;
+        saveProductOrder();
+    }
+    draggedId.value = null;
+    dragOverId.value = null;
+};
+
+const onDragEnd = () => {
+    draggedId.value = null;
+    dragOverId.value = null;
+};
+
+const orderStorageKey = computed(() => {
+    const storeId = storeContext.currentStoreId;
+    return storeId ? `posProductOrder:${storeId}` : 'posProductOrder';
+});
+
+const saveProductOrder = () => {
+    localStorage.setItem(orderStorageKey.value, JSON.stringify(productOrder.value));
+};
+
+const loadProductOrder = () => {
+    const raw = localStorage.getItem(orderStorageKey.value);
+    if (!raw) return;
+    try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) productOrder.value = parsed;
+    } catch {}
+};
+
+const resetOrder = () => {
+    productOrder.value = [];
+    localStorage.removeItem(orderStorageKey.value);
+};
+
 const settingsStorageKey = computed(() => {
     const storeId = storeContext.currentStoreId;
     return storeId ? `posDisplaySettings:${storeId}` : 'posDisplaySettings';
@@ -513,11 +691,15 @@ const loadDisplaySettings = () => {
         if (typeof parsed.showSku === 'boolean') displaySettings.showSku = parsed.showSku;
         if (typeof parsed.showType === 'boolean') displaySettings.showType = parsed.showType;
         if (typeof parsed.showCategory === 'boolean') displaySettings.showCategory = parsed.showCategory;
+        if (typeof parsed.showPrice === 'boolean') displaySettings.showPrice = parsed.showPrice;
         if (typeof parsed.useCategoryColor === 'boolean') {
             displaySettings.useCategoryColor = parsed.useCategoryColor;
         }
         if (parsed.categoryColors && typeof parsed.categoryColors === 'object') {
             displaySettings.categoryColors = { ...parsed.categoryColors };
+        }
+        if (typeof parsed.groupByCategory === 'boolean') {
+            displaySettings.groupByCategory = parsed.groupByCategory;
         }
     } catch (error) {
         // Ignore persisted settings errors.
@@ -588,6 +770,7 @@ onMounted(async () => {
         storeContext.setCurrentStore(routeStoreId);
     }
     loadDisplaySettings();
+    loadProductOrder();
     await loadProducts();
 });
 
@@ -598,7 +781,10 @@ watch(
         searchQuery.value = '';
         activeCategory.value = 'ALL';
         discountEnabled.value = true;
+        isRearranging.value = false;
+        productOrder.value = [];
         loadDisplaySettings();
+        loadProductOrder();
         await loadProducts();
     }
 );
@@ -625,6 +811,7 @@ watch(
                 showCategory: displaySettings.showCategory,
                 useCategoryColor: displaySettings.useCategoryColor,
                 categoryColors: displaySettings.categoryColors,
+                groupByCategory: displaySettings.groupByCategory,
             })
         );
     },
@@ -1010,6 +1197,7 @@ watch(
     flex-direction: column;
     gap: 0.4rem;
     overflow: hidden;
+    min-height: 56px;
     transition: border-color 0.15s, box-shadow 0.15s, transform 0.12s;
     cursor: pointer;
 }
@@ -1082,6 +1270,10 @@ watch(
     font-weight: 600;
     color: var(--c-text);
     line-height: 1.3;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
 }
 
 .product-sub {
@@ -1393,6 +1585,100 @@ watch(
 .secondary-button:disabled {
     opacity: 0.4;
     cursor: not-allowed;
+}
+
+/* ============================================================
+   REARRANGE
+============================================================ */
+.rearrange-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    padding: 0.6rem 0.9rem;
+    background: rgba(13, 148, 136, 0.07);
+    border: 1px solid rgba(13, 148, 136, 0.25);
+    border-radius: 10px;
+    font-size: 0.8rem;
+    color: var(--c-accent-dark);
+    font-weight: 500;
+}
+
+.rearrange-banner-actions {
+    display: flex;
+    gap: 0.4rem;
+}
+
+.ghost-button--sm {
+    padding: 0.28rem 0.7rem;
+    font-size: 0.75rem;
+}
+
+.ghost-button--active {
+    border-color: var(--c-accent);
+    color: var(--c-accent-dark);
+    background: var(--c-accent-soft);
+}
+
+.ghost-button--accent {
+    border-color: var(--c-accent);
+    color: white;
+    background: var(--c-accent);
+}
+
+.ghost-button--accent:hover {
+    background: var(--c-accent-dark);
+    border-color: var(--c-accent-dark);
+    color: white;
+}
+
+.product-card--rearrange {
+    cursor: grab;
+    user-select: none;
+}
+
+.product-card--rearrange:hover {
+    border-color: var(--c-accent);
+    box-shadow: 0 2px 8px rgba(13, 148, 136, 0.12);
+    transform: none;
+}
+
+.product-card--dragging {
+    opacity: 0.35;
+    cursor: grabbing;
+}
+
+.product-card--drag-over {
+    border-color: var(--c-accent) !important;
+    box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.2) !important;
+    transform: scale(1.03);
+}
+
+/* ============================================================
+   GROUPED VIEW
+============================================================ */
+.product-sections {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.category-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+}
+
+.category-section-title {
+    margin: 0;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--c-muted);
+    padding-bottom: 0.4rem;
+    border-bottom: 1px solid var(--c-border);
 }
 
 /* ============================================================

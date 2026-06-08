@@ -64,6 +64,7 @@ export const exportProducts = (storeId: string) => {
 
 export type ImportResult = {
     imported: number;
+    updated: number;
     failed: number;
     errors: Array<{ row: number; message: string }>;
 };

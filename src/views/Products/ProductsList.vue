@@ -98,7 +98,7 @@
                     <!-- IMPORT RESULT -->
                     <div v-if="importResult" class="import-result" :class="importResult.failed > 0 ? 'import-result--warn' : 'import-result--ok'">
                         <div class="import-result__summary">
-                            <span>Import complete: <strong>{{ importResult.imported }}</strong> added{{ importResult.failed > 0 ? `, ${importResult.failed} failed` : '' }}.</span>
+                            <span>Import complete: <strong>{{ importResult.imported }}</strong> added, <strong>{{ importResult.updated }}</strong> updated{{ importResult.failed > 0 ? `, ${importResult.failed} failed` : '' }}.</span>
                             <button class="import-result__close" @click="importResult = null">✕</button>
                         </div>
                         <ul v-if="importResult.errors.length > 0" class="import-result__errors">

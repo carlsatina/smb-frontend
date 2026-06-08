@@ -167,8 +167,8 @@
             </div>
 
             <div v-else class="reports-grid">
-                <section v-if="visibleCards['sales-charts']" class="report-card report-card--wide charts-row">
-                    <div class="chart-panel">
+                <section v-if="visibleCards['sales-charts']" class="report-card report-card--wide charts-row" :class="{ 'charts-row--single': isSingleDay }">
+                    <div v-if="!isSingleDay" class="chart-panel">
                         <div class="chart-panel-header">
                             <h3>Sales by day</h3>
                             <span class="chart-total">{{ formatMoney(salesSummary.netSales) }}</span>
@@ -635,14 +635,14 @@ const buildDateInput = (value: Date) =>
 
 const today = new Date();
 const defaultTo = buildDateInput(today);
-const defaultFrom = buildDateInput(new Date(today.getTime() - 6 * 24 * 60 * 60 * 1000));
+const defaultFrom = buildDateInput(today);
 
 const filters = reactive({
     from: defaultFrom,
     to: defaultTo,
 });
 
-const activeRange = ref<'TODAY' | 'LAST_7' | 'LAST_30' | null>('LAST_7');
+const activeRange = ref<'TODAY' | 'LAST_7' | 'LAST_30' | null>('TODAY');
 const isSettingRange = ref(false);
 
 const isLoading = ref(false);
@@ -673,6 +673,7 @@ const purchaseSpendSummary = ref<PurchaseSpendSummary>({
     avgReceipt: 0,
 });
 const canViewReports = computed(() => canAccess(storeContext.currentStore?.role, 'reports'));
+const isSingleDay = computed(() => filters.from === filters.to);
 const canUseIngredients = computed(() => hasPlanFeature(userContext.planTier, 'ingredients'));
 const canUsePurchaseOrders = computed(() => hasPlanFeature(userContext.planTier, 'purchaseOrders'));
 
@@ -1599,6 +1600,10 @@ watch(
     grid-template-columns: 1fr 1fr;
     gap: 1.5rem;
     align-items: stretch;
+}
+
+.charts-row--single {
+    grid-template-columns: 1fr;
 }
 
 .charts-row.report-card {

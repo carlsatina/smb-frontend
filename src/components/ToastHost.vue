@@ -1,6 +1,6 @@
 <template>
-    <transition name="toast-slide">
-        <div v-if="toast.state.visible" class="toast" :class="`toast--${toast.state.variant}`">
+    <transition name="snack-slide">
+        <div v-if="toast.state.visible" class="snackbar" :class="`snackbar--${toast.state.variant}`">
             {{ toast.state.message }}
         </div>
     </transition>
@@ -13,10 +13,10 @@ const toast = useToast();
 </script>
 
 <style scoped>
-.toast {
+.snackbar {
     position: fixed;
     right: 2rem;
-    top: 5.5rem;
+    bottom: 2rem;
     padding: 0.85rem 1.2rem;
     border-radius: 14px;
     font-size: 0.85rem;
@@ -25,37 +25,37 @@ const toast = useToast();
     z-index: 1000;
 }
 
-.toast--success {
+.snackbar--success {
     background: #16a34a;
     color: #f0fdf4;
 }
 
-.toast--error {
+.snackbar--error {
     background: #dc2626;
     color: #fef2f2;
 }
 
-.toast--info {
+.snackbar--info {
     background: #0f766e;
     color: #ecfeff;
 }
 
-.toast-slide-enter-active,
-.toast-slide-leave-active {
+.snack-slide-enter-active,
+.snack-slide-leave-active {
     transition: transform 0.2s ease, opacity 0.2s ease;
 }
 
-.toast-slide-enter-from,
-.toast-slide-leave-to {
-    transform: translateY(-12px);
+.snack-slide-enter-from,
+.snack-slide-leave-to {
+    transform: translateY(12px);
     opacity: 0;
 }
 
 @media (max-width: 640px) {
-    .toast {
+    .snackbar {
         right: 1rem;
         left: 1rem;
-        top: 5rem;
+        bottom: 1rem;
     }
 }
 </style>

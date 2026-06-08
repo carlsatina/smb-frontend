@@ -127,6 +127,18 @@ export const voidSale = async (storeId: string, saleId: string) => {
     });
 };
 
+export type SalesImportResult = {
+    imported: number;
+    failed: number;
+    errors: Array<{ saleId: string; message: string }>;
+};
+
+export const importSales = (storeId: string, file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return apiClient.upload<SalesImportResult>(`/api/v1/stores/${storeId}/sales/import`, formData);
+};
+
 export const exportSales = (
     storeId: string,
     params: {

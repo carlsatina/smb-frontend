@@ -54,9 +54,21 @@
                             />
                         </div>
                         <div class="toolbar-right">
-                            <button v-if="canImportExport" class="ghost-button" :disabled="isExporting" @click="handleExport">
-                                {{ isExporting ? 'Exporting…' : 'Export CSV' }}
-                            </button>
+                            <template v-if="canImportExport">
+                                <button class="ghost-button" :disabled="isExporting" @click="handleExport">
+                                    {{ isExporting ? 'Exporting…' : 'Export CSV' }}
+                                </button>
+                                <button class="ghost-button" :disabled="isImporting" @click="triggerImport">
+                                    {{ isImporting ? 'Importing…' : 'Import CSV' }}
+                                </button>
+                                <input
+                                    ref="importFileInput"
+                                    type="file"
+                                    accept=".csv,text/csv"
+                                    style="display:none"
+                                    @change="handleImportFileSelected"
+                                />
+                            </template>
                             <button class="ghost-button" @click="goToPos">Back to POS</button>
                         </div>
                     </div>
@@ -97,6 +109,18 @@
                         >
                             Clear filters
                         </button>
+                    </div>
+
+                    <!-- IMPORT RESULT -->
+                    <div v-if="importResult" class="import-result" :class="importResult.failed > 0 ? 'import-result--warn' : 'import-result--ok'">
+                        <div class="import-result__summary">
+                            <span>Import complete: <strong>{{ importResult.imported }}</strong> sale{{ importResult.imported !== 1 ? 's' : '' }} added{{ importResult.failed > 0 ? `, ${importResult.failed} failed` : '' }}.</span>
+                            <button class="import-result__close" @click="importResult = null">✕</button>
+                        </div>
+                        <ul v-if="importResult.errors.length > 0" class="import-result__errors">
+                            <li v-for="err in importResult.errors.slice(0, 10)" :key="err.saleId">Sale {{ err.saleId }}: {{ err.message }}</li>
+                            <li v-if="importResult.errors.length > 10" class="import-result__more">… and {{ importResult.errors.length - 10 }} more</li>
+                        </ul>
                     </div>
 
                     <!-- TABLE PANEL -->
@@ -265,7 +289,7 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { listProducts, ProductResponse } from '@/api/products';
-import { exportSales, getSale, listSales, SaleDetail, SaleSummary, voidSale } from '@/api/sales';
+import { exportSales, getSale, importSales, listSales, SaleDetail, SalesImportResult, SaleSummary, voidSale } from '@/api/sales';
 import { listStoreMembers, StoreMember } from '@/api/storeMembers';
 import { useToast } from '@/composables/useToast';
 import { useStoreContextStore } from '@/stores/storeContext';
@@ -280,6 +304,9 @@ const userContext = useUserContextStore();
 const { showToast } = useToast();
 const canImportExport = computed(() => hasPlanFeature(userContext.effectivePlan, 'importExport'));
 const isExporting = ref(false);
+const isImporting = ref(false);
+const importFileInput = ref<HTMLInputElement | null>(null);
+const importResult = ref<SalesImportResult | null>(null);
 
 const sales = ref<SaleSummary[]>([]);
 const isLoading = ref(false);
@@ -748,6 +775,27 @@ const goToPos = () => {
     router.push(`/stores/${storeContext.currentStoreId}/pos`);
 };
 
+const triggerImport = () => {
+    importResult.value = null;
+    importFileInput.value?.click();
+};
+
+const handleImportFileSelected = async (event: Event) => {
+    const file = (event.target as HTMLInputElement).files?.[0];
+    if (!file || !storeContext.currentStoreId) return;
+    (event.target as HTMLInputElement).value = '';
+    isImporting.value = true;
+    try {
+        const result = await importSales(storeContext.currentStoreId, file);
+        importResult.value = result;
+        if (result.imported > 0) await loadSales();
+    } catch {
+        importResult.value = { imported: 0, failed: 1, errors: [{ saleId: '—', message: 'Upload failed. Check the file and try again.' }] };
+    } finally {
+        isImporting.value = false;
+    }
+};
+
 const handleExport = async () => {
     const storeId = storeContext.currentStoreId;
     if (!storeId) return;
@@ -830,6 +878,20 @@ watch(
 
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+.import-result {
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    font-size: 0.875rem;
+    margin-bottom: 0.75rem;
+}
+.import-result--ok { background: #f0fdf4; border: 1px solid #86efac; color: #15803d; }
+.import-result--warn { background: #fffbeb; border: 1px solid #fcd34d; color: #92400e; }
+.import-result__summary { display: flex; justify-content: space-between; align-items: center; }
+.import-result__close { background: none; border: none; cursor: pointer; font-size: 1rem; opacity: 0.6; }
+.import-result__close:hover { opacity: 1; }
+.import-result__errors { margin: 0.5rem 0 0; padding-left: 1.25rem; display: flex; flex-direction: column; gap: 0.2rem; }
+.import-result__more { opacity: 0.7; font-style: italic; }
 
 /* ============================================================
    TOKENS

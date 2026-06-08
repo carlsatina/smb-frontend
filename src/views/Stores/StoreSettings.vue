@@ -24,7 +24,7 @@
                     <span v-if="currentStore" class="st-role-badge">{{ currentStore.role }}</span>
                 </div>
 
-                <div v-if="storeContext.isLoading" class="st-state">Loading store settings...</div>
+                <div v-if="storeContext.isLoading && !currentStore" class="st-state">Loading store settings...</div>
 
                 <div v-else-if="!currentStore" class="st-state">
                     Store not found. Return to the store list to select another store.
