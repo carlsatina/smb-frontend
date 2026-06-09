@@ -7,261 +7,220 @@
                 <div class="st-header-left">
                     <span class="st-eyebrow">Store Settings</span>
                     <h1 class="st-title">{{ storeTitle }}</h1>
-                    <p class="st-subtitle">Manage timezone, currency, and inventory defaults for {{ storeDescriptionName }}.</p>
+                    <p class="st-subtitle">{{ currentStoreLabel }}</p>
                 </div>
                 <div class="st-header-right">
+                    <span v-if="currentStore" class="st-role-badge">{{ currentStore.role }}</span>
                     <button class="st-btn-ghost" @click="goToStores">Back to stores</button>
                 </div>
             </header>
 
-            <!-- Panel 1: Store profile -->
-            <section class="st-panel">
-                <div class="st-panel-header">
-                    <div>
-                        <h2 class="st-panel-title">Store profile</h2>
-                        <p class="st-panel-sub">{{ currentStoreLabel }}</p>
-                    </div>
-                    <span v-if="currentStore" class="st-role-badge">{{ currentStore.role }}</span>
-                </div>
+            <!-- Body: sidebar + content -->
+            <div class="st-body">
 
-                <div v-if="storeContext.isLoading && !currentStore" class="st-state">Loading store settings...</div>
-
-                <div v-else-if="!currentStore" class="st-state">
-                    Store not found. Return to the store list to select another store.
-                </div>
-
-                <form v-else class="st-form" @submit.prevent="saveSettings">
-                    <div class="st-form-grid">
-                        <label class="st-field">
-                            Store name
-                            <input
-                                v-model="storeForm.name"
-                                type="text"
-                                placeholder="Cafe Downtown"
-                                :disabled="!canEdit"
-                                required
-                            />
-                        </label>
-
-                        <label class="st-field">
-                            Store type
-                            <select v-model="storeForm.storeType" :disabled="!canEdit">
-                                <option value="RETAIL">Retail (point of sale)</option>
-                                <option value="WAREHOUSE">Warehouse (stock holding)</option>
-                            </select>
-                        </label>
-
-                        <label class="st-field">
-                            Timezone
-                            <select v-model="storeForm.timezone" :disabled="!canEdit">
-                                <option v-for="timezone in timezoneOptions" :key="timezone" :value="timezone">
-                                    {{ timezone }}
-                                </option>
-                            </select>
-                        </label>
-
-                        <label class="st-field">
-                            Currency
-                            <select v-model="storeForm.currency" :disabled="!canEdit">
-                                <option v-for="currency in currencyOptions" :key="currency" :value="currency">
-                                    {{ currency }}
-                                </option>
-                            </select>
-                        </label>
-
-                        <label class="st-field">
-                            Low stock threshold
-                            <input
-                                v-model.number="storeForm.lowStockThreshold"
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                placeholder="0"
-                                :disabled="!canEdit"
-                            />
-                        </label>
-
-                        <label class="st-field">
-                            Tax rate (%)
-                            <input
-                                v-model.number="storeForm.defaultTaxRate"
-                                type="number"
-                                min="0"
-                                max="100"
-                                step="0.01"
-                                placeholder="0"
-                                :disabled="!canEdit"
-                            />
-                        </label>
-
-                        <label class="st-field">
-                            Discount (%)
-                            <input
-                                v-model.number="storeForm.defaultDiscount"
-                                type="number"
-                                min="0"
-                                max="100"
-                                step="0.01"
-                                placeholder="0"
-                                :disabled="!canEdit"
-                            />
-                        </label>
-                    </div>
-
-                    <label class="st-toggle-field">
-                        <input v-model="storeForm.allowNegativeStock" type="checkbox" :disabled="!canEdit" />
-                        <span class="st-toggle-track"></span>
-                        <span class="st-toggle-label">Allow negative stock</span>
-                    </label>
-
-                    <div class="st-catalog-box">
-                        <div class="st-catalog-header">
-                            <h3 class="st-catalog-title">Catalog defaults</h3>
-                            <p class="st-catalog-sub">Define the unit and category dropdowns used in products.</p>
-                        </div>
-                        <div class="st-catalog-grid">
-                            <div class="st-catalog-group">
-                                <span class="st-catalog-label">Units</span>
-                                <div class="st-catalog-input">
-                                    <input
-                                        v-model="newUnit"
-                                        type="text"
-                                        placeholder="Add unit"
-                                        :disabled="!canEdit"
-                                    />
-                                    <button
-                                        class="st-btn-ghost"
-                                        type="button"
-                                        :disabled="!canEdit || !newUnit.trim()"
-                                        @click="addUnitOption"
-                                    >
-                                        Add
-                                    </button>
-                                </div>
-                                <div v-if="storeForm.unitOptions.length" class="st-catalog-tags">
-                                    <span v-for="unit in storeForm.unitOptions" :key="unit" class="st-catalog-tag">
-                                        {{ unit }}
-                                        <button
-                                            type="button"
-                                            class="st-catalog-remove"
-                                            :disabled="!canEdit"
-                                            @click="removeUnitOption(unit)"
-                                        >
-                                            &times;
-                                        </button>
-                                    </span>
-                                </div>
-                                <div v-else class="st-catalog-empty">No units configured.</div>
-                            </div>
-                            <div class="st-catalog-group">
-                                <span class="st-catalog-label">Categories</span>
-                                <div class="st-catalog-input">
-                                    <input
-                                        v-model="newCategory"
-                                        type="text"
-                                        placeholder="Add category"
-                                        :disabled="!canEdit"
-                                    />
-                                    <button
-                                        class="st-btn-ghost"
-                                        type="button"
-                                        :disabled="!canEdit || !newCategory.trim()"
-                                        @click="addCategoryOption"
-                                    >
-                                        Add
-                                    </button>
-                                </div>
-                                <div v-if="storeForm.categoryOptions.length" class="st-catalog-tags">
-                                    <span
-                                        v-for="category in storeForm.categoryOptions"
-                                        :key="category"
-                                        class="st-catalog-tag"
-                                    >
-                                        {{ category }}
-                                        <button
-                                            type="button"
-                                            class="st-catalog-remove"
-                                            :disabled="!canEdit"
-                                            @click="removeCategoryOption(category)"
-                                        >
-                                            &times;
-                                        </button>
-                                    </span>
-                                </div>
-                                <div v-else class="st-catalog-empty">No categories configured.</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <p v-if="!canEdit" class="st-permission-note">
-                        Your role is {{ currentStore?.role }}. You can view settings but only owners or admins can edit.
-                    </p>
-
-                    <div class="st-form-footer">
-                        <button class="st-btn-ghost" type="button" :disabled="!currentStore" @click="resetForm">
-                            Reset changes
+                <!-- Left sidebar nav -->
+                <nav class="st-sidebar">
+                    <div class="st-sidebar-group">
+                        <span class="st-sidebar-group-label">Settings</span>
+                        <button class="st-sidebar-item" :class="{ 'is-active': activeSection === 'profile' }" @click="activeSection = 'profile'">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="18" rx="2"/><path d="M8 10h8M8 14h5"/></svg>
+                            Store profile
                         </button>
-                        <button class="st-btn-primary" type="submit" :disabled="!canEdit || !storeForm.name || isSaving">
-                            {{ isSaving ? 'Saving...' : 'Save changes' }}
+                        <button class="st-sidebar-item" :class="{ 'is-active': activeSection === 'payment' }" @click="activeSection = 'payment'">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2"/><path d="M1 10h22"/></svg>
+                            Payment methods
+                        </button>
+                        <button class="st-sidebar-item" :class="{ 'is-active': activeSection === 'catalog' }" @click="activeSection = 'catalog'">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 10h16M4 14h10"/></svg>
+                            Catalog defaults
                         </button>
                     </div>
-                </form>
-            </section>
 
-            <!-- Quick nav to related pages -->
-            <div class="st-nav-links">
-                <button class="st-nav-card" @click="goToTeam" :disabled="!currentStore">
-                    <div class="st-nav-card-icon">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                    <div class="st-sidebar-group">
+                        <span class="st-sidebar-group-label">Navigate</span>
+                        <button class="st-sidebar-item" :disabled="!currentStore" @click="goToTeam">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                            Team &amp; roles
+                            <svg class="st-sidebar-external" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+                        </button>
+                        <button class="st-sidebar-item" @click="goToPlan">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+                            Plan &amp; subscription
+                            <svg class="st-sidebar-external" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+                        </button>
                     </div>
-                    <div class="st-nav-card-body">
-                        <span class="st-nav-card-title">Team &amp; roles</span>
-                        <span class="st-nav-card-sub">Manage members and invitations</span>
+
+                    <div class="st-sidebar-group">
+                        <button class="st-sidebar-item st-sidebar-item--danger" :class="{ 'is-active': activeSection === 'danger' }" @click="activeSection = 'danger'">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                            Danger zone
+                        </button>
                     </div>
-                    <svg class="st-nav-card-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-                </button>
-                <button class="st-nav-card" @click="goToPlan">
-                    <div class="st-nav-card-icon">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/></svg>
-                    </div>
-                    <div class="st-nav-card-body">
-                        <span class="st-nav-card-title">Plan &amp; subscription</span>
-                        <span class="st-nav-card-sub">View your plan, limits, and feature access</span>
-                    </div>
-                    <svg class="st-nav-card-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-                </button>
+                </nav>
+
+                <!-- Right content area -->
+                <div class="st-content">
+
+                    <div v-if="storeContext.isLoading && !currentStore" class="st-state">Loading store settings…</div>
+                    <div v-else-if="!currentStore" class="st-state">Store not found. Return to the store list to select another.</div>
+
+                    <template v-else>
+
+                        <!-- ── Store profile ── -->
+                        <section v-if="activeSection === 'profile'" class="st-section">
+                            <div class="st-section-header">
+                                <h2 class="st-section-title">Store profile</h2>
+                                <p class="st-section-sub">Basic identity, locale, and inventory defaults for this store.</p>
+                            </div>
+                            <form class="st-form" @submit.prevent="saveSettings">
+                                <div class="st-form-grid">
+                                    <label class="st-field">
+                                        Store name
+                                        <input v-model="storeForm.name" type="text" placeholder="Cafe Downtown" :disabled="!canEdit" required />
+                                    </label>
+                                    <label class="st-field">
+                                        Store type
+                                        <select v-model="storeForm.storeType" :disabled="!canEdit">
+                                            <option value="RETAIL">Retail (point of sale)</option>
+                                            <option value="WAREHOUSE">Warehouse (stock holding)</option>
+                                        </select>
+                                    </label>
+                                    <label class="st-field">
+                                        Timezone
+                                        <select v-model="storeForm.timezone" :disabled="!canEdit">
+                                            <option v-for="tz in timezoneOptions" :key="tz" :value="tz">{{ tz }}</option>
+                                        </select>
+                                    </label>
+                                    <label class="st-field">
+                                        Currency
+                                        <select v-model="storeForm.currency" :disabled="!canEdit">
+                                            <option v-for="c in currencyOptions" :key="c" :value="c">{{ c }}</option>
+                                        </select>
+                                    </label>
+                                    <label class="st-field">
+                                        Low stock threshold
+                                        <input v-model.number="storeForm.lowStockThreshold" type="number" min="0" step="0.01" placeholder="0" :disabled="!canEdit" />
+                                    </label>
+                                    <label class="st-field">
+                                        Tax rate (%)
+                                        <input v-model.number="storeForm.defaultTaxRate" type="number" min="0" max="100" step="0.01" placeholder="0" :disabled="!canEdit" />
+                                    </label>
+                                    <label class="st-field">
+                                        Discount (%)
+                                        <input v-model.number="storeForm.defaultDiscount" type="number" min="0" max="100" step="0.01" placeholder="0" :disabled="!canEdit" />
+                                    </label>
+                                    <label class="st-field">
+                                        Cashier sales history limit
+                                        <input v-model.number="storeForm.cashierSalesHistoryLimit" type="number" min="1" step="1" placeholder="No limit" :disabled="!canEdit" />
+                                        <span class="st-field-hint">Max recent sales shown to cashier role. Leave blank for no limit.</span>
+                                    </label>
+                                </div>
+                                <label class="st-toggle-field">
+                                    <input v-model="storeForm.allowNegativeStock" type="checkbox" :disabled="!canEdit" />
+                                    <span class="st-toggle-track"></span>
+                                    <span class="st-toggle-label">Allow negative stock</span>
+                                </label>
+                                <p v-if="!canEdit" class="st-permission-note">Your role is {{ currentStore?.role }}. Only owners or admins can edit settings.</p>
+                                <div class="st-form-footer">
+                                    <button class="st-btn-ghost" type="button" @click="resetForm">Reset changes</button>
+                                    <button class="st-btn-primary" type="submit" :disabled="!canEdit || !storeForm.name || isSaving">
+                                        {{ isSaving ? 'Saving…' : 'Save changes' }}
+                                    </button>
+                                </div>
+                            </form>
+                        </section>
+
+                        <!-- ── Payment methods ── -->
+                        <section v-if="activeSection === 'payment'" class="st-section">
+                            <div class="st-section-header">
+                                <h2 class="st-section-title">Payment methods</h2>
+                                <p class="st-section-sub">Choose which payment methods are available at the POS.</p>
+                            </div>
+                            <form class="st-form" @submit.prevent="saveSettings">
+                                <div class="st-pm-grid">
+                                    <label v-for="pm in allPaymentMethods" :key="pm.value" class="st-pm-option" :class="{ 'st-pm-option--disabled': !canEdit }">
+                                        <input type="checkbox" :value="pm.value" v-model="storeForm.paymentMethods" :disabled="!canEdit" />
+                                        {{ pm.label }}
+                                    </label>
+                                </div>
+                                <p v-if="!canEdit" class="st-permission-note">Only owners or admins can edit settings.</p>
+                                <div class="st-form-footer">
+                                    <button class="st-btn-ghost" type="button" @click="resetForm">Reset changes</button>
+                                    <button class="st-btn-primary" type="submit" :disabled="!canEdit || isSaving">
+                                        {{ isSaving ? 'Saving…' : 'Save changes' }}
+                                    </button>
+                                </div>
+                            </form>
+                        </section>
+
+                        <!-- ── Catalog defaults ── -->
+                        <section v-if="activeSection === 'catalog'" class="st-section">
+                            <div class="st-section-header">
+                                <h2 class="st-section-title">Catalog defaults</h2>
+                                <p class="st-section-sub">Define the unit and category dropdowns used when creating products.</p>
+                            </div>
+                            <form class="st-form" @submit.prevent="saveSettings">
+                                <div class="st-catalog-box">
+                                    <div class="st-catalog-group">
+                                        <span class="st-catalog-label">Units</span>
+                                        <div class="st-catalog-input">
+                                            <input v-model="newUnit" type="text" placeholder="Add unit" :disabled="!canEdit" />
+                                            <button class="st-btn-ghost" type="button" :disabled="!canEdit || !newUnit.trim()" @click="addUnitOption">Add</button>
+                                        </div>
+                                        <div v-if="storeForm.unitOptions.length" class="st-catalog-tags">
+                                            <span v-for="unit in storeForm.unitOptions" :key="unit" class="st-catalog-tag">
+                                                {{ unit }}
+                                                <button type="button" class="st-catalog-remove" :disabled="!canEdit" @click="removeUnitOption(unit)">&times;</button>
+                                            </span>
+                                        </div>
+                                        <div v-else class="st-catalog-empty">No units configured.</div>
+                                    </div>
+                                    <div class="st-catalog-group">
+                                        <span class="st-catalog-label">Categories</span>
+                                        <div class="st-catalog-input">
+                                            <input v-model="newCategory" type="text" placeholder="Add category" :disabled="!canEdit" />
+                                            <button class="st-btn-ghost" type="button" :disabled="!canEdit || !newCategory.trim()" @click="addCategoryOption">Add</button>
+                                        </div>
+                                        <div v-if="storeForm.categoryOptions.length" class="st-catalog-tags">
+                                            <span v-for="category in storeForm.categoryOptions" :key="category" class="st-catalog-tag">
+                                                {{ category }}
+                                                <button type="button" class="st-catalog-remove" :disabled="!canEdit" @click="removeCategoryOption(category)">&times;</button>
+                                            </span>
+                                        </div>
+                                        <div v-else class="st-catalog-empty">No categories configured.</div>
+                                    </div>
+                                </div>
+                                <p v-if="!canEdit" class="st-permission-note">Only owners or admins can edit settings.</p>
+                                <div class="st-form-footer">
+                                    <button class="st-btn-ghost" type="button" @click="resetForm">Reset changes</button>
+                                    <button class="st-btn-primary" type="submit" :disabled="!canEdit || isSaving">
+                                        {{ isSaving ? 'Saving…' : 'Save changes' }}
+                                    </button>
+                                </div>
+                            </form>
+                        </section>
+
+                        <!-- ── Danger zone ── -->
+                        <section v-if="activeSection === 'danger'" class="st-section">
+                            <div class="st-section-header">
+                                <h2 class="st-section-title st-section-title--danger">Danger zone</h2>
+                                <p class="st-section-sub">Irreversible actions for this store. Proceed with caution.</p>
+                            </div>
+                            <div class="st-danger-card">
+                                <div>
+                                    <p class="st-danger-card-title">Archive store</p>
+                                    <p class="st-danger-card-sub">Hides this store from all members and disables new activity. Data is retained but cannot be reversed without database access.</p>
+                                </div>
+                                <button class="st-btn-danger" type="button" :disabled="!canArchive || isArchiving" @click="archiveStore">
+                                    {{ isArchiving ? 'Archiving…' : 'Archive store' }}
+                                </button>
+                            </div>
+                            <p v-if="!canArchive" class="st-permission-note">Only owners can archive a store.</p>
+                        </section>
+
+                    </template>
+                </div>
             </div>
-
-            <!-- Archive store -->
-            <section class="st-panel st-danger-panel">
-                <div class="st-panel-header">
-                    <div>
-                        <h2 class="st-panel-title">Archive store</h2>
-                        <p class="st-panel-sub">Remove this store from active use. Data stays in the database.</p>
-                    </div>
-                </div>
-
-                <div v-if="!currentStore" class="st-state">
-                    Select a store to manage archive settings.
-                </div>
-
-                <div v-else class="st-danger-body">
-                    <p class="st-danger-text">
-                        Archiving hides the store from all members and disables new activity. This action can be reversed only with database access.
-                    </p>
-                    <div class="st-danger-actions">
-                        <button
-                            class="st-btn-danger"
-                            type="button"
-                            :disabled="!canArchive || isArchiving"
-                            @click="archiveStore"
-                        >
-                            {{ isArchiving ? 'Archiving...' : 'Archive store' }}
-                        </button>
-                        <p v-if="!canArchive" class="st-permission-note">Only owners can archive a store.</p>
-                    </div>
-                </div>
-            </section>
 
         </div>
     </section>
@@ -289,6 +248,8 @@ const storeForm = reactive({
     lowStockThreshold: 0,
     defaultTaxRate: 0,
     defaultDiscount: 0,
+    cashierSalesHistoryLimit: null as number | null,
+    paymentMethods: ['CASH', 'CARD', 'TRANSFER', 'GCASH', 'MAYA', 'OTHER'] as string[],
     unitOptions: [...DEFAULT_UNIT_OPTIONS],
     categoryOptions: [...DEFAULT_CATEGORY_OPTIONS],
 });
@@ -312,6 +273,17 @@ const baseCurrencyOptions = [
     'PHP', 'USD', 'EUR', 'GBP', 'AUD', 'CAD',
     'SGD', 'HKD', 'JPY', 'CNY', 'KRW', 'THB', 'IDR', 'MYR', 'VND',
 ];
+
+const allPaymentMethods = [
+    { value: 'CASH', label: 'Cash' },
+    { value: 'CARD', label: 'Card' },
+    { value: 'GCASH', label: 'GCash' },
+    { value: 'MAYA', label: 'Maya' },
+    { value: 'TRANSFER', label: 'Bank Transfer' },
+    { value: 'OTHER', label: 'Other' },
+];
+
+const activeSection = ref<'profile' | 'payment' | 'catalog' | 'danger'>('profile');
 
 const isSaving = ref(false);
 const isArchiving = ref(false);
@@ -373,6 +345,10 @@ const resetForm = () => {
     storeForm.lowStockThreshold = currentStore.value.lowStockThreshold ?? 0;
     storeForm.defaultTaxRate = currentStore.value.defaultTaxRate ?? 0;
     storeForm.defaultDiscount = currentStore.value.defaultDiscount ?? 0;
+    storeForm.cashierSalesHistoryLimit = currentStore.value.cashierSalesHistoryLimit ?? null;
+    storeForm.paymentMethods = currentStore.value.paymentMethods?.length
+        ? [...currentStore.value.paymentMethods]
+        : ['CASH', 'CARD', 'TRANSFER', 'GCASH', 'MAYA', 'OTHER'];
     storeForm.unitOptions = normalizeOptions(currentStore.value.unitOptions ?? [], DEFAULT_UNIT_OPTIONS);
     storeForm.categoryOptions = normalizeOptions(currentStore.value.categoryOptions ?? [], DEFAULT_CATEGORY_OPTIONS);
     newUnit.value = '';
@@ -497,8 +473,6 @@ watch(
 </script>
 
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-
 :root {
     --c-text: #0f172a;
     --c-muted: #64748b;
@@ -514,12 +488,12 @@ watch(
     min-height: 100vh;
     background: var(--c-bg);
     padding: 2.5rem 1.5rem 4rem;
-    font-family: 'Inter', sans-serif;
+    font-family: var(--app-font-sans);
     color: var(--c-text);
 }
 
 .st-shell {
-    max-width: 960px;
+    max-width: 1280px;
     margin: 0 auto;
     display: flex;
     flex-direction: column;
@@ -579,35 +553,173 @@ watch(
     padding-top: 0.25rem;
 }
 
-/* ── Panels ── */
-.st-panel {
+/* ── Sidebar + content body ── */
+.st-body {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    gap: 2rem;
+    align-items: start;
+}
+
+/* ── Left sidebar ── */
+.st-sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
     background: var(--c-surface);
     border: 1px solid var(--c-border);
-    border-radius: 16px;
+    border-radius: 14px;
+    padding: 0.75rem 0.5rem;
+    position: sticky;
+    top: 1.5rem;
+}
+
+.st-sidebar-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    padding: 0.25rem 0;
+}
+
+.st-sidebar-group + .st-sidebar-group {
+    border-top: 1px solid var(--c-border);
+    margin-top: 0.25rem;
+    padding-top: 0.5rem;
+}
+
+.st-sidebar-group-label {
+    font-size: 0.62rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: #94a3b8;
+    padding: 0.2rem 0.75rem 0.4rem;
+}
+
+.st-sidebar-item {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #475569;
+    cursor: pointer;
+    text-align: left;
+    font-family: var(--app-font-sans);
+    transition: background 0.12s, color 0.12s;
+}
+
+.st-sidebar-item:hover:not(:disabled) {
+    background: #f1f5f9;
+    color: var(--c-text);
+}
+
+.st-sidebar-item.is-active {
+    background: rgba(13, 148, 136, 0.08);
+    color: var(--c-accent-dark);
+    font-weight: 600;
+}
+
+.st-sidebar-item.is-active svg {
+    color: var(--c-accent);
+}
+
+.st-sidebar-item--danger {
+    color: #b91c1c;
+}
+
+.st-sidebar-item--danger:hover:not(:disabled) {
+    background: #fef2f2;
+    color: #991b1b;
+}
+
+.st-sidebar-item--danger.is-active {
+    background: #fef2f2;
+    color: #991b1b;
+}
+
+.st-sidebar-item:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.st-sidebar-external {
+    margin-left: auto;
+    color: #cbd5e1;
+    flex-shrink: 0;
+}
+
+/* ── Right content area ── */
+.st-content {
+    min-width: 0;
+}
+
+.st-section {
+    background: var(--c-surface);
+    border: 1px solid var(--c-border);
+    border-radius: 14px;
     padding: 1.75rem;
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
 }
 
-.st-panel-header {
+.st-section-header {
     display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 1rem;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--c-border);
 }
 
-.st-panel-title {
-    font-size: 1.1rem;
+.st-section-title {
+    margin: 0;
+    font-size: 1.05rem;
     font-weight: 700;
-    margin: 0 0 0.2rem;
     color: var(--c-text);
 }
 
-.st-panel-sub {
+.st-section-title--danger {
+    color: #b91c1c;
+}
+
+.st-section-sub {
     margin: 0;
     font-size: 0.85rem;
     color: var(--c-muted);
+}
+
+/* ── Danger card ── */
+.st-danger-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+    background: #fff5f5;
+    border: 1px solid #fecaca;
+    border-radius: 10px;
+    padding: 1.1rem 1.25rem;
+}
+
+.st-danger-card-title {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #991b1b;
+    margin: 0 0 0.2rem;
+}
+
+.st-danger-card-sub {
+    font-size: 0.82rem;
+    color: #b91c1c;
+    margin: 0;
+    max-width: 480px;
+    line-height: 1.5;
 }
 
 .st-role-badge {
@@ -727,6 +839,7 @@ watch(
     gap: 1.25rem;
 }
 
+
 .st-form-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
@@ -750,7 +863,7 @@ watch(
     border: 1px solid var(--c-border);
     padding: 0.6rem 0.75rem;
     font-size: 0.9rem;
-    font-family: 'Inter', sans-serif;
+    font-family: var(--app-font-sans);
     color: var(--c-text);
     background: var(--c-surface);
     text-transform: none;
@@ -770,6 +883,14 @@ watch(
     background: var(--c-bg);
     color: #94a3b8;
     cursor: not-allowed;
+}
+
+.st-field-hint {
+    font-size: 0.72rem;
+    font-weight: 400;
+    color: #94a3b8;
+    text-transform: none;
+    letter-spacing: 0;
 }
 
 /* ── Toggle ── */
@@ -831,13 +952,51 @@ watch(
 }
 
 /* ── Catalog defaults box ── */
-.st-catalog-box {
-    border: 1px solid var(--c-border);
-    border-radius: 12px;
-    padding: 1.25rem;
+.st-payment-methods {
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: 0.75rem;
+}
+
+.st-pm-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.st-pm-option {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.4rem 0.75rem;
+    border: 1px solid var(--c-border);
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.12s, border-color 0.12s;
+}
+
+.st-pm-option:has(input:checked) {
+    background: #f0fdf4;
+    border-color: var(--c-accent);
+    color: var(--c-accent);
+}
+
+.st-pm-option input[type="checkbox"] {
+    accent-color: var(--c-accent);
+}
+
+.st-pm-option--disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.st-catalog-box {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
 }
 
 .st-catalog-title {
@@ -955,449 +1114,86 @@ watch(
     color: var(--c-muted);
 }
 
-/* ── Plan panel ── */
-.st-plan-body {
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
-}
-
-.st-plan-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 1rem;
-}
-
-.st-plan-card {
-    background: var(--c-surface);
-    border: 1px solid var(--c-border);
-    border-radius: 12px;
-    padding: 1rem 1.25rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0.3rem;
-}
-
-.st-plan-label {
-    font-size: 0.7rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: var(--c-muted);
-}
-
-.st-plan-value {
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: var(--c-text);
-    line-height: 1.2;
-}
-
-.st-plan-meta {
-    font-size: 0.78rem;
-    color: var(--c-muted);
-}
-
-/* ── Feature access list ── */
-.st-plan-features-title {
-    margin: 0 0 0.75rem;
-    font-size: 0.95rem;
-    font-weight: 700;
-    color: var(--c-text);
-}
-
-.st-feature-list {
-    border: 1px solid var(--c-border);
-    border-radius: 10px;
-    overflow: hidden;
-}
-
-.st-feature-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.7rem 1rem;
-    font-size: 0.9rem;
-    color: var(--c-text);
-}
-
-.st-feature-row + .st-feature-row {
-    border-top: 1px solid var(--c-border);
-}
-
-.st-feature-row.locked .st-feature-name {
-    color: var(--c-muted);
-}
-
-.st-feature-name {
-    font-weight: 500;
-}
-
-.st-feature-badge {
-    font-size: 0.72rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    padding: 0.2rem 0.6rem;
-    border-radius: 999px;
-}
-
-.st-feature-badge--included {
-    background: rgba(13, 148, 136, 0.1);
-    color: var(--c-accent-dark);
-}
-
-.st-feature-badge--locked {
-    background: #f1f5f9;
-    color: var(--c-muted);
-}
-
-/* ── Plan CTA ── */
-.st-plan-cta {
-    background: rgba(13, 148, 136, 0.06);
-    border: 1px solid rgba(13, 148, 136, 0.2);
-    border-radius: 10px;
-    padding: 1rem 1.25rem;
-}
-
-.st-plan-cta-inner {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    flex-wrap: wrap;
-}
-
-.st-plan-cta-note {
-    font-size: 0.85rem;
-    color: var(--c-muted);
-    flex: 1;
-}
-
-/* ── Team panel ── */
-.st-team-body {
-    display: flex;
-    flex-direction: column;
-}
-
-.st-team-section {
-    padding: 1.25rem 0;
-}
-
-.st-team-section + .st-team-section {
-    border-top: 1px solid var(--c-border);
-}
-
-.st-team-section-title {
-    margin: 0 0 0.2rem;
-    font-size: 1rem;
-    font-weight: 700;
-    color: var(--c-text);
-}
-
-.st-team-section-sub {
-    font-size: 0.82rem;
-    color: var(--c-muted);
-    margin: 0 0 1rem;
-}
-
-/* ── Member rows ── */
-.st-member-list {
-    display: flex;
-    flex-direction: column;
-}
-
-.st-member-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.85rem 0;
-    border-bottom: 1px solid var(--c-border);
-    gap: 1rem;
-}
-
-.st-member-row:last-child {
-    border-bottom: none;
-}
-
-.st-member-info {
-    display: flex;
-    flex-direction: column;
-    gap: 0.15rem;
-    min-width: 0;
-}
-
-.st-member-name {
-    font-weight: 600;
-    font-size: 0.9rem;
-    color: var(--c-text);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.st-member-meta {
-    font-size: 0.78rem;
-    color: var(--c-muted);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.st-member-actions {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    flex-shrink: 0;
-}
-
-/* ── Role select ── */
-.st-role-select {
-    border: 1px solid var(--c-border);
-    border-radius: 6px;
-    padding: 0.35rem 0.5rem;
-    font-size: 0.82rem;
-    font-family: 'Inter', sans-serif;
-    color: var(--c-text);
-    background: var(--c-surface);
-    cursor: pointer;
-}
-
-.st-role-select:disabled {
-    background: var(--c-bg);
-    color: #94a3b8;
-    cursor: not-allowed;
-}
-
-/* ── Invite form ── */
-.st-invite-form {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    gap: 0.85rem 1rem;
-    align-items: end;
-}
-
-.st-invite-form-action {
-    grid-column: 1 / -1;
-    display: flex;
-    justify-content: flex-end;
-}
-
-/* ── Invite link card ── */
-.st-invite-link-card {
-    margin-top: 1rem;
-    background: rgba(13, 148, 136, 0.05);
-    border: 1px solid rgba(13, 148, 136, 0.18);
-    border-radius: 10px;
-    padding: 0.9rem 1rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-}
-
-.st-invite-link-label {
-    font-size: 0.78rem;
-    font-weight: 600;
-    color: var(--c-accent-dark);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-}
-
-.st-invite-link {
-    display: flex;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-}
-
-.st-invite-link input {
-    flex: 1;
-    min-width: 200px;
-    border-radius: 8px;
-    border: 1px solid var(--c-border);
-    padding: 0.6rem 0.75rem;
-    font-size: 0.85rem;
-    font-family: 'Inter', sans-serif;
-    background: var(--c-surface);
-    color: var(--c-muted);
-}
-
-/* ── Invite rows ── */
-.st-invite-list {
-    display: flex;
-    flex-direction: column;
-}
-
-.st-invite-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.85rem 0;
-    border-bottom: 1px solid var(--c-border);
-    gap: 1rem;
-}
-
-.st-invite-row:last-child {
-    border-bottom: none;
-}
-
-.st-invite-actions {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    flex-shrink: 0;
-}
-
-/* ── Status pills ── */
-.st-status-pill {
-    display: inline-flex;
-    align-items: center;
-    padding: 0.22rem 0.65rem;
-    border-radius: 999px;
-    font-size: 0.7rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-}
-
-.st-status-pill.status-pill--warning {
-    background: rgba(234, 179, 8, 0.15);
-    color: #92400e;
-}
-
-.st-status-pill.status-pill--active {
-    background: rgba(16, 185, 129, 0.15);
-    color: #047857;
-}
-
-.st-status-pill.status-pill--inactive {
-    background: #f1f5f9;
-    color: #64748b;
-}
-
-/* ── Nav link cards ── */
-.st-nav-links {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 1rem;
-}
-
-.st-nav-card {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    background: var(--c-surface);
-    border: 1px solid var(--c-border);
-    border-radius: 16px;
-    padding: 1.25rem 1.5rem;
-    text-align: left;
-    cursor: pointer;
-    font-family: 'Inter', sans-serif;
-    transition: border-color 0.15s, background 0.15s;
-    width: 100%;
-}
-
-.st-nav-card:hover:not(:disabled) {
-    background: #f8fafc;
-    border-color: #cbd5e1;
-}
-
-.st-nav-card:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
-.st-nav-card-icon {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 40px;
-    height: 40px;
-    border-radius: 10px;
-    background: rgba(13, 148, 136, 0.08);
-    color: var(--c-accent);
-    flex-shrink: 0;
-}
-
-.st-nav-card-body {
-    display: flex;
-    flex-direction: column;
-    gap: 0.15rem;
-    flex: 1;
-    min-width: 0;
-}
-
-.st-nav-card-title {
-    font-size: 0.95rem;
-    font-weight: 700;
-    color: var(--c-text);
-}
-
-.st-nav-card-sub {
-    font-size: 0.8rem;
-    color: var(--c-muted);
-}
-
-.st-nav-card-arrow {
-    color: #94a3b8;
-    flex-shrink: 0;
-}
-
-/* ── Danger panel ── */
-.st-danger-panel {
-    border-color: #fecaca;
-    background: #fff5f5;
-}
-
-.st-danger-body {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-}
-
-.st-danger-text {
-    margin: 0;
-    color: #991b1b;
-    font-size: 0.9rem;
-    line-height: 1.6;
-}
-
-.st-danger-actions {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    flex-wrap: wrap;
-}
-
 /* ── Responsive ── */
-@media (max-width: 768px) {
+
+/* Tablet: sidebar collapses to horizontal tab strip */
+@media (max-width: 900px) {
+    .st-body {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+
+    .st-sidebar {
+        position: static;
+        flex-direction: row;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        padding: 0.4rem 0.5rem;
+        gap: 0;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+    }
+
+    .st-sidebar::-webkit-scrollbar {
+        display: none;
+    }
+
+    .st-sidebar-group {
+        flex-direction: row;
+        flex-wrap: nowrap;
+        padding: 0;
+        gap: 0.15rem;
+    }
+
+    .st-sidebar-group + .st-sidebar-group {
+        border-top: none;
+        border-left: 1px solid var(--c-border);
+        margin-top: 0;
+        padding-top: 0;
+        margin-left: 0.5rem;
+        padding-left: 0.5rem;
+    }
+
+    .st-sidebar-group-label {
+        display: none;
+    }
+
+    .st-sidebar-item {
+        white-space: nowrap;
+        font-size: 0.82rem;
+        padding: 0.45rem 0.7rem;
+    }
+
+    .st-sidebar-external {
+        display: none;
+    }
+
+    .st-form-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+/* Mobile */
+@media (max-width: 600px) {
+    .st-page {
+        padding: 1.25rem 0.75rem 3rem;
+    }
+
+    .st-shell {
+        gap: 1.25rem;
+    }
+
+    .st-section {
+        padding: 1.25rem 1rem;
+    }
+
     .st-form-grid {
         grid-template-columns: 1fr;
     }
 
-    .st-catalog-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .st-plan-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .st-invite-form {
-        grid-template-columns: 1fr;
-    }
-
-    .st-nav-links {
-        grid-template-columns: 1fr;
-    }
-}
-
-@media (max-width: 600px) {
-    .st-page {
-        padding: 1.5rem 1rem 3rem;
-    }
-
-    .st-panel {
-        padding: 1.25rem;
+    .st-danger-card {
+        flex-direction: column;
+        align-items: flex-start;
     }
 }
 </style>

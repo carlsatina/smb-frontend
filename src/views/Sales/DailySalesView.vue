@@ -409,10 +409,14 @@ const formatMoney = (v: number) =>
 
 const formatDate = (d: string | Date) => {
     const date = typeof d === 'string' ? new Date(d) : d;
-    return date.toLocaleDateString('en-PH', {
-        timeZone: storeTimezone.value,
-        month: 'numeric', day: 'numeric', year: 'numeric', weekday: 'short',
-    });
+    const tz = storeTimezone.value;
+    const datePart = new Intl.DateTimeFormat('en-US', {
+        timeZone: tz, month: '2-digit', day: '2-digit', year: 'numeric',
+    }).format(date);
+    const weekday = new Intl.DateTimeFormat('en-US', {
+        timeZone: tz, weekday: 'short',
+    }).format(date);
+    return `${datePart}, ${weekday}`;
 };
 
 // ── Row helpers ──────────────────────────────────────────────

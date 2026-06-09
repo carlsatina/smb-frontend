@@ -16,6 +16,8 @@ export type StoreSummary = {
     categoryOptions: string[];
     defaultTaxRate: number;
     defaultDiscount: number;
+    cashierSalesHistoryLimit: number | null;
+    paymentMethods: string[];
     role: string;
     ownerPlanTier: PlanTier;
     ownerSubscriptionActive: boolean;

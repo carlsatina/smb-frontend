@@ -270,15 +270,15 @@
 
                         <div class="pagination" v-if="totalPages > 0">
                             <div class="pagination-info">
-                                <span>{{ total }} sale{{ total !== 1 ? 's' : '' }}</span>
-                                <label class="pagination-size">
+                                <span>{{ cashierLimit ? `Latest ${cashierLimit} sales` : `${total} sale${total !== 1 ? 's' : ''}` }}</span>
+                                <label class="pagination-size" v-if="!cashierLimit">
                                     <span>Show</span>
-                                    <select v-model.number="pageSize">
+                                    <select v-model.number="pageSizeRef">
                                         <option v-for="size in pageSizeOptions" :key="size" :value="size">{{ size }}</option>
                                     </select>
                                 </label>
                             </div>
-                            <div v-if="totalPages > 1" class="pagination-controls">
+                            <div v-if="totalPages > 1 && !cashierLimit" class="pagination-controls">
                                 <button class="page-btn" :disabled="page === 1" @click="changePage(page - 1)">
                                     <mdicon name="chevron-left" size="18" />
                                 </button>
@@ -357,7 +357,16 @@ const toDate = ref(formatDateInput(new Date()));
 const customFromDate = ref(formatDateInput(new Date()));
 const customToDate = ref(formatDateInput(new Date()));
 const page = ref(1);
-const pageSize = ref(20);
+const cashierLimit = computed(() => {
+    const role = storeContext.currentStore?.role;
+    const limit = storeContext.currentStore?.cashierSalesHistoryLimit;
+    return role === 'CASHIER' && limit ? limit : null;
+});
+const pageSize = computed({
+    get: () => cashierLimit.value ?? pageSizeRef.value,
+    set: (v: number) => { pageSizeRef.value = v; },
+});
+const pageSizeRef = ref(20);
 const pageSizeOptions = [10, 20, 50];
 const total = ref(0);
 const cashierFilter = ref('');
@@ -365,14 +374,19 @@ const paymentMethodFilter = ref('');
 const productFilter = ref('');
 const cashierOptions = ref<StoreMember[]>([]);
 const productOptions = ref<ProductResponse[]>([]);
-const paymentMethodOptions = [
+const ALL_PAYMENT_METHOD_OPTIONS = [
     { value: 'CASH', label: 'Cash' },
     { value: 'CARD', label: 'Card' },
     { value: 'GCASH', label: 'GCash' },
     { value: 'MAYA', label: 'Maya' },
     { value: 'TRANSFER', label: 'Bank transfer' },
     { value: 'OTHER', label: 'Other' },
-] as const;
+];
+const paymentMethodOptions = computed(() => {
+    const configured = storeContext.currentStore?.paymentMethods;
+    if (!configured?.length) return ALL_PAYMENT_METHOD_OPTIONS;
+    return ALL_PAYMENT_METHOD_OPTIONS.filter(o => configured.includes(o.value));
+});
 
 function formatDateInput(date: Date): string {
     const year = date.getFullYear();

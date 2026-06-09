@@ -115,6 +115,7 @@ import login from '@/composables/auth/login'
 import store from '@/store'
 import getProfile from '@/composables/getProfile'
 import brandLogo from '@/assets/SmB-PoS.png'
+import { useStoreContextStore } from '@/stores/storeContext'
 
 export default {
     name: "LoginWeb",
@@ -155,8 +156,22 @@ export default {
                                 store.methods.setUserAdmin(data.response.value.userInfo.is_admin)
                             }
                         })
-                    const redirectPath = route.query.redirect || '/stores'
-                    router.push(redirectPath)
+                    if (route.query.redirect) {
+                        router.push(String(route.query.redirect))
+                    } else {
+                        try {
+                            const storeContext = useStoreContextStore()
+                            await storeContext.fetchStores()
+                            const ownerStore = storeContext.stores.find(s => s.role === 'OWNER')
+                            if (ownerStore) {
+                                router.push({ name: 'reports', params: { storeId: ownerStore.id } })
+                            } else {
+                                router.push('/stores')
+                            }
+                        } catch {
+                            router.push('/stores')
+                        }
+                    }
                 } else {
                     hasError.value = true
                     errorMsg.value = 'Login failed'

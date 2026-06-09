@@ -15,6 +15,8 @@ export const listStores = () => {
             categoryOptions: string[];
             defaultTaxRate: number;
             defaultDiscount: number;
+            cashierSalesHistoryLimit: number | null;
+            paymentMethods: string[];
             role: string;
             ownerPlanTier: PlanTier;
             ownerSubscriptionActive: boolean;
@@ -50,6 +52,8 @@ export const updateStore = (
         categoryOptions?: string[];
         defaultTaxRate?: number;
         defaultDiscount?: number;
+        cashierSalesHistoryLimit?: number | null;
+        paymentMethods?: string[];
     }
 ) => {
     return apiClient.request<{ store: { id: string; name: string } }>(`/api/v1/stores/${storeId}`, {

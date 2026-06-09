@@ -7,7 +7,7 @@ const accessMap = {
     inventory: ['OWNER', 'ADMIN', 'INVENTORY_MANAGER', 'VIEWER'],
     inventoryAdjustments: ['OWNER', 'ADMIN', 'INVENTORY_MANAGER'],
     salesPos: ['OWNER', 'ADMIN', 'CASHIER'],
-    salesHistory: ['OWNER', 'ADMIN', 'INVENTORY_MANAGER', 'VIEWER'],
+    salesHistory: ['OWNER', 'ADMIN', 'CASHIER', 'INVENTORY_MANAGER', 'VIEWER'],
     salesVoid: ['OWNER', 'ADMIN'],
     purchaseOrders: ['OWNER', 'ADMIN', 'INVENTORY_MANAGER', 'VIEWER'],
     purchaseOrdersWrite: ['OWNER', 'ADMIN', 'INVENTORY_MANAGER'],

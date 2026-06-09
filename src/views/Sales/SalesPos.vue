@@ -342,7 +342,16 @@ const products = ref<Product[]>([]);
 const cartItems = ref<CartItem[]>([]);
 const searchQuery = ref('');
 const activeCategory = ref('ALL');
-const paymentMethod = ref('CASH');
+const paymentMethod = computed({
+    get: () => _paymentMethod.value,
+    set: (v: string) => { _paymentMethod.value = v; },
+});
+const _paymentMethod = ref('CASH');
+watch(() => storeContext.currentStore?.paymentMethods, (methods) => {
+    if (methods?.length && !methods.includes(_paymentMethod.value)) {
+        _paymentMethod.value = methods[0];
+    }
+}, { immediate: true });
 const discountEnabled = ref(false);
 const isLoading = ref(false);
 const isSubmitting = ref(false);
@@ -377,7 +386,11 @@ const categoryPalette = [
     '#fff7ed',
 ];
 
-const paymentMethods = ['CASH', 'CARD', 'GCASH', 'MAYA', 'TRANSFER', 'OTHER'];
+const ALL_PAYMENT_METHODS = ['CASH', 'CARD', 'GCASH', 'MAYA', 'TRANSFER', 'OTHER'];
+const paymentMethods = computed(() => {
+    const configured = storeContext.currentStore?.paymentMethods;
+    return configured?.length ? configured : ALL_PAYMENT_METHODS;
+});
 
 const loadProducts = async () => {
     const storeId = storeContext.currentStoreId;
@@ -840,7 +853,7 @@ watch(
     padding: 1.5rem;
     background: #f8fafc;
     color: var(--c-text);
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-family: var(--app-font-sans);
 }
 
 /* ============================================================
@@ -953,7 +966,7 @@ watch(
     padding: 0.48rem 0.85rem;
     min-width: 200px;
     font-size: 0.85rem;
-    font-family: 'Inter', sans-serif;
+    font-family: var(--app-font-sans);
     color: var(--c-text);
     background: white;
     transition: border-color 0.15s, box-shadow 0.15s;
@@ -976,7 +989,7 @@ watch(
     padding: 0.46rem 0.9rem;
     font-size: 0.82rem;
     font-weight: 600;
-    font-family: 'Inter', sans-serif;
+    font-family: var(--app-font-sans);
     background: transparent;
     color: var(--c-text);
     cursor: pointer;
@@ -1005,7 +1018,7 @@ watch(
     padding: 0.46rem 0.9rem;
     font-size: 0.82rem;
     font-weight: 600;
-    font-family: 'Inter', sans-serif;
+    font-family: var(--app-font-sans);
     color: var(--c-text);
     background: white;
     transition: border-color 0.15s;
@@ -1121,7 +1134,7 @@ watch(
     padding: 0.3rem 0.8rem;
     font-size: 0.72rem;
     font-weight: 600;
-    font-family: 'Inter', sans-serif;
+    font-family: var(--app-font-sans);
     cursor: pointer;
     transition: border-color 0.15s, background 0.15s, box-shadow 0.12s;
 }
@@ -1400,7 +1413,7 @@ watch(
     padding: 0.1rem;
     text-align: center;
     font-size: 0.72rem;
-    font-family: 'Inter', sans-serif;
+    font-family: var(--app-font-sans);
     background: white;
     color: var(--c-text);
 }
@@ -1521,7 +1534,7 @@ watch(
     padding: 0.6rem 0.85rem;
     background: white;
     font-size: 0.875rem;
-    font-family: 'Inter', sans-serif;
+    font-family: var(--app-font-sans);
     color: var(--c-text);
     transition: border-color 0.15s;
 }
@@ -1539,7 +1552,7 @@ watch(
     padding: 0.85rem 1rem;
     font-size: 1rem;
     font-weight: 700;
-    font-family: 'Inter', sans-serif;
+    font-family: var(--app-font-sans);
     background: var(--c-accent);
     color: white;
     cursor: pointer;
@@ -1568,7 +1581,7 @@ watch(
     padding: 0.6rem 1rem;
     font-size: 0.875rem;
     font-weight: 600;
-    font-family: 'Inter', sans-serif;
+    font-family: var(--app-font-sans);
     background: transparent;
     color: var(--c-muted);
     cursor: pointer;
