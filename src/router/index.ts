@@ -21,8 +21,6 @@ import SupplierDetail from '@/views/PurchaseOrders/SupplierDetail.vue'
 import SuppliersList from '@/views/PurchaseOrders/SuppliersList.vue'
 import ReportsDashboard from '@/views/Reports/ReportsDashboard.vue'
 import DailySalesView from '@/views/Sales/DailySalesView.vue'
-import TeamSettings from '@/views/Stores/TeamSettings.vue'
-import AccountPlan from '@/views/Account/AccountPlan.vue'
 import { useStoreContextStore } from '@/stores/storeContext'
 import { useUserContextStore } from '@/stores/userContext'
 import { canAccess, FeatureKey, getDefaultRouteForRole } from '@/utils/roleAccess'
@@ -179,15 +177,11 @@ const routes: Array<RouteRecordRaw> = [
   },
   {
     path: '/stores/:storeId/team',
-    name: 'store-team',
-    component: TeamSettings,
-    meta: { requiresAuth: true, feature: 'storeSettings' }
+    redirect: (to) => ({ path: `/stores/${to.params.storeId}/settings`, query: { section: 'team' } }),
   },
   {
     path: '/account/plan',
-    name: 'account-plan',
-    component: AccountPlan,
-    meta: { requiresAuth: true }
+    redirect: '/stores',
   },
   {
     path: '/admin/login',

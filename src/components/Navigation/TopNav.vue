@@ -107,15 +107,6 @@
                                 </button>
                                 <RouterLink
                                     v-if="canViewSettings"
-                                    :to="`/stores/${currentStoreId}/team`"
-                                    class="topnav__dropdown-item"
-                                    @click="closeMore"
-                                >
-                                    <mdicon name="account-group" size="18" />
-                                    <span>Team</span>
-                                </RouterLink>
-                                <RouterLink
-                                    v-if="canViewSettings"
                                     :to="`/stores/${currentStoreId}/settings`"
                                     class="topnav__dropdown-item"
                                     @click="closeMore"
@@ -283,9 +274,6 @@
                     </RouterLink>
                     <RouterLink v-if="canViewSuppliers && !isPurchaseOrdersLocked" :to="`/stores/${currentStoreId}/suppliers`" class="topnav__mobile-item" @click="closeMobileMenu">
                         <mdicon name="account-group" size="20" /><span>Suppliers</span>
-                    </RouterLink>
-                    <RouterLink v-if="canViewSettings" :to="`/stores/${currentStoreId}/team`" class="topnav__mobile-item" @click="closeMobileMenu">
-                        <mdicon name="account-group" size="20" /><span>Team</span>
                     </RouterLink>
                     <RouterLink v-if="canViewSettings" :to="`/stores/${currentStoreId}/settings`" class="topnav__mobile-item" @click="closeMobileMenu">
                         <mdicon name="cog" size="20" /><span>Settings</span>

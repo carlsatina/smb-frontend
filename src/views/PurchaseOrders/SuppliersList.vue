@@ -35,7 +35,7 @@
 
                             <label class="form-field">
                                 Supplier name
-                                <input v-model="form.name" type="text" placeholder="Fresh Supplier Co" required />
+                                <input ref="supplierNameInputRef" v-model="form.name" type="text" placeholder="Fresh Supplier Co" required />
                             </label>
 
                             <label class="form-field">
@@ -183,7 +183,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { onClickOutside } from '@vueuse/core';
 import { createSupplier, deleteSupplier, listSuppliers, Supplier, updateSupplier } from '@/api/suppliers';
@@ -207,6 +207,7 @@ const searchQuery = ref('');
 const page = ref(1);
 const pageSize = ref(10);
 const pageSizeOptions = [10, 20, 50];
+const supplierNameInputRef = ref<HTMLInputElement | null>(null);
 const formError = ref('');
 const editingId = ref<string | null>(null);
 
@@ -302,6 +303,7 @@ const openAddModal = () => {
     form.phone = '';
     formError.value = '';
     showFormModal.value = true;
+    nextTick(() => supplierNameInputRef.value?.focus());
 };
 
 const closeFormModal = () => {

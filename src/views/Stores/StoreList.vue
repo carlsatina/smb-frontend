@@ -47,7 +47,7 @@
                         <form v-else class="st-modal-body" @submit.prevent="createNewStore">
                             <label class="form-field">
                                 Store name
-                                <input v-model="storeForm.name" type="text" placeholder="Cafe Downtown" required />
+                                <input ref="storeNameInputRef" v-model="storeForm.name" type="text" placeholder="Cafe Downtown" required />
                             </label>
 
                             <label class="form-field">
@@ -282,7 +282,7 @@ const storeForm = reactive({
     name: '',
     timezone: 'Asia/Manila',
     currency: 'PHP',
-    allowNegativeStock: false,
+    allowNegativeStock: true,
     lowStockThreshold: 0,
 });
 
@@ -322,6 +322,7 @@ const baseCurrencyOptions = [
 const subscriptionActive = computed(() => userContext.subscriptionActive);
 const isSubscriptionLoading = computed(() => userContext.isLoading && !userContext.hasLoaded);
 const isEmailVerified = computed(() => userContext.profile?.emailVerified === true);
+const storeNameInputRef = ref<HTMLInputElement | null>(null);
 const isResendingVerification = ref(false);
 const isCreating = ref(false);
 const showCreateModal = ref(false);
@@ -561,13 +562,14 @@ const resetForm = () => {
     storeForm.name = '';
     storeForm.timezone = 'Asia/Manila';
     storeForm.currency = 'PHP';
-    storeForm.allowNegativeStock = false;
+    storeForm.allowNegativeStock = true;
     storeForm.lowStockThreshold = 0;
 };
 
 const openCreateModal = () => {
     resetForm();
     showCreateModal.value = true;
+    nextTick(() => storeNameInputRef.value?.focus());
 };
 
 const closeCreateModal = () => {

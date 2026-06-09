@@ -260,6 +260,222 @@
             </table>
         </div>
 
+        <!-- ── Mobile card view (hidden on tablet+, shown on mobile) ── -->
+        <div class="ds-cards">
+
+            <!-- Add card -->
+            <div v-if="isAdding" class="ds-card ds-card--add">
+                <div class="ds-card-header">
+                    <span class="ds-card-date">New Entry</span>
+                </div>
+                <div class="ds-card-body">
+                    <label class="ds-card-field ds-card-field--full">
+                        <span class="ds-card-label">Date</span>
+                        <input type="date" v-model="addForm.date" class="ds-input" @change="onAddDateChange" />
+                    </label>
+                    <template v-for="m in cashierMembers" :key="m.userId">
+                        <div class="ds-card-cashier-label">{{ memberName(m) }}</div>
+                        <div class="ds-card-field-row">
+                            <div class="ds-card-field">
+                                <span class="ds-card-label">COH</span>
+                                <div class="ds-coh-cell">
+                                    <span class="ds-coh-amount">{{ formatMoney(addCashierCoh(m.userId)) }}</span>
+                                    <button class="btn-denom-edit" @click="openEditDenomModal(m)">Denoms</button>
+                                </div>
+                            </div>
+                            <label class="ds-card-field">
+                                <span class="ds-card-label">GCash</span>
+                                <input type="number" v-model.number="addForm.cashiers[m.userId].gcashAmount" class="ds-input ds-input--num" min="0" step="0.01" />
+                            </label>
+                        </div>
+                    </template>
+                    <div class="ds-card-field-row">
+                        <label class="ds-card-field">
+                            <span class="ds-card-label">Expense</span>
+                            <input type="number" v-model.number="addForm.expense" class="ds-input ds-input--num" min="0" step="0.01" />
+                        </label>
+                        <label v-if="!isCashierRole" class="ds-card-field">
+                            <span class="ds-card-label">Actual COH</span>
+                            <input type="number" v-model.number="addForm.actualCoh" class="ds-input ds-input--num" min="0" step="0.01" :placeholder="formatMoney(addTotalCoh)" />
+                        </label>
+                    </div>
+                    <div class="ds-card-summary">
+                        <div class="ds-card-summary-row"><span>Senior</span><span><span v-if="addForm.posLoading" class="ds-loading-dot">…</span><span v-else>{{ formatMoney(addForm.seniorTotal) }}</span></span></div>
+                        <div class="ds-card-summary-row"><span>Total GCash</span><span>{{ formatMoney(addTotalGcash) }}</span></div>
+                        <div class="ds-card-summary-row"><span>Total COH</span><span>{{ formatMoney(addTotalCoh) }}</span></div>
+                        <template v-if="!isCashierRole">
+                            <div class="ds-card-summary-row ds-card-summary-row--highlight">
+                                <span>Total Sales</span><span class="fw-bold">{{ formatMoney(addTotalSales) }}</span>
+                            </div>
+                            <div class="ds-card-summary-row"><span>POS</span><span><span v-if="addForm.posLoading" class="ds-loading-dot">…</span><span v-else>{{ formatMoney(addForm.posTotal) }}</span></span></div>
+                        </template>
+                    </div>
+                </div>
+                <div class="ds-card-actions">
+                    <button class="btn btn-sm btn-success-solid" :disabled="addForm.saving || !addForm.date" @click="saveAddRow">
+                        {{ addForm.saving ? '…' : 'Save' }}
+                    </button>
+                    <button class="btn btn-sm btn-outline-secondary" @click="cancelAdding">Cancel</button>
+                </div>
+            </div>
+
+            <!-- Loading / empty -->
+            <div v-if="isLoading" class="ds-card-empty">Loading…</div>
+            <div v-else-if="rows.length === 0 && !isAdding" class="ds-card-empty">No entries for this month.</div>
+
+            <!-- Existing row cards -->
+            <template v-else>
+                <div v-for="row in rows" :key="row.id" class="ds-card" :class="{ 'ds-card--editing': inlineEdit.rowId === row.id }">
+
+                    <!-- Inline edit mode -->
+                    <template v-if="inlineEdit.rowId === row.id">
+                        <div class="ds-card-header">
+                            <span class="ds-card-date">{{ formatDate(row.date) }}</span>
+                        </div>
+                        <div class="ds-card-body">
+                            <template v-for="m in cashierMembers" :key="m.userId">
+                                <div class="ds-card-cashier-label">{{ memberName(m) }}</div>
+                                <div class="ds-card-field-row">
+                                    <div class="ds-card-field">
+                                        <span class="ds-card-label">COH</span>
+                                        <div class="ds-coh-cell">
+                                            <span class="ds-coh-amount">{{ formatMoney(inlineEditCoh(m.userId)) }}</span>
+                                            <button class="btn-denom-edit" @click="openInlineEditDenomModal(m)">Denoms</button>
+                                        </div>
+                                    </div>
+                                    <label class="ds-card-field">
+                                        <span class="ds-card-label">GCash</span>
+                                        <input type="number" v-model.number="inlineEdit.cashiers[m.userId].gcashAmount" class="ds-input ds-input--num" min="0" step="0.01" />
+                                    </label>
+                                </div>
+                            </template>
+                            <div class="ds-card-field-row">
+                                <label v-if="!isCashierRole" class="ds-card-field">
+                                    <span class="ds-card-label">Expense</span>
+                                    <input type="number" v-model.number="inlineEdit.expense" class="ds-input ds-input--num" min="0" step="0.01" />
+                                </label>
+                                <label v-if="!isCashierRole" class="ds-card-field">
+                                    <span class="ds-card-label">Actual COH</span>
+                                    <input type="number" v-model.number="inlineEdit.actualCoh" class="ds-input ds-input--num" min="0" step="0.01" :placeholder="formatMoney(inlineEditTotalCoh)" />
+                                </label>
+                            </div>
+                            <div class="ds-card-summary">
+                                <div class="ds-card-summary-row"><span>Total GCash</span><span>{{ formatMoney(inlineEditTotalGcash) }}</span></div>
+                                <div class="ds-card-summary-row"><span>Total COH</span><span>{{ formatMoney(inlineEditTotalCoh) }}</span></div>
+                                <template v-if="!isCashierRole">
+                                    <div class="ds-card-summary-row ds-card-summary-row--highlight">
+                                        <span>Total Sales</span><span class="fw-bold">{{ formatMoney(inlineEditTotalSales) }}</span>
+                                    </div>
+                                    <div class="ds-card-summary-row" :class="inlineEditKulangRemit > 0 ? 'text-danger' : ''">
+                                        <span>Kulang Remit</span><span>{{ formatMoney(inlineEditKulangRemit) }}</span>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                        <div class="ds-card-actions">
+                            <button class="btn btn-sm btn-success-solid" :disabled="inlineEdit.saving" @click="saveInlineEdit">
+                                {{ inlineEdit.saving ? '…' : 'Save' }}
+                            </button>
+                            <button class="btn btn-sm btn-outline-secondary" @click="cancelInlineEdit">Cancel</button>
+                        </div>
+                    </template>
+
+                    <!-- Read mode -->
+                    <template v-else>
+                        <div class="ds-card-header">
+                            <span class="ds-card-date">{{ formatDate(row.date) }}</span>
+                            <div v-if="!isCashierRole" class="ds-card-header-actions">
+                                <button class="btn btn-icon btn-warning-soft" @click="openInlineEdit(row)"><mdicon name="pencil" size="14" /></button>
+                                <button class="btn btn-icon btn-danger-soft" @click="confirmDelete(row)"><mdicon name="close" size="14" /></button>
+                            </div>
+                        </div>
+                        <div class="ds-card-body">
+                            <template v-for="m in cashierMembers" :key="m.userId">
+                                <div class="ds-card-cashier-label">{{ memberName(m) }}</div>
+                                <div class="ds-card-field-row">
+                                    <div class="ds-card-field">
+                                        <span class="ds-card-label">COH</span>
+                                        <button class="denom-btn" @click="openReadDenomModal(row, m)">{{ formatMoney(getCashierCoh(row, m.userId)) }}</button>
+                                    </div>
+                                    <div class="ds-card-field">
+                                        <span class="ds-card-label">GCash</span>
+                                        <span>{{ formatMoney(getCashierGcash(row, m.userId)) }}</span>
+                                    </div>
+                                </div>
+                            </template>
+                            <div class="ds-card-field-row">
+                                <div class="ds-card-field">
+                                    <span class="ds-card-label">Senior</span>
+                                    <span>{{ formatMoney(row.totalSenior) }}</span>
+                                </div>
+                                <div class="ds-card-field">
+                                    <span class="ds-card-label">Expense</span>
+                                    <span>{{ formatMoney(row.expense) }}</span>
+                                </div>
+                            </div>
+                            <div class="ds-card-summary">
+                                <div class="ds-card-summary-row"><span>Total GCash</span><span>{{ formatMoney(row.totalGcash) }}</span></div>
+                                <div class="ds-card-summary-row"><span>Total COH</span><span>{{ formatMoney(row.totalCoh) }}</span></div>
+                                <template v-if="!isCashierRole">
+                                    <div class="ds-card-summary-row ds-card-summary-row--highlight">
+                                        <span>Total Sales</span><span class="fw-bold">{{ formatMoney(row.totalSales) }}</span>
+                                    </div>
+                                    <div class="ds-card-summary-row"><span>POS</span><span>{{ formatMoney(row.pos) }}</span></div>
+                                    <div class="ds-card-summary-row"><span>Actual COH</span><span>{{ formatMoney(row.actualCoh) }}</span></div>
+                                    <div class="ds-card-summary-row" :class="row.kulangRemit > 0 ? 'text-danger' : ''">
+                                        <span>Kulang Remit</span><span>{{ formatMoney(row.kulangRemit) }}</span>
+                                    </div>
+                                    <div class="ds-card-summary-row" :class="row.shortIf < 0 ? 'text-danger' : 'text-success'">
+                                        <span>Short if (-)</span><span>{{ formatMoney(row.shortIf) }}</span>
+                                    </div>
+                                    <div class="ds-card-summary-row" :class="row.salesNeeded < 0 ? 'text-success' : 'text-danger'">
+                                        <span>Sales Needed</span><span>{{ formatMoney(row.salesNeeded) }}</span>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+
+                <!-- Monthly totals card -->
+                <div class="ds-card ds-card--total">
+                    <div class="ds-card-header">
+                        <span class="ds-card-date fw-bold">Monthly Total</span>
+                    </div>
+                    <div class="ds-card-body">
+                        <template v-for="m in cashierMembers" :key="m.userId">
+                            <div class="ds-card-cashier-label">{{ memberName(m) }}</div>
+                            <div class="ds-card-field-row">
+                                <div class="ds-card-field">
+                                    <span class="ds-card-label">COH</span>
+                                    <span class="fw-bold">{{ formatMoney(sumCashierField(m.userId, 'cashAmount')) }}</span>
+                                </div>
+                                <div class="ds-card-field">
+                                    <span class="ds-card-label">GCash</span>
+                                    <span class="fw-bold">{{ formatMoney(sumCashierField(m.userId, 'gcashAmount')) }}</span>
+                                </div>
+                            </div>
+                        </template>
+                        <div class="ds-card-summary">
+                            <div class="ds-card-summary-row"><span>Senior</span><span class="fw-bold">{{ formatMoney(sumAll('totalSenior')) }}</span></div>
+                            <div class="ds-card-summary-row"><span>Expense</span><span class="fw-bold">{{ formatMoney(sumAll('expense')) }}</span></div>
+                            <div class="ds-card-summary-row"><span>Total GCash</span><span class="fw-bold">{{ formatMoney(sumAll('totalGcash')) }}</span></div>
+                            <div class="ds-card-summary-row"><span>Total COH</span><span class="fw-bold">{{ formatMoney(sumAll('totalCoh')) }}</span></div>
+                            <template v-if="!isCashierRole">
+                                <div class="ds-card-summary-row ds-card-summary-row--highlight">
+                                    <span>Total Sales</span><span class="fw-bold">{{ formatMoney(sumAll('totalSales')) }}</span>
+                                </div>
+                                <div class="ds-card-summary-row ds-card-summary-row--highlight">
+                                    <span>POS</span><span class="fw-bold">{{ formatMoney(sumAll('pos')) }}</span>
+                                </div>
+                                <div class="ds-card-summary-row"><span>Actual COH</span><span class="fw-bold">{{ formatMoney(sumAll('actualCoh')) }}</span></div>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+            </template>
+        </div>
+
         <!-- Denomination modal (editable for add row / inline edit, read-only for existing) -->
         <DenominationModal
             v-if="denomModal.open"
@@ -796,8 +1012,8 @@ const saveGoal = async () => {
 .ds-month-label { font-weight: 600; min-width: 120px; text-align: center; }
 .ds-record-count { font-size: 0.82rem; color: #6b7280; }
 
-.ds-table-wrap { overflow: visible; border: 1px solid #e5e7eb; border-radius: 8px; }
-.ds-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+.ds-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; border: 1px solid #e5e7eb; border-radius: 8px; }
+.ds-table { width: 100%; min-width: 860px; border-collapse: collapse; font-size: 0.8rem; }
 .ds-table th { background: #f0fdfa; border-bottom: 2px solid #99f6e4; padding: 0.5rem 0.4rem; text-align: left; font-size: 0.68rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: #0f766e; word-break: break-word; line-height: 1.3; }
 .ds-table td { padding: 0.35rem 0.4rem; border-bottom: 1px solid #f3f4f6; vertical-align: middle; white-space: nowrap; }
 .ds-table tbody tr:hover { background: #f9fafb; }
@@ -865,4 +1081,114 @@ const saveGoal = async () => {
 .ds-cashier-item { border: 1px solid #e5e7eb; border-radius: 6px; padding: 0.75rem; }
 .ds-cashier-name { font-weight: 600; font-size: 0.85rem; margin-bottom: 0.5rem; }
 .ds-cashier-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+
+/* ── Tablet: sticky date column ── */
+@media (max-width: 1100px) {
+    .ds-table th.col-date,
+    .ds-table td.col-date {
+        position: sticky;
+        left: 0;
+        z-index: 2;
+        /* shadow to hint scrollability */
+        box-shadow: 2px 0 4px rgba(0,0,0,0.06);
+    }
+    .ds-table th.col-date { background: #f0fdfa; }
+    .ds-table td.col-date { background: #ffffff; }
+    .ds-add-row td.col-date { background: #eff6ff !important; }
+    .ds-editing-row td.col-date { background: #fefce8 !important; }
+    .ds-total-row td.col-date { background: #f9fafb !important; }
+}
+
+/* ── Mobile: hide table, show cards ── */
+.ds-cards { display: none; }
+
+@media (max-width: 640px) {
+    .ds-page { padding: 0.75rem 0.75rem 2rem; }
+    .ds-header { flex-wrap: wrap; }
+    .ds-table-wrap { display: none; }
+    .ds-cards { display: flex; flex-direction: column; gap: 0.65rem; }
+}
+
+/* ── Card styles ── */
+.ds-card { border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden; background: #ffffff; }
+.ds-card--add { border-color: #93c5fd; }
+.ds-card--editing { border-color: #fde68a; }
+.ds-card--total { background: #f9fafb; }
+
+.ds-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.55rem 0.85rem;
+    background: #f9fafb;
+    border-bottom: 1px solid #e5e7eb;
+}
+.ds-card--add .ds-card-header { background: #dbeafe; border-color: #93c5fd; }
+.ds-card--editing .ds-card-header { background: #fef9c3; border-color: #fde68a; }
+.ds-card--total .ds-card-header { background: #f1f5f9; border-color: #e5e7eb; }
+
+.ds-card-date { font-weight: 600; font-size: 0.875rem; color: #111827; }
+.ds-card-header-actions { display: flex; gap: 0.35rem; }
+
+.ds-card-body { padding: 0.75rem 0.85rem; display: flex; flex-direction: column; gap: 0.5rem; }
+
+.ds-card-cashier-label {
+    font-size: 0.67rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #0f766e;
+    padding-top: 0.4rem;
+    border-top: 1px solid #f3f4f6;
+    margin-top: 0.1rem;
+}
+
+.ds-card-field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+.ds-card-field { display: flex; flex-direction: column; gap: 0.2rem; font-size: 0.85rem; }
+.ds-card-field--full { grid-column: 1 / -1; }
+.ds-card-label { font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: #6b7280; }
+
+.ds-card-summary {
+    margin-top: 0.15rem;
+    border-top: 1px solid #e5e7eb;
+    padding-top: 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+.ds-card-summary-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.82rem;
+    color: #374151;
+    padding: 0.1rem 0;
+}
+.ds-card-summary-row--highlight {
+    background: #f0fdf4;
+    padding: 0.25rem 0.4rem;
+    border-radius: 5px;
+    color: #15803d;
+    font-weight: 500;
+    margin: 0.1rem 0;
+}
+
+.ds-card-actions {
+    padding: 0.55rem 0.85rem;
+    border-top: 1px solid #e5e7eb;
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+    background: #fafafa;
+}
+.ds-card--add .ds-card-actions { background: #eff6ff; border-color: #93c5fd; }
+.ds-card--editing .ds-card-actions { background: #fefce8; border-color: #fde68a; }
+
+.ds-card-empty {
+    text-align: center;
+    color: #9ca3af;
+    padding: 2rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    background: #ffffff;
+}
 </style>

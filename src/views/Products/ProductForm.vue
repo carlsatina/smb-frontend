@@ -32,7 +32,7 @@
                         <div class="form-grid two-col">
                             <label class="field">
                                 <span>Name</span>
-                                <input v-model="form.name" type="text" required />
+                                <input ref="productNameInputRef" v-model="form.name" type="text" required />
                             </label>
                             <label class="field">
                                 <span>Type</span>
@@ -47,9 +47,9 @@
                     <div class="form-section">
                         <div class="section-title">
                             <h2>Identifiers</h2>
-                            <p>Scanning and category metadata for quick lookup.</p>
+                            <p>Scanning, classification, and unit metadata.</p>
                         </div>
-                        <div class="form-grid three-col">
+                        <div class="form-grid two-col">
                             <label class="field">
                                 <span>SKU</span>
                                 <input v-model="form.sku" type="text" />
@@ -66,23 +66,6 @@
                                     </option>
                                 </select>
                             </label>
-                        </div>
-                    </div>
-
-                    <div class="form-section">
-                        <div class="section-title">
-                            <h2>Pricing</h2>
-                            <p>Define retail pricing and internal cost.</p>
-                        </div>
-                        <div class="form-grid three-col">
-                            <label class="field">
-                                <span>Price ({{ currencySymbol }})</span>
-                                <input v-model.number="form.price" type="number" step="0.01" />
-                            </label>
-                            <label class="field">
-                                <span>Cost ({{ currencySymbol }})</span>
-                                <input v-model.number="form.cost" type="number" step="0.01" />
-                            </label>
                             <label class="field">
                                 <span>Category</span>
                                 <select v-model="form.category">
@@ -91,6 +74,23 @@
                                         {{ category }}
                                     </option>
                                 </select>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <div class="section-title">
+                            <h2>Pricing</h2>
+                            <p>Define retail pricing and internal cost.</p>
+                        </div>
+                        <div class="form-grid two-col">
+                            <label class="field">
+                                <span>Price ({{ currencySymbol }})</span>
+                                <input v-model.number="form.price" type="number" step="0.01" />
+                            </label>
+                            <label class="field">
+                                <span>Cost ({{ currencySymbol }})</span>
+                                <input v-model.number="form.cost" type="number" step="0.01" />
                             </label>
                         </div>
                     </div>
@@ -317,7 +317,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { listIngredients, IngredientCategory } from '@/api/ingredients';
 import { listStock, StockItem } from '@/api/inventory';
@@ -371,6 +371,7 @@ const currentStoreLabel = computed(() => {
     if (!store) return 'your store';
     return `${store.name} · ${store.currency}`;
 });
+const productNameInputRef = ref<HTMLInputElement | null>(null);
 const formError = ref('');
 const recipeLines = ref<RecipeLineDraft[]>([]);
 const recipeLoading = ref(false);
@@ -858,6 +859,9 @@ onMounted(async () => {
     await loadIngredients();
     await loadIngredientStock();
     await loadRecipeLines();
+    if (!isEdit.value) {
+        nextTick(() => productNameInputRef.value?.focus());
+    }
 });
 
 watch(
@@ -1089,7 +1093,7 @@ watch(
 }
 
 .form-grid.two-col {
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    grid-template-columns: repeat(2, 1fr);
 }
 
 .form-grid.three-col {
@@ -1356,6 +1360,7 @@ watch(
     align-items: center;
     gap: 0.75rem;
     flex-wrap: wrap;
+    margin-top: 0.75rem;
 }
 
 .add-ingredient-btn {
@@ -1385,7 +1390,7 @@ watch(
 }
 
 .recipe-hint {
-    margin: 0;
+    margin: 0.5rem 0 0;
     color: var(--c-muted);
     font-size: 0.8rem;
 }
@@ -1807,6 +1812,10 @@ watch(
 
     .product-title h1 {
         font-size: 1.5rem;
+    }
+
+    .form-grid.two-col {
+        grid-template-columns: 1fr;
     }
 }
 </style>

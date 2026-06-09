@@ -21,7 +21,7 @@
                 <!-- Left sidebar nav -->
                 <nav class="st-sidebar">
                     <div class="st-sidebar-group">
-                        <span class="st-sidebar-group-label">Settings</span>
+                        <span class="st-sidebar-group-label">Store</span>
                         <button class="st-sidebar-item" :class="{ 'is-active': activeSection === 'profile' }" @click="activeSection = 'profile'">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="18" rx="2"/><path d="M8 10h8M8 14h5"/></svg>
                             Store profile
@@ -34,19 +34,14 @@
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 10h16M4 14h10"/></svg>
                             Catalog defaults
                         </button>
-                    </div>
-
-                    <div class="st-sidebar-group">
-                        <span class="st-sidebar-group-label">Navigate</span>
-                        <button class="st-sidebar-item" :disabled="!currentStore" @click="goToTeam">
+                        <button class="st-sidebar-item" :class="{ 'is-active': activeSection === 'team' }" @click="activeSection = 'team'">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                             Team &amp; roles
-                            <svg class="st-sidebar-external" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+                            <span v-if="pendingInvites.length" class="st-sidebar-badge">{{ pendingInvites.length }}</span>
                         </button>
-                        <button class="st-sidebar-item" @click="goToPlan">
+                        <button class="st-sidebar-item" :class="{ 'is-active': activeSection === 'plan' }" @click="activeSection = 'plan'">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
                             Plan &amp; subscription
-                            <svg class="st-sidebar-external" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
                         </button>
                     </div>
 
@@ -200,6 +195,230 @@
                             </form>
                         </section>
 
+                        <!-- ── Team & roles ── -->
+                        <section v-if="activeSection === 'team'" class="st-section">
+                            <div class="st-section-header">
+                                <h2 class="st-section-title">Team &amp; roles</h2>
+                                <p class="st-section-sub">Manage members and invitations for this store.</p>
+                            </div>
+
+                            <!-- Tabs -->
+                            <div class="st-team-tabs">
+                                <button class="st-team-tab" :class="{ 'is-active': activeTeamTab === 'members' }" @click="activeTeamTab = 'members'">
+                                    Members
+                                    <span class="st-team-tab-count">{{ members.length }}</span>
+                                </button>
+                                <button class="st-team-tab" :class="{ 'is-active': activeTeamTab === 'invites' }" @click="activeTeamTab = 'invites'">
+                                    Invites
+                                    <span v-if="pendingInvites.length" class="st-team-tab-count st-team-tab-count--pending">{{ pendingInvites.length }}</span>
+                                </button>
+                            </div>
+
+                            <!-- Members tab -->
+                            <template v-if="activeTeamTab === 'members'">
+                                <SkeletonLoader v-if="isTeamLoading" :rows="4" label="Loading team…" />
+                                <div v-else-if="!currentStore" class="st-state">Select a store to view members.</div>
+                                <div v-else-if="members.length === 0" class="st-team-empty">No members yet.</div>
+                                <div v-else class="st-member-list">
+                                    <div v-for="member in members" :key="member.id" class="st-member-row">
+                                        <div class="st-member-info">
+                                            <div class="st-member-name">{{ member.fullName || member.email }}</div>
+                                            <div class="st-member-meta">{{ member.email }}</div>
+                                        </div>
+                                        <div class="st-member-actions">
+                                            <select
+                                                class="st-role-select"
+                                                :value="member.role"
+                                                :disabled="!canManageMembers || isOwnerLocked(member) || isUpdatingMember(member.id)"
+                                                @change="changeMemberRole(member, $event)"
+                                            >
+                                                <option v-for="role in roleOptions" :key="role" :value="role">{{ role }}</option>
+                                            </select>
+                                            <button
+                                                class="st-btn-ghost st-btn-ghost--danger"
+                                                type="button"
+                                                :disabled="!canManageMembers || isOwnerLocked(member) || isRemovingMember(member.id) || member.userId === currentUserId"
+                                                @click="removeMember(member)"
+                                            >
+                                                {{ isRemovingMember(member.id) ? '…' : 'Remove' }}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+
+                            <!-- Invites tab -->
+                            <template v-if="activeTeamTab === 'invites'">
+                                <div class="st-invite-block">
+                                    <p class="st-section-sub">Share a generated link to onboard a new teammate.</p>
+                                    <form v-if="canManageMembers" class="st-invite-form" @submit.prevent="createInvite">
+                                        <label class="st-field">
+                                            Email
+                                            <input v-model="inviteForm.email" type="email" placeholder="teammate@shop.com" required />
+                                        </label>
+                                        <label class="st-field">
+                                            Role
+                                            <select v-model="inviteForm.role">
+                                                <option v-for="role in inviteRoleOptions" :key="role" :value="role">{{ role }}</option>
+                                            </select>
+                                        </label>
+                                        <label class="st-field">
+                                            Expires (days)
+                                            <input v-model.number="inviteForm.expiresInDays" type="number" min="1" max="30" />
+                                        </label>
+                                        <div class="st-invite-form-action">
+                                            <button class="st-btn-primary" type="submit" :disabled="isInviting || !inviteForm.email">
+                                                {{ isInviting ? 'Creating…' : 'Create invite' }}
+                                            </button>
+                                        </div>
+                                    </form>
+                                    <p v-else class="st-permission-note">Only owners or admins can invite new members.</p>
+
+                                    <div v-if="recentInviteLink" class="st-invite-link-card">
+                                        <span class="st-invite-link-label">Invite link</span>
+                                        <div class="st-invite-link-row">
+                                            <input type="text" readonly :value="recentInviteLink" />
+                                            <button class="st-btn-ghost" type="button" @click="copyInviteLink">Copy</button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="st-section-sub-header">
+                                    <span>Pending invites</span>
+                                    <span v-if="pendingInvites.length" class="st-role-badge">{{ pendingInvites.length }} pending</span>
+                                </div>
+                                <SkeletonLoader v-if="isTeamLoading" :rows="3" label="Loading invites…" />
+                                <div v-else-if="pendingInvites.length === 0" class="st-team-empty">No pending invites.</div>
+                                <div v-else class="st-invite-list">
+                                    <div v-for="invite in pendingInvites" :key="invite.id" class="st-invite-row">
+                                        <div>
+                                            <div class="st-member-name">{{ invite.email }}</div>
+                                            <div class="st-member-meta">
+                                                {{ invite.role }}
+                                                <span v-if="invite.status === 'EXPIRED'"> &ndash; expired {{ formatInviteDate(invite.expiresAt) }}</span>
+                                                <span v-else> &ndash; expires {{ formatInviteDate(invite.expiresAt) }}</span>
+                                            </div>
+                                        </div>
+                                        <div class="st-invite-actions">
+                                            <span class="st-invite-status" :class="inviteStatusClass(invite.status)">{{ invite.status }}</span>
+                                            <button
+                                                v-if="canManageMembers && invite.status === 'PENDING'"
+                                                class="st-btn-ghost st-btn-ghost--danger"
+                                                type="button"
+                                                :disabled="isRevokingInvite(invite.id)"
+                                                @click="revokeInvite(invite)"
+                                            >
+                                                {{ isRevokingInvite(invite.id) ? '…' : 'Revoke' }}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+                        </section>
+
+                        <!-- ── Plan & subscription ── -->
+                        <section v-if="activeSection === 'plan'" class="st-section">
+                            <div class="st-section-header">
+                                <h2 class="st-section-title">Plan &amp; subscription</h2>
+                                <p class="st-section-sub">Compare plans and upgrade anytime. Plan is account-wide and applies to all your stores.</p>
+                            </div>
+
+                            <div v-if="userContext.isLoading && !userContext.hasLoaded" class="st-state">Loading plan details…</div>
+
+                            <template v-else>
+                                <!-- Summary bar -->
+                                <div class="st-plan-summary">
+                                    <div class="st-plan-summary-item">
+                                        <span class="st-plan-summary-label">Current plan</span>
+                                        <span class="st-plan-summary-value">{{ planConfig.label }}</span>
+                                    </div>
+                                    <div class="st-plan-summary-divider"></div>
+                                    <div class="st-plan-summary-item">
+                                        <span class="st-plan-summary-label">Status</span>
+                                        <span class="st-plan-summary-value" :class="userContext.subscriptionActive ? 'st-plan-active' : 'st-plan-inactive'">
+                                            {{ userContext.subscriptionActive ? 'Active' : 'Inactive' }}
+                                        </span>
+                                    </div>
+                                    <div class="st-plan-summary-divider"></div>
+                                    <div class="st-plan-summary-item">
+                                        <span class="st-plan-summary-label">Stores</span>
+                                        <span class="st-plan-summary-value">{{ storeUsage }} / {{ planConfig.maxStores }}</span>
+                                    </div>
+                                    <div class="st-plan-summary-divider"></div>
+                                    <div class="st-plan-summary-item">
+                                        <span class="st-plan-summary-label">Members per store</span>
+                                        <span class="st-plan-summary-value">Up to {{ planConfig.maxUsersPerStore }}</span>
+                                    </div>
+                                </div>
+
+                                <!-- Plan cards -->
+                                <div class="st-plan-header">
+                                    <h3 class="st-plan-heading">Choose your plan</h3>
+                                    <p class="st-section-sub">All plans include POS, inventory, products, and sales reports.</p>
+                                </div>
+
+                                <div class="st-plan-grid">
+                                    <div
+                                        v-for="plan in allPlans"
+                                        :key="plan.tier"
+                                        class="st-plan-card"
+                                        :class="{
+                                            'st-plan-card--current': plan.tier === userContext.planTier,
+                                            'st-plan-card--recommended': plan.tier === recommendedTier,
+                                        }"
+                                    >
+                                        <div class="st-plan-card-top">
+                                            <div class="st-plan-name-row">
+                                                <h4 class="st-plan-name">{{ plan.label }}</h4>
+                                                <span v-if="plan.tier === userContext.planTier" class="st-plan-pill st-plan-pill--current">Current</span>
+                                                <span v-else-if="plan.tier === recommendedTier" class="st-plan-pill st-plan-pill--recommended">Recommended</span>
+                                            </div>
+                                            <p class="st-plan-tagline">{{ planTaglines[plan.tier] }}</p>
+                                            <p class="st-plan-price">{{ planPrices[plan.tier] }}</p>
+                                        </div>
+                                        <div class="st-plan-limits">
+                                            <div class="st-plan-limit">
+                                                <svg viewBox="0 0 20 20" fill="currentColor" width="13" height="13"><path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"/></svg>
+                                                {{ plan.maxStores }} {{ plan.maxStores === 1 ? 'store' : 'stores' }}
+                                            </div>
+                                            <div class="st-plan-limit">
+                                                <svg viewBox="0 0 20 20" fill="currentColor" width="13" height="13"><path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/></svg>
+                                                {{ plan.maxUsersPerStore }} members per store
+                                            </div>
+                                        </div>
+                                        <div class="st-plan-features">
+                                            <div class="st-plan-feature-group-label">Always included</div>
+                                            <div v-for="f in coreFeatures" :key="f.key" class="st-plan-feature-row">
+                                                <svg class="st-plan-check st-plan-check--yes" viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                                                {{ f.label }}
+                                            </div>
+                                            <div class="st-plan-feature-group-label" style="margin-top:0.5rem">Advanced features</div>
+                                            <div v-for="f in advancedFeatures" :key="f.key" class="st-plan-feature-row" :class="{ 'st-plan-feature-row--locked': !plan.features[f.key] }">
+                                                <svg v-if="plan.features[f.key]" class="st-plan-check st-plan-check--yes" viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                                                <svg v-else class="st-plan-check st-plan-check--no" viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+                                                {{ f.label }}
+                                            </div>
+                                        </div>
+                                        <div class="st-plan-card-footer">
+                                            <button v-if="plan.tier === userContext.planTier" class="st-plan-btn st-plan-btn--current" disabled>Current plan</button>
+                                            <button v-else-if="isDowngrade(plan.tier)" class="st-plan-btn st-plan-btn--ghost" :disabled="isUpgrading" @click="handlePlanAction(plan)">
+                                                {{ isUpgrading ? 'Updating…' : 'Downgrade' }}
+                                            </button>
+                                            <button v-else class="st-plan-btn st-plan-btn--upgrade" :disabled="isUpgrading" @click="handlePlanAction(plan)">
+                                                {{ isUpgrading ? 'Updating…' : `Upgrade to ${plan.label}` }}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <p class="st-plan-note">
+                                    To change your plan, contact us at
+                                    <a href="mailto:support@arshii.app" class="st-plan-link">support@arshii.app</a>
+                                    and we'll get you sorted within 24 hours.
+                                </p>
+                            </template>
+                        </section>
+
                         <!-- ── Danger zone ── -->
                         <section v-if="activeSection === 'danger'" class="st-section">
                             <div class="st-section-header">
@@ -232,11 +451,26 @@ import { useRoute, useRouter } from 'vue-router';
 import { deleteStore, updateStore } from '@/api/stores';
 import { useToast } from '@/composables/useToast';
 import { useStoreContextStore } from '@/stores/storeContext';
+import { useUserContextStore } from '@/stores/userContext';
 import { DEFAULT_CATEGORY_OPTIONS, DEFAULT_UNIT_OPTIONS } from '@/utils/catalogDefaults';
+import { getPlanConfig, planTierOrder, planConfigs, type PlanTier, type PlanFeature } from '@/utils/planAccess';
+import { getMe } from '@/api/auth';
+import {
+    createStoreInvite,
+    listStoreInvites,
+    listStoreMembers,
+    removeStoreMember,
+    revokeStoreInvite,
+    updateStoreMemberRole,
+    type StoreInvite,
+    type StoreMember,
+} from '@/api/storeMembers';
+import SkeletonLoader from '@/components/SkeletonLoader.vue';
 
 const router = useRouter();
 const route = useRoute();
 const storeContext = useStoreContextStore();
+const userContext = useUserContextStore();
 const { showToast } = useToast();
 
 const storeForm = reactive({
@@ -283,7 +517,7 @@ const allPaymentMethods = [
     { value: 'OTHER', label: 'Other' },
 ];
 
-const activeSection = ref<'profile' | 'payment' | 'catalog' | 'danger'>('profile');
+const activeSection = ref<'profile' | 'payment' | 'catalog' | 'team' | 'plan' | 'danger'>('profile');
 
 const isSaving = ref(false);
 const isArchiving = ref(false);
@@ -448,12 +682,197 @@ const archiveStore = async () => {
 };
 
 const goToStores = () => router.push('/stores');
-const goToTeam = () => {
-    if (!routeStoreId.value) return;
-    router.push(`/stores/${routeStoreId.value}/team`);
-};
-const goToPlan = () => router.push('/account/plan');
 
+// ── Team & Roles ─────────────────────────────────────────────
+const activeTeamTab = ref<'members' | 'invites'>('members');
+const isTeamLoaded = ref(false);
+const isTeamLoading = ref(false);
+const isInviting = ref(false);
+const updatingMemberId = ref<string | null>(null);
+const removingMemberId = ref<string | null>(null);
+const revokingInviteId = ref<string | null>(null);
+const currentUserId = ref<string | null>(null);
+const members = ref<StoreMember[]>([]);
+const invites = ref<StoreInvite[]>([]);
+const recentInviteLink = ref('');
+const roleOptions = ['OWNER', 'ADMIN', 'CASHIER', 'INVENTORY_MANAGER', 'VIEWER'];
+const inviteForm = reactive({ email: '', role: 'CASHIER', expiresInDays: 7 });
+
+const canManageMembers = computed(() => canEdit.value);
+const canManageOwners = computed(() => currentStore.value?.role === 'OWNER');
+const inviteRoleOptions = computed(() =>
+    canManageOwners.value ? roleOptions : roleOptions.filter((r) => r !== 'OWNER')
+);
+const pendingInvites = computed(() => invites.value.filter((i) => i.status !== 'ACCEPTED'));
+const isOwnerLocked = (member: StoreMember) => member.role === 'OWNER' && !canManageOwners.value;
+const isUpdatingMember = (id: string) => updatingMemberId.value === id;
+const isRemovingMember = (id: string) => removingMemberId.value === id;
+const isRevokingInvite = (id: string) => revokingInviteId.value === id;
+
+const loadTeam = async () => {
+    if (!currentStore.value) return;
+    isTeamLoading.value = true;
+    try {
+        const [memberData, inviteData] = await Promise.all([
+            listStoreMembers(currentStore.value.id),
+            listStoreInvites(currentStore.value.id),
+        ]);
+        members.value = memberData.members;
+        invites.value = inviteData.invites;
+        isTeamLoaded.value = true;
+    } catch (error: any) {
+        showToast(error?.body?.error?.message || 'Unable to load team.', 'error');
+    } finally {
+        isTeamLoading.value = false;
+    }
+};
+
+const loadCurrentUser = async () => {
+    try {
+        const data = await getMe();
+        currentUserId.value = data.user.id;
+    } catch {
+        currentUserId.value = null;
+    }
+};
+
+const changeMemberRole = async (member: StoreMember, event: Event) => {
+    if (!currentStore.value || !canManageMembers.value) return;
+    if (!(event.target instanceof HTMLSelectElement)) return;
+    const nextRole = event.target.value;
+    const previousRole = member.role;
+    if (nextRole === previousRole) return;
+    updatingMemberId.value = member.id;
+    try {
+        const data = await updateStoreMemberRole(currentStore.value.id, member.id, nextRole);
+        member.role = data.member.role;
+        showToast('Member role updated.', 'success');
+    } catch (error: any) {
+        (event.target as HTMLSelectElement).value = previousRole;
+        showToast(error?.body?.error?.message || 'Unable to update role.', 'error');
+    } finally {
+        updatingMemberId.value = null;
+    }
+};
+
+const removeMember = async (member: StoreMember) => {
+    if (!currentStore.value || !canManageMembers.value) return;
+    if (member.userId === currentUserId.value) {
+        showToast('You cannot remove yourself from the store.', 'error');
+        return;
+    }
+    if (!window.confirm(`Remove ${member.email} from this store?`)) return;
+    removingMemberId.value = member.id;
+    try {
+        await removeStoreMember(currentStore.value.id, member.id);
+        members.value = members.value.filter((e) => e.id !== member.id);
+        showToast('Member removed.', 'success');
+    } catch (error: any) {
+        showToast(error?.body?.error?.message || 'Unable to remove member.', 'error');
+    } finally {
+        removingMemberId.value = null;
+    }
+};
+
+const createInvite = async () => {
+    if (!currentStore.value || !canManageMembers.value) return;
+    isInviting.value = true;
+    try {
+        const data = await createStoreInvite(currentStore.value.id, {
+            email: inviteForm.email,
+            role: inviteForm.role,
+            expiresInDays: inviteForm.expiresInDays,
+        });
+        invites.value = [data.invite, ...invites.value];
+        recentInviteLink.value = buildInviteLink(currentStore.value.id, data.token);
+        inviteForm.email = '';
+        inviteForm.role = 'CASHIER';
+        inviteForm.expiresInDays = 7;
+        showToast(data.emailSent === false ? 'Invite created. Share the link below.' : 'Invite created.', 'success');
+    } catch (error: any) {
+        showToast(error?.body?.error?.message || 'Unable to create invite.', 'error');
+    } finally {
+        isInviting.value = false;
+    }
+};
+
+const revokeInvite = async (invite: StoreInvite) => {
+    if (!currentStore.value || !canManageMembers.value) return;
+    if (!window.confirm(`Revoke invite for ${invite.email}?`)) return;
+    revokingInviteId.value = invite.id;
+    try {
+        await revokeStoreInvite(currentStore.value.id, invite.id);
+        invites.value = invites.value.filter((e) => e.id !== invite.id);
+        showToast('Invite revoked.', 'success');
+    } catch (error: any) {
+        showToast(error?.body?.error?.message || 'Unable to revoke invite.', 'error');
+    } finally {
+        revokingInviteId.value = null;
+    }
+};
+
+const buildInviteLink = (storeId: string, token: string) =>
+    typeof window !== 'undefined'
+        ? `${window.location.origin}/stores/${storeId}/invites/accept?token=${token}`
+        : token;
+
+const copyInviteLink = async () => {
+    if (!recentInviteLink.value) return;
+    try {
+        await navigator.clipboard.writeText(recentInviteLink.value);
+        showToast('Invite link copied.', 'success');
+    } catch {
+        showToast('Unable to copy link.', 'error');
+    }
+};
+
+const formatInviteDate = (value: string) => {
+    const d = new Date(value);
+    return isNaN(d.getTime()) ? value : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+};
+
+const inviteStatusClass = (status: string) => {
+    if (status === 'PENDING') return 'st-invite-status--pending';
+    if (status === 'ACCEPTED') return 'st-invite-status--accepted';
+    return 'st-invite-status--expired';
+};
+
+// ── Plan & Subscription ───────────────────────────────────────
+const planConfig = computed(() => getPlanConfig(userContext.planTier));
+const storeUsage = computed(() => storeContext.stores.length);
+const allPlans = computed(() => planTierOrder.map((tier) => planConfigs[tier]));
+const currentTierIndex = computed(() => planTierOrder.indexOf(userContext.planTier ?? 'STARTER'));
+const recommendedTier = computed<PlanTier | null>(() => planTierOrder[currentTierIndex.value + 1] ?? null);
+const isDowngrade = (tier: PlanTier) => planTierOrder.indexOf(tier) < currentTierIndex.value;
+const isUpgrading = ref(false);
+
+const planTaglines: Record<PlanTier, string> = {
+    STARTER: 'Everything you need to get started — free forever.',
+    STANDARD: 'Advanced workflows for growing operations.',
+    GROWTH: 'Multi-store power for scaling businesses.',
+};
+const planPrices: Record<PlanTier, string> = {
+    STARTER: 'Free',
+    STANDARD: 'Contact us',
+    GROWTH: 'Contact us',
+};
+const coreFeatures = [
+    { key: 'pos' as const, label: 'Point of sale (POS)' },
+    { key: 'inventory' as const, label: 'Inventory tracking' },
+    { key: 'products' as const, label: 'Product management' },
+    { key: 'reports' as const, label: 'Sales reports' },
+];
+const advancedFeatures: { key: PlanFeature; label: string }[] = [
+    { key: 'ingredients', label: 'Ingredients & raw materials' },
+    { key: 'recipes', label: 'Recipes & product costing' },
+    { key: 'purchaseOrders', label: 'Purchase orders & suppliers' },
+    { key: 'importExport', label: 'Data exports (CSV)' },
+];
+const handlePlanAction = (plan: typeof allPlans.value[0]) => {
+    showToast(`To switch to ${plan.label}, contact us at support@arshii.app.`, 'info');
+};
+
+// ── Lifecycle ─────────────────────────────────────────────────
 onMounted(async () => {
     if (!storeContext.stores.length) {
         await storeContext.fetchStores();
@@ -462,13 +881,39 @@ onMounted(async () => {
         storeContext.setCurrentStore(routeStoreId.value);
     }
     resetForm();
+
+    // Support deep-linking via ?section=team etc.
+    const qs = route.query.section as string | undefined;
+    if (qs && ['profile', 'payment', 'catalog', 'team', 'plan', 'danger'].includes(qs)) {
+        activeSection.value = qs as typeof activeSection.value;
+    }
+
+    await Promise.all([loadCurrentUser(), userContext.fetchMe()]);
+
+    if (activeSection.value === 'team') await loadTeam();
 });
 
 watch(
     () => currentStore.value,
-    (store) => {
-        if (store) resetForm();
-    }
+    async (store) => {
+        if (!store) return;
+        resetForm();
+        if (activeSection.value === 'team') {
+            isTeamLoaded.value = false;
+            await loadTeam();
+        }
+    },
+);
+
+watch(activeSection, async (section) => {
+    if (section === 'team' && !isTeamLoaded.value) await loadTeam();
+});
+
+watch(
+    () => canManageOwners.value,
+    (canManage) => {
+        if (!canManage && inviteForm.role === 'OWNER') inviteForm.role = 'CASHIER';
+    },
 );
 </script>
 
@@ -1114,6 +1559,250 @@ watch(
     color: var(--c-muted);
 }
 
+/* ── Sidebar badge (pending invite count) ── */
+.st-sidebar-badge {
+    margin-left: auto;
+    background: rgba(234, 179, 8, 0.18);
+    color: #92400e;
+    font-size: 0.6rem;
+    font-weight: 700;
+    padding: 0.1rem 0.45rem;
+    border-radius: 999px;
+    flex-shrink: 0;
+}
+
+/* ── Team section ── */
+.st-team-tabs {
+    display: flex;
+    border-bottom: 2px solid var(--c-border);
+    gap: 0;
+    margin-bottom: 0.25rem;
+}
+
+.st-team-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.55rem 1.1rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    font-family: var(--app-font-sans);
+    color: var(--c-muted);
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+}
+.st-team-tab:hover { color: var(--c-text); }
+.st-team-tab.is-active { color: var(--c-accent-dark); border-bottom-color: var(--c-accent); }
+
+.st-team-tab-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.2rem;
+    height: 1.2rem;
+    padding: 0 0.3rem;
+    border-radius: 999px;
+    font-size: 0.62rem;
+    font-weight: 700;
+    background: #e2e8f0;
+    color: #475569;
+}
+.st-team-tab-count--pending { background: rgba(234, 179, 8, 0.15); color: #92400e; }
+
+.st-team-empty { font-size: 0.875rem; color: var(--c-muted); padding: 0.5rem 0; }
+
+.st-member-list { display: flex; flex-direction: column; }
+.st-member-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.8rem 0;
+    border-bottom: 1px solid var(--c-border);
+    gap: 1rem;
+}
+.st-member-row:last-child { border-bottom: none; }
+.st-member-info { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
+.st-member-name { font-weight: 600; font-size: 0.9rem; color: var(--c-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.st-member-meta { font-size: 0.78rem; color: var(--c-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.st-member-actions { display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0; }
+
+.st-role-select {
+    border: 1px solid var(--c-border);
+    border-radius: 6px;
+    padding: 0.35rem 0.5rem;
+    font-size: 0.82rem;
+    font-family: var(--app-font-sans);
+    color: var(--c-text);
+    background: var(--c-surface);
+    cursor: pointer;
+}
+.st-role-select:disabled { background: var(--c-bg); color: #94a3b8; cursor: not-allowed; }
+
+.st-invite-block { display: flex; flex-direction: column; gap: 1rem; }
+
+.st-invite-form {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 0.85rem 1rem;
+}
+.st-invite-form-action { grid-column: 1 / -1; display: flex; justify-content: flex-end; }
+
+.st-invite-link-card {
+    background: rgba(13, 148, 136, 0.05);
+    border: 1px solid rgba(13, 148, 136, 0.18);
+    border-radius: 10px;
+    padding: 0.85rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+}
+.st-invite-link-label { font-size: 0.7rem; font-weight: 600; color: var(--c-accent-dark); text-transform: uppercase; letter-spacing: 0.08em; }
+.st-invite-link-row { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.st-invite-link-row input {
+    flex: 1;
+    min-width: 180px;
+    border-radius: 8px;
+    border: 1px solid var(--c-border);
+    padding: 0.6rem 0.75rem;
+    font-size: 0.85rem;
+    font-family: var(--app-font-sans);
+    background: var(--c-surface);
+    color: var(--c-muted);
+}
+
+.st-section-sub-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--c-text);
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--c-border);
+    margin-top: 0.25rem;
+}
+
+.st-invite-list { display: flex; flex-direction: column; }
+.st-invite-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.8rem 0;
+    border-bottom: 1px solid var(--c-border);
+    gap: 1rem;
+}
+.st-invite-row:last-child { border-bottom: none; }
+.st-invite-actions { display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0; }
+
+.st-invite-status {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.2rem 0.6rem;
+    border-radius: 999px;
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+.st-invite-status--pending { background: rgba(234, 179, 8, 0.15); color: #92400e; }
+.st-invite-status--accepted { background: rgba(16, 185, 129, 0.15); color: #047857; }
+.st-invite-status--expired { background: #f1f5f9; color: #64748b; }
+
+/* ── Plan section ── */
+.st-plan-summary {
+    background: var(--c-bg);
+    border: 1px solid var(--c-border);
+    border-radius: 12px;
+    padding: 1rem 1.5rem;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0;
+}
+.st-plan-summary-item { display: flex; flex-direction: column; gap: 0.2rem; padding: 0.2rem 1.25rem 0.2rem 0; flex: 1; min-width: 110px; }
+.st-plan-summary-item:first-child { padding-left: 0; }
+.st-plan-summary-divider { width: 1px; height: 32px; background: var(--c-border); margin-right: 1.25rem; flex-shrink: 0; }
+.st-plan-summary-label { font-size: 0.66rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; color: var(--c-muted); }
+.st-plan-summary-value { font-size: 0.95rem; font-weight: 700; color: var(--c-text); }
+.st-plan-active { color: var(--c-accent-dark); }
+.st-plan-inactive { color: #b91c1c; }
+
+.st-plan-header { display: flex; flex-direction: column; gap: 0.2rem; }
+.st-plan-heading { font-size: 1.05rem; font-weight: 700; margin: 0; color: var(--c-text); }
+
+.st-plan-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    align-items: start;
+}
+
+.st-plan-card {
+    background: var(--c-surface);
+    border: 1.5px solid var(--c-border);
+    border-radius: 14px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transition: box-shadow 0.15s, border-color 0.15s;
+}
+.st-plan-card:hover { box-shadow: 0 6px 20px rgba(15,23,42,0.07); }
+.st-plan-card--current { border-color: var(--c-accent); box-shadow: 0 0 0 3px rgba(13,148,136,0.1); }
+.st-plan-card--recommended:not(.st-plan-card--current) { border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,0.09); }
+
+.st-plan-card-top { padding: 1.25rem 1.25rem 1rem; border-bottom: 1px solid var(--c-border); }
+.st-plan-name-row { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.35rem; }
+.st-plan-name { font-size: 1.05rem; font-weight: 800; margin: 0; color: var(--c-text); letter-spacing: -0.02em; }
+.st-plan-pill { padding: 0.12rem 0.5rem; border-radius: 999px; font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
+.st-plan-pill--current { background: rgba(13,148,136,0.12); color: var(--c-accent-dark); }
+.st-plan-pill--recommended { background: rgba(99,102,241,0.12); color: #4f46e5; }
+.st-plan-tagline { font-size: 0.8rem; color: var(--c-muted); margin: 0 0 0.75rem; line-height: 1.5; }
+.st-plan-price { font-size: 1.35rem; font-weight: 800; color: var(--c-text); margin: 0; letter-spacing: -0.03em; }
+
+.st-plan-limits {
+    padding: 0.85rem 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    border-bottom: 1px solid var(--c-border);
+    background: var(--c-bg);
+}
+.st-plan-limit { display: flex; align-items: center; gap: 0.45rem; font-size: 0.8rem; font-weight: 500; color: var(--c-text); }
+.st-plan-limit svg { color: var(--c-muted); flex-shrink: 0; }
+
+.st-plan-features { padding: 1rem 1.25rem; display: flex; flex-direction: column; gap: 0.5rem; flex: 1; }
+.st-plan-feature-group-label { font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--c-muted); padding-bottom: 0.2rem; border-bottom: 1px solid var(--c-border); }
+.st-plan-feature-row { display: flex; align-items: center; gap: 0.5rem; font-size: 0.82rem; color: var(--c-text); }
+.st-plan-feature-row--locked { color: var(--c-muted); }
+.st-plan-check--yes { color: var(--c-accent); flex-shrink: 0; }
+.st-plan-check--no { color: #cbd5e1; flex-shrink: 0; }
+
+.st-plan-card-footer { padding: 1rem 1.25rem; border-top: 1px solid var(--c-border); }
+.st-plan-btn {
+    width: 100%;
+    padding: 0.6rem 1rem;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    font-family: var(--app-font-sans);
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+}
+.st-plan-btn--current { background: rgba(13,148,136,0.08); border: 1.5px solid rgba(13,148,136,0.22); color: var(--c-accent-dark); cursor: default; }
+.st-plan-btn--upgrade { background: var(--c-accent); border: none; color: white; }
+.st-plan-btn--upgrade:hover { background: var(--c-accent-dark); }
+.st-plan-btn--ghost { background: transparent; border: 1.5px solid var(--c-border); color: var(--c-muted); }
+.st-plan-btn--ghost:hover { border-color: #cbd5e1; color: var(--c-text); }
+.st-plan-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.st-plan-note { font-size: 0.82rem; color: var(--c-muted); margin: 0; text-align: center; }
+.st-plan-link { color: var(--c-accent-dark); font-weight: 500; text-decoration: none; }
+.st-plan-link:hover { text-decoration: underline; }
+
 /* ── Responsive ── */
 
 /* Tablet: sidebar collapses to horizontal tab strip */
@@ -1173,6 +1862,22 @@ watch(
     }
 }
 
+/* Plan grid: 3-col → 1-col at 900px */
+@media (max-width: 900px) {
+    .st-plan-grid {
+        grid-template-columns: 1fr;
+        max-width: 420px;
+    }
+    .st-plan-summary-divider { display: none; }
+    .st-plan-summary-item { padding: 0; min-width: calc(50% - 0.5rem); flex: none; }
+    .st-plan-summary { gap: 0.75rem; }
+
+    .st-invite-form {
+        grid-template-columns: 1fr;
+    }
+    .st-member-row { flex-wrap: wrap; }
+}
+
 /* Mobile */
 @media (max-width: 600px) {
     .st-page {
@@ -1195,5 +1900,7 @@ watch(
         flex-direction: column;
         align-items: flex-start;
     }
+
+    .st-plan-summary-item { min-width: 100%; }
 }
 </style>
