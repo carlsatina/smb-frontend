@@ -21,8 +21,22 @@
             </div>
         </header>
 
+        <!-- Tabs -->
+        <div class="ab-tabs">
+            <button class="ab-tab" :class="{ 'ab-tab--active': view === 'send' }" @click="view = 'send'">Send bills</button>
+            <button class="ab-tab" :class="{ 'ab-tab--active': view === 'history' }" @click="view = 'history'">History</button>
+        </div>
+
         <!-- Toolbar -->
         <div class="ab-toolbar">
+            <button
+                v-if="view === 'history'"
+                class="ab-month-toggle"
+                :class="{ 'ab-month-toggle--active': historyFilterByMonth }"
+                @click="historyFilterByMonth = !historyFilterByMonth"
+            >
+                {{ historyFilterByMonth ? `Showing ${monthLabel}` : 'All months' }}
+            </button>
             <div class="ab-month-nav">
                 <button class="ab-month-btn" @click="shiftMonth(-1)" title="Previous month">
                     <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
@@ -34,7 +48,7 @@
                 <button v-if="!isCurrentMonth" class="ab-today-btn" @click="goToCurrentMonth">This month</button>
             </div>
 
-            <label class="ab-fee-wrap">
+            <label v-if="view === 'send'" class="ab-fee-wrap">
                 <span class="ab-fee-label">Fee / receipt</span>
                 <span class="ab-fee-input-wrap">
                     <span class="ab-fee-currency">₱</span>
@@ -43,6 +57,8 @@
             </label>
         </div>
 
+        <!-- Send bills view -->
+        <template v-if="view === 'send'">
         <div v-if="loading" class="ab-state">Loading billing...</div>
         <div v-else-if="error" class="ab-state ab-state--error">{{ error }}</div>
 
@@ -104,6 +120,51 @@
                 </table>
             </div>
         </template>
+        </template>
+
+        <!-- History view -->
+        <template v-else>
+            <div v-if="historyLoading" class="ab-state">Loading history...</div>
+            <template v-else>
+                <div class="ab-table-wrap">
+                    <table class="ab-table">
+                        <thead>
+                            <tr>
+                                <th>Sent</th>
+                                <th>Store</th>
+                                <th>Billed to</th>
+                                <th>Period</th>
+                                <th class="ab-th-num">Receipts</th>
+                                <th class="ab-th-num">Amount</th>
+                                <th>Sent by</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="entry in history" :key="entry.id">
+                                <td class="ab-date-cell">{{ formatDateTime(entry.sentAt) }}</td>
+                                <td><span class="ab-store-name">{{ entry.storeName }}</span></td>
+                                <td><span class="ab-owner-email">{{ entry.sentToEmail }}</span></td>
+                                <td>{{ periodLabel(entry.month, entry.year) }}</td>
+                                <td class="ab-td-num"><span class="ab-num">{{ entry.receiptCount.toLocaleString() }}</span></td>
+                                <td class="ab-td-num"><span class="ab-num ab-num--active">{{ formatPeso(entry.amount) }}</span></td>
+                                <td><span class="ab-muted">{{ entry.sentByEmail ?? '—' }}</span></td>
+                            </tr>
+                            <tr v-if="history.length === 0">
+                                <td colspan="7" class="ab-empty">No bills have been sent yet.</td>
+                            </tr>
+                        </tbody>
+                        <tfoot v-if="history.length > 0">
+                            <tr class="ab-history-total">
+                                <td colspan="4">{{ history.length }} bill{{ history.length !== 1 ? 's' : '' }}</td>
+                                <td class="ab-td-num"><span class="ab-num">{{ totalHistoryReceipts.toLocaleString() }}</span></td>
+                                <td class="ab-td-num"><span class="ab-num">{{ formatPeso(totalHistoryAmount) }}</span></td>
+                                <td></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </template>
+        </template>
 
         <!-- Confirm send modal -->
         <div v-if="confirm.store" class="ab-modal-backdrop" @click.self="closeConfirm">
@@ -137,7 +198,7 @@
                 </div>
 
                 <p v-if="confirm.store.lastBilledAt" class="ab-modal-note">
-                    This store was already billed for {{ monthLabel }} on {{ formatDateTime(confirm.store.lastBilledAt) }}. Sending again will replace that record.
+                    This store was already billed for {{ monthLabel }} on {{ formatDateTime(confirm.store.lastBilledAt) }}. Sending again will record an additional bill in the history.
                 </p>
 
                 <div class="ab-modal-footer">
@@ -153,16 +214,28 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue';
-import { getBillingStores, sendBillingNotice, type BillingStore } from '@/api/admin';
+import {
+    getBillingHistory,
+    getBillingStores,
+    sendBillingNotice,
+    type BillingHistoryEntry,
+    type BillingStore,
+} from '@/api/admin';
 import { useToast } from '@/composables/useToast';
 
 const { showToast } = useToast();
+
+const view = ref<'send' | 'history'>('send');
 
 const loading = ref(false);
 const error = ref<string | null>(null);
 const stores = ref<BillingStore[]>([]);
 const confirm = reactive<{ store: BillingStore | null }>({ store: null });
 const sending = ref(false);
+
+const history = ref<BillingHistoryEntry[]>([]);
+const historyLoading = ref(false);
+const historyFilterByMonth = ref(false);
 
 const now = new Date();
 const selectedMonth = ref(now.getMonth() + 1);
@@ -180,6 +253,11 @@ const amountDue = (store: BillingStore) => store.receiptCount * safeFeeRate.valu
 
 const totalReceipts = computed(() => stores.value.reduce((acc, s) => acc + s.receiptCount, 0));
 const totalDue = computed(() => totalReceipts.value * safeFeeRate.value);
+
+const totalHistoryReceipts = computed(() => history.value.reduce((acc, e) => acc + e.receiptCount, 0));
+const totalHistoryAmount = computed(() => history.value.reduce((acc, e) => acc + e.amount, 0));
+
+const periodLabel = (month: number, year: number) => `${MONTH_NAMES[month - 1]} ${year}`;
 
 const formatPeso = (amount: number) =>
     `₱${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -249,7 +327,33 @@ const confirmSend = async () => {
     }
 };
 
-watch([selectedMonth, selectedYear], loadStores);
+const loadHistory = async () => {
+    historyLoading.value = true;
+    try {
+        const data = historyFilterByMonth.value
+            ? await getBillingHistory(selectedMonth.value, selectedYear.value)
+            : await getBillingHistory();
+        history.value = data.entries;
+    } catch (e: any) {
+        showToast(e?.body?.error?.message || 'Failed to load history.', 'error');
+    } finally {
+        historyLoading.value = false;
+    }
+};
+
+watch([selectedMonth, selectedYear], () => {
+    loadStores();
+    if (view.value === 'history' && historyFilterByMonth.value) loadHistory();
+});
+
+watch(view, (v) => {
+    if (v === 'history') loadHistory();
+});
+
+watch(historyFilterByMonth, () => {
+    if (view.value === 'history') loadHistory();
+});
+
 onMounted(loadStores);
 </script>
 
@@ -286,6 +390,37 @@ onMounted(loadStores);
 .ab-fee-currency { font-size: 0.875rem; color: #64748b; }
 .ab-fee-input { width: 64px; border: none; outline: none; padding: 0.5rem 0.25rem; font-size: 0.875rem; color: #0f172a; background: transparent; }
 
+/* Tabs */
+.ab-tabs { display: flex; gap: 0.25rem; border-bottom: 1px solid #e2e8f0; }
+.ab-tab {
+    border: none;
+    background: none;
+    padding: 0.55rem 0.9rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #64748b;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: color 0.12s, border-color 0.12s;
+}
+.ab-tab:hover { color: #0f172a; }
+.ab-tab--active { color: #0f766e; border-bottom-color: #0d9488; }
+
+.ab-month-toggle {
+    border: 1px solid #e2e8f0;
+    background: #fff;
+    border-radius: 8px;
+    padding: 0.5rem 0.85rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #64748b;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: border-color 0.12s, color 0.12s, background 0.12s;
+}
+.ab-month-toggle--active { border-color: #0d9488; color: #0f766e; background: rgba(13, 148, 136, 0.06); }
+
 /* Table */
 .ab-table-wrap { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; overflow-x: auto; }
 .ab-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
@@ -302,6 +437,9 @@ onMounted(loadStores);
 .ab-store-name { font-weight: 600; color: #0f172a; }
 .ab-owner-email { font-size: 0.85rem; color: #334155; word-break: break-all; }
 .ab-muted { color: #94a3b8; font-size: 0.82rem; }
+.ab-date-cell { font-size: 0.8rem; color: #475569; white-space: nowrap; }
+
+.ab-history-total td { padding: 0.7rem 1rem; border-top: 1px solid #e2e8f0; background: #f8fafc; font-weight: 700; color: #0f172a; font-size: 0.8rem; }
 .ab-num { font-size: 0.875rem; font-weight: 700; color: #0f172a; }
 .ab-num--active { color: #0d9488; }
 .ab-num--zero { color: #cbd5e1; font-weight: 600; }

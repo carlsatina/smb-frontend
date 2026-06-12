@@ -45,6 +45,19 @@ export type BillingStore = {
     lastBilledReceipts: number | null;
 };
 
+export type BillingHistoryEntry = {
+    id: string;
+    storeName: string;
+    sentToEmail: string;
+    sentByEmail: string | null;
+    year: number;
+    month: number;
+    receiptCount: number;
+    feeRate: number;
+    amount: number;
+    sentAt: string;
+};
+
 export type PaginatedResponse<T> = {
     total: number;
     page: number;
@@ -126,3 +139,15 @@ export const sendBillingNotice = (storeId: string, month: number, year: number, 
         method: 'POST',
         body: { month, year, feeRate },
     });
+
+export const getBillingHistory = (month?: number, year?: number) => {
+    const params = new URLSearchParams();
+    if (month && year) {
+        params.set('month', String(month));
+        params.set('year', String(year));
+    }
+    const qs = params.toString();
+    return apiClient.request<{ entries: BillingHistoryEntry[] }>(
+        `/api/v1/admin/billing/history${qs ? `?${qs}` : ''}`
+    );
+};
