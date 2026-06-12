@@ -205,6 +205,17 @@
                             </RouterLink>
 
                             <RouterLink
+                                to="/account/profile"
+                                class="topnav__pd-item"
+                                @click="closeProfile"
+                            >
+                                <span class="topnav__pd-item-icon">
+                                    <mdicon name="account-circle-outline" size="16" />
+                                </span>
+                                <span class="topnav__pd-item-label">My Profile</span>
+                            </RouterLink>
+
+                            <RouterLink
                                 to="/account/plan"
                                 class="topnav__pd-item"
                                 @click="closeProfile"
@@ -280,6 +291,9 @@
                     </RouterLink>
                     <RouterLink v-if="canViewSettings" :to="`/stores/${currentStoreId}/audit-logs`" class="topnav__mobile-item" @click="closeMobileMenu">
                         <mdicon name="history" size="20" /><span>Audit Log</span>
+                    </RouterLink>
+                    <RouterLink to="/account/profile" class="topnav__mobile-item" @click="closeMobileMenu">
+                        <mdicon name="account-circle-outline" size="20" /><span>My Profile</span>
                     </RouterLink>
                     <RouterLink to="/account/plan" class="topnav__mobile-item" @click="closeMobileMenu">
                         <mdicon name="credit-card-outline" size="20" /><span>My Plan</span>

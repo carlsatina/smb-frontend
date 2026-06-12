@@ -20,7 +20,9 @@ const userContext = useUserContextStore();
 const hideTopNavRoutes = new Set(['home', 'login', 'register', 'forgot-password', 'reset-password', 'verify-email']);
 const showTopNav = computed(() => {
     const routeName = route.name?.toString();
-    return routeName ? !hideTopNavRoutes.has(routeName) : true;
+    if (!routeName) return true;
+    if (route.meta?.requiresSuperAdmin || routeName.startsWith('admin')) return false;
+    return !hideTopNavRoutes.has(routeName);
 });
 
 const planModalOpen = ref(false);

@@ -17,11 +17,16 @@
                     <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4zm2 0v12h8V4H6zm2 2h4v2H8V6zm0 4h4v2H8v-2z" clip-rule="evenodd"/></svg>
                     Stores
                 </RouterLink>
+                <RouterLink class="adm-nav-item" :to="{ name: 'admin-billing' }" active-class="adm-nav-item--active">
+                    <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path fill-rule="evenodd" d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4zM18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z" clip-rule="evenodd"/></svg>
+                    Billing
+                </RouterLink>
             </nav>
             <div class="adm-sidebar-footer">
-                <RouterLink class="adm-back-link" :to="{ name: 'stores' }">
-                    ← Back to app
-                </RouterLink>
+                <span v-if="adminContext.profile?.email" class="adm-admin-email">{{ adminContext.profile.email }}</span>
+                <button class="adm-back-link" type="button" @click="handleSignOut">
+                    Sign out
+                </button>
             </div>
         </aside>
         <main class="adm-main">
@@ -31,7 +36,36 @@
 </template>
 
 <script setup lang="ts">
-import { RouterLink, RouterView } from 'vue-router';
+import { onBeforeUnmount, onMounted } from 'vue';
+import { RouterView, useRouter } from 'vue-router';
+import { adminLogout } from '@/api/auth';
+import { useAdminContextStore } from '@/stores/adminContext';
+
+const router = useRouter();
+const adminContext = useAdminContextStore();
+
+const handleSignOut = async () => {
+    await adminLogout();
+    adminContext.clear();
+    router.push({ name: 'admin-login' });
+};
+
+// Triggered by the API client when an admin refresh fails (session expired/revoked).
+const handleAdminLogout = () => {
+    adminContext.clear();
+    if (router.currentRoute.value.name !== 'admin-login') {
+        router.push({ name: 'admin-login' });
+    }
+};
+
+onMounted(() => {
+    if (!adminContext.hasLoaded) adminContext.fetchMe();
+    window.addEventListener('admin:logout', handleAdminLogout);
+});
+
+onBeforeUnmount(() => {
+    window.removeEventListener('admin:logout', handleAdminLogout);
+});
 </script>
 
 <style scoped>
@@ -98,6 +132,16 @@ import { RouterLink, RouterView } from 'vue-router';
 .adm-sidebar-footer {
     padding: 1rem 1.25rem;
     border-top: 1px solid rgba(255,255,255,0.07);
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    align-items: flex-start;
+}
+
+.adm-admin-email {
+    font-size: 0.72rem;
+    color: #475569;
+    word-break: break-all;
 }
 
 .adm-back-link {
@@ -105,6 +149,11 @@ import { RouterLink, RouterView } from 'vue-router';
     color: #64748b;
     text-decoration: none;
     transition: color 0.12s;
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    font-family: inherit;
 }
 
 .adm-back-link:hover {

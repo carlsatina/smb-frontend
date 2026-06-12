@@ -74,6 +74,11 @@ export const useUserContextStore = defineStore('userContext', {
                 this.isLoading = false;
             }
         },
+        setFullName(fullName: string) {
+            if (this.profile) {
+                this.profile.fullName = fullName;
+            }
+        },
         clear() {
             this.$reset();
         },

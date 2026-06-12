@@ -84,6 +84,11 @@
                         </div>
                     </label>
 
+                    <label class="auth-remember">
+                        <input type="checkbox" v-model="rememberMe" />
+                        <span>Remember me</span>
+                    </label>
+
                     <div v-if="hasError" class="auth-error">
                         <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16" style="flex-shrink:0">
                             <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
@@ -128,8 +133,14 @@ export default {
         const hasError = ref(false)
         const errorMsg = ref('')
         const loadingModal = ref(false)
+        const rememberMe = ref(false)
 
         onMounted(() => {
+            const rememberedEmail = localStorage.getItem('rememberedEmail')
+            if (rememberedEmail) {
+                email.value = rememberedEmail
+                rememberMe.value = true
+            }
             if (typeof route.query.email === 'string' && route.query.email) {
                 email.value = route.query.email
             }
@@ -149,6 +160,11 @@ export default {
                     hasError.value = true
                     errorMsg.value = response.value.error.message || 'Login failed'
                 } else if (response.value?.accessToken) {
+                    if (rememberMe.value) {
+                        localStorage.setItem('rememberedEmail', email.value)
+                    } else {
+                        localStorage.removeItem('rememberedEmail')
+                    }
                     store.methods.loginUser(response.value.accessToken, response.value.csrfToken)
                     getProfile(response.value.accessToken)
                         .then((data) => {
@@ -189,6 +205,7 @@ export default {
             errorMsg,
             loadingModal,
             brandLogo,
+            rememberMe,
         }
     }
 }
@@ -453,6 +470,24 @@ export default {
 
 .password-toggle:hover {
     color: var(--c-text);
+}
+
+.auth-remember {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.84rem;
+    font-weight: 500;
+    color: var(--c-muted);
+    cursor: pointer;
+    user-select: none;
+}
+
+.auth-remember input {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--c-accent);
+    cursor: pointer;
 }
 
 .auth-error {

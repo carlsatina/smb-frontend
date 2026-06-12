@@ -68,6 +68,11 @@
                             </div>
                         </label>
 
+                        <label class="auth-remember">
+                            <input type="checkbox" v-model="rememberMe" />
+                            <span>Remember me</span>
+                        </label>
+
                         <div v-if="hasError" class="auth-error">
                             <mdicon name="alert-circle-outline" size="16" />
                             <span>{{ errorMsg }}</span>
@@ -89,7 +94,7 @@
 </template>
 
 <script>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import login from '@/composables/auth/login'
 import store from '@/store'
@@ -110,6 +115,15 @@ export default {
         const hasError = ref(false)
         const errorMsg = ref('')
         const loadingModal = ref(false)
+        const rememberMe = ref(false)
+
+        onMounted(() => {
+            const rememberedEmail = localStorage.getItem('rememberedEmail')
+            if (rememberedEmail) {
+                email.value = rememberedEmail
+                rememberMe.value = true
+            }
+        })
 
         const handleLogin = async() => {
             hasError.value = false
@@ -125,6 +139,11 @@ export default {
                     hasError.value = true
                     errorMsg.value = response.value.error.message || 'Login failed'
                 } else if (response.value?.accessToken) {
+                    if (rememberMe.value) {
+                        localStorage.setItem('rememberedEmail', email.value)
+                    } else {
+                        localStorage.removeItem('rememberedEmail')
+                    }
                     store.methods.loginUser(response.value.accessToken, response.value.csrfToken)
                     getProfile(response.value.accessToken)
                         .then((data) => {
@@ -149,7 +168,8 @@ export default {
             handleLogin,
             hasError,
             errorMsg,
-            loadingModal
+            loadingModal,
+            rememberMe
         }
     }
 }
@@ -339,6 +359,24 @@ export default {
 
 .password-toggle:hover {
     color: var(--ink);
+}
+
+.auth-remember {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--muted);
+    cursor: pointer;
+    user-select: none;
+}
+
+.auth-remember input {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--accent);
+    cursor: pointer;
 }
 
 .auth-error {

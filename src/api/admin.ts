@@ -9,6 +9,7 @@ export type AdminUser = {
     grantedPlan: PlanTier | null;
     grantedUntil: string | null;
     subscriptionActive: boolean;
+    payPerReceipt: boolean;
     isSuperAdmin: boolean;
     emailVerified: boolean;
     createdAt: string;
@@ -21,7 +22,6 @@ export type AdminStore = {
     currency: string;
     createdAt: string;
     totalSales: number;
-    totalReceipts: number;
     salesThisMonth: number;
     owner: {
         id: string;
@@ -30,7 +30,19 @@ export type AdminStore = {
         grantedPlan: PlanTier | null;
         grantedUntil: string | null;
         subscriptionActive: boolean;
+        payPerReceipt: boolean;
     } | null;
+};
+
+export type BillingStore = {
+    id: string;
+    name: string;
+    currency: string;
+    owner: { id: string; email: string } | null;
+    receiptCount: number;
+    lastBilledAt: string | null;
+    lastBilledAmount: number | null;
+    lastBilledReceipts: number | null;
 };
 
 export type PaginatedResponse<T> = {
@@ -91,3 +103,26 @@ export const updateSuperAdmin = (userId: string, isSuperAdmin: boolean) =>
         `/api/v1/admin/users/${userId}/super-admin`,
         { method: 'PATCH', body: { isSuperAdmin } }
     );
+
+export const updateBillingMode = (userId: string, payPerReceipt: boolean) =>
+    apiClient.request<{ user: { id: string; email: string; payPerReceipt: boolean } }>(
+        `/api/v1/admin/users/${userId}/billing-mode`,
+        { method: 'PATCH', body: { payPerReceipt } }
+    );
+
+export const getBillingStores = (month: number, year: number) =>
+    apiClient.request<{ stores: BillingStore[]; month: number; year: number }>(
+        `/api/v1/admin/billing?month=${month}&year=${year}`
+    );
+
+export type SendBillingResult = {
+    sent: boolean;
+    message?: string;
+    notice?: { sentAt: string; amount: number; receiptCount: number; sentToEmail: string };
+};
+
+export const sendBillingNotice = (storeId: string, month: number, year: number, feeRate: number) =>
+    apiClient.request<SendBillingResult>(`/api/v1/admin/billing/${storeId}/send`, {
+        method: 'POST',
+        body: { month, year, feeRate },
+    });

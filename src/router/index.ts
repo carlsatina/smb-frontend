@@ -22,12 +22,14 @@ import SuppliersList from '@/views/PurchaseOrders/SuppliersList.vue'
 import ReportsDashboard from '@/views/Reports/ReportsDashboard.vue'
 import DailySalesView from '@/views/Sales/DailySalesView.vue'
 import { useStoreContextStore } from '@/stores/storeContext'
-import { useUserContextStore } from '@/stores/userContext'
+import { useAdminContextStore } from '@/stores/adminContext'
+import { getAdminAccessToken } from '@/api/client'
 import { canAccess, FeatureKey, getDefaultRouteForRole } from '@/utils/roleAccess'
 import AdminLayout from '@/views/admin/AdminLayout.vue'
 import AdminDashboard from '@/views/admin/AdminDashboard.vue'
 import AdminUsers from '@/views/admin/AdminUsers.vue'
 import AdminStores from '@/views/admin/AdminStores.vue'
+import AdminBilling from '@/views/admin/AdminBilling.vue'
 import AdminLogin from '@/views/admin/AdminLogin.vue'
 
 // Auth 
@@ -36,6 +38,7 @@ import Register from '@/views/LandingPage/Register.vue'
 import ForgotPassword from '@/views/LandingPage/ForgotPassword.vue'
 import ResetPassword from '@/views/LandingPage/ResetPassword.vue'
 import VerifyEmail from '@/views/LandingPage/VerifyEmail.vue'
+import AccountProfile from '@/views/Account/AccountProfile.vue'
 
 
 const routes: Array<RouteRecordRaw> = [
@@ -184,6 +187,12 @@ const routes: Array<RouteRecordRaw> = [
     redirect: '/stores',
   },
   {
+    path: '/account/profile',
+    name: 'account-profile',
+    component: AccountProfile,
+    meta: { requiresAuth: true }
+  },
+  {
     path: '/admin/login',
     name: 'admin-login',
     component: AdminLogin,
@@ -207,6 +216,11 @@ const routes: Array<RouteRecordRaw> = [
         path: 'stores',
         name: 'admin-stores',
         component: AdminStores,
+      },
+      {
+        path: 'billing',
+        name: 'admin-billing',
+        component: AdminBilling,
       },
     ],
   },
@@ -254,9 +268,36 @@ const router = createRouter({
 router.beforeEach(async (to) => {
   const isPublicRoute = publicRoutes.includes(to.name as string)
   const isAuthRoute = ['login', 'register', 'forgot-password', 'reset-password'].includes(to.name as string)
+  const isAdminRoute = Boolean(to.meta.requiresSuperAdmin)
   const token = localStorage.getItem('accessToken') || localStorage.getItem('token')
+  const adminToken = getAdminAccessToken()
   const feature = to.meta.feature as FeatureKey | undefined
 
+  // --- Platform admin portal: separate, audience-scoped session ---
+  if (to.name === 'admin-login') {
+    if (adminToken) {
+      const adminContext = useAdminContextStore()
+      if (!adminContext.hasLoaded) await adminContext.fetchMe()
+      if (adminContext.profile?.isSuperAdmin) {
+        return { name: 'admin-dashboard' }
+      }
+    }
+    return true
+  }
+
+  if (isAdminRoute) {
+    if (!adminToken) {
+      return { name: 'admin-login' }
+    }
+    const adminContext = useAdminContextStore()
+    if (!adminContext.hasLoaded) await adminContext.fetchMe()
+    if (!adminContext.profile?.isSuperAdmin) {
+      return { name: 'admin-login' }
+    }
+    return true
+  }
+
+  // --- Normal app session ---
   // Redirect to home if not logged in and trying to access a protected route
   if (!isPublicRoute && !token) {
     return { name: 'home', query: { redirect: to.fullPath } }
@@ -265,27 +306,6 @@ router.beforeEach(async (to) => {
   // Redirect to stores if already logged in and trying to access auth routes
   if (isAuthRoute && token) {
     return { name: 'stores' }
-  }
-
-  if (to.name === 'admin-login') {
-    const userContext = useUserContextStore()
-    if (token) {
-      if (!userContext.hasLoaded) await userContext.fetchMe()
-      if (userContext.profile?.isSuperAdmin) {
-        return { name: 'admin-dashboard' }
-      }
-    }
-    return true
-  }
-
-  if (to.meta.requiresSuperAdmin) {
-    const userContext = useUserContextStore()
-    if (!userContext.hasLoaded) {
-      await userContext.fetchMe()
-    }
-    if (!userContext.profile?.isSuperAdmin) {
-      return { name: 'admin-login' }
-    }
   }
 
   // For any authenticated store-scoped route, ensure stores are loaded and current store is synced

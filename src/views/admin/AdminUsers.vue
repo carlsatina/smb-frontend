@@ -17,6 +17,7 @@
                             <th>Plan</th>
                             <th>Grant</th>
                             <th>Status</th>
+                            <th>Billing</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
@@ -51,7 +52,19 @@
                                 </span>
                             </td>
                             <td>
+                                <span class="au-badge" :class="user.payPerReceipt ? 'au-badge--per-receipt' : 'au-badge--subscription'">
+                                    {{ user.payPerReceipt ? 'Per receipt' : 'Subscription' }}
+                                </span>
+                            </td>
+                            <td>
                                 <div class="au-actions">
+                                    <button
+                                        class="au-btn-sm au-btn-sm--ghost"
+                                        @click="onToggleBillingMode(user)"
+                                        :title="user.payPerReceipt ? 'Switch to subscription billing' : 'Switch to per-receipt billing'"
+                                    >
+                                        {{ user.payPerReceipt ? 'Use subscription' : 'Bill per receipt' }}
+                                    </button>
                                     <button
                                         class="au-btn-sm au-btn-sm--ghost"
                                         @click="onToggleSub(user)"
@@ -132,7 +145,7 @@
 
 <script setup lang="ts">
 import { onMounted, ref, computed, reactive } from 'vue';
-import { getAdminUsers, updateUserPlan, grantUserPlan, revokeUserGrant, updateSuperAdmin } from '@/api/admin';
+import { getAdminUsers, updateUserPlan, grantUserPlan, revokeUserGrant, updateSuperAdmin, updateBillingMode } from '@/api/admin';
 import type { AdminUser } from '@/api/admin';
 import { grantDailySalesFeature, revokeDailySalesFeature, getUserFeatures } from '@/api/dailySales';
 import type { PlanTier } from '@/utils/planAccess';
@@ -289,11 +302,25 @@ const onRemoveAdmin = async (user: AdminUser) => {
     }
 };
 
+const onToggleBillingMode = async (user: AdminUser) => {
+    const next = !user.payPerReceipt;
+    try {
+        await updateBillingMode(user.id, next);
+        user.payPerReceipt = next;
+        showToast(
+            next ? `${user.email} is now billed per receipt.` : `${user.email} is back on subscription billing.`,
+            'success'
+        );
+    } catch (e: any) {
+        showToast(e?.body?.error?.message || 'Failed to update billing mode.', 'error');
+    }
+};
+
 onMounted(() => loadPage(1));
 </script>
 
 <style scoped>
-.au { max-width: 1100px; }
+.au { width: 100%; }
 
 .au-header { margin-bottom: 1.75rem; }
 
@@ -372,6 +399,8 @@ onMounted(() => loadPage(1));
 .au-badge--grant { background: #d1fae5; color: #065f46; }
 .au-badge--active { background: #d1fae5; color: #065f46; }
 .au-badge--inactive { background: #fee2e2; color: #b91c1c; }
+.au-badge--per-receipt { background: #fef3c7; color: #92400e; }
+.au-badge--subscription { background: #e0e7ff; color: #3730a3; }
 
 .au-grant-cell { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
 

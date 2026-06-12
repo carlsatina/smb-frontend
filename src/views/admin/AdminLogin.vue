@@ -51,10 +51,11 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { useUserContextStore } from '@/stores/userContext';
+import { adminLogin } from '@/api/auth';
+import { useAdminContextStore } from '@/stores/adminContext';
 
 const router = useRouter();
-const userContext = useUserContextStore();
+const adminContext = useAdminContextStore();
 
 const email = ref('');
 const password = ref('');
@@ -66,38 +67,11 @@ const handleLogin = async () => {
     loading.value = true;
 
     try {
-        const res = await fetch(
-            (import.meta.env.VITE_BACKEND_API || '') + '/api/v1/auth/login',
-            {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({ email: email.value, password: password.value }),
-            }
-        );
-
-        const data = await res.json();
-
-        if (!res.ok) {
-            error.value = data?.error?.message || 'Invalid email or password.';
-            return;
-        }
-
-        if (!data.user?.isSuperAdmin) {
-            error.value = 'Access denied. This account is not a platform admin.';
-            return;
-        }
-
-        localStorage.setItem('accessToken', data.accessToken);
-        localStorage.setItem('token', data.accessToken);
-        if (data.csrfToken) {
-            localStorage.setItem('csrfToken', data.csrfToken);
-        }
-
-        await userContext.fetchMe(true);
+        await adminLogin(email.value, password.value);
+        await adminContext.fetchMe(true);
         router.push({ name: 'admin-dashboard' });
-    } catch {
-        error.value = 'Unable to connect. Please try again.';
+    } catch (e: any) {
+        error.value = e?.body?.error?.message || 'Invalid email or password.';
     } finally {
         loading.value = false;
     }

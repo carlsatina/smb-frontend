@@ -558,12 +558,9 @@
                                     <th>Staff</th>
                                     <th>Role</th>
                                     <th>Orders</th>
-                                    <th>Cash</th>
-                                    <th>Card</th>
-                                    <th>GCash</th>
-                                    <th>Maya</th>
-                                    <th>Transfer</th>
-                                    <th>Other</th>
+                                    <th v-for="method in employeePaymentMethods" :key="method">
+                                        {{ formatPaymentMethod(method) }}
+                                    </th>
                                     <th>Total</th>
                                 </tr>
                             </thead>
@@ -578,7 +575,7 @@
                                         <span v-else class="item-meta">—</span>
                                     </td>
                                     <td>{{ emp.orderCount }}</td>
-                                    <td v-for="method in ['CASH','CARD','GCASH','MAYA','TRANSFER','OTHER']" :key="method">
+                                    <td v-for="method in employeePaymentMethods" :key="method">
                                         {{ formatMoney(emp.methods.find(m => m.method === method)?.total ?? 0) }}
                                     </td>
                                     <td><strong>{{ formatMoney(emp.totalSales) }}</strong></td>
@@ -672,6 +669,12 @@ const purchaseSpendSummary = ref<PurchaseSpendSummary>({
     totalSpend: 0,
     totalReceipts: 0,
     avgReceipt: 0,
+});
+const PAYMENT_METHOD_ORDER = ['CASH', 'CARD', 'GCASH', 'MAYA', 'TRANSFER', 'OTHER'];
+const employeePaymentMethods = computed(() => {
+    const enabled = storeContext.currentStore?.paymentMethods;
+    if (!enabled || enabled.length === 0) return PAYMENT_METHOD_ORDER;
+    return PAYMENT_METHOD_ORDER.filter((method) => enabled.includes(method));
 });
 const canViewReports = computed(() => canAccess(storeContext.currentStore?.role, 'reports'));
 const isSingleDay = computed(() => filters.from === filters.to);
