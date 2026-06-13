@@ -148,7 +148,7 @@
                                         <th>Cost per unit</th>
                                         <th>Purchase unit</th>
                                         <th>Status</th>
-                                        <th class="align-right">Actions</th>
+                                        <th class="align-center">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -184,10 +184,10 @@
                                             </span>
                                         </td>
                                         <td class="table-actions">
-                                            <template v-if="canWrite">
+                                            <div v-if="canWrite" class="action-group">
                                                 <button class="action-btn" @click="openEditModal(ingredient)">Edit</button>
                                                 <button class="action-btn action-btn--danger" @click="openDeleteModal(ingredient)">Delete</button>
-                                            </template>
+                                            </div>
                                             <span v-else class="cell-muted">View only</span>
                                         </td>
                                     </tr>
@@ -889,6 +889,7 @@ watch(
 }
 
 .ingredients-table thead th.align-right { text-align: right; }
+.ingredients-table thead th.align-center { text-align: center; }
 
 .ingredients-table tbody td {
     padding: 0.65rem 0.9rem;
@@ -981,8 +982,15 @@ watch(
 }
 
 .table-actions {
-    text-align: right;
+    text-align: center;
     white-space: nowrap;
+}
+
+.action-group {
+    display: inline-flex;
+    flex-wrap: nowrap;
+    justify-content: center;
+    gap: 0.35rem;
 }
 
 .action-btn {
@@ -998,7 +1006,7 @@ watch(
     font-family: 'Inter', -apple-system, sans-serif;
     cursor: pointer;
     transition: all 0.15s;
-    margin-left: 0.35rem;
+    white-space: nowrap;
 }
 
 .action-btn:hover {

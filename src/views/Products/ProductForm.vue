@@ -152,16 +152,13 @@
                                         class="recipe-line-row"
                                         :class="{ 'recipe-line-row--error': lineError(line) }"
                                     >
-                                        <select v-model="line.ingredientId" class="recipe-line-select">
-                                            <option value="" disabled>Select ingredient…</option>
-                                            <option
-                                                v-for="ingredient in availableIngredients(line)"
-                                                :key="ingredient.id"
-                                                :value="ingredient.id"
-                                            >
-                                                {{ ingredient.name }} ({{ ingredient.unit }})
-                                            </option>
-                                        </select>
+                                        <SearchableSelect
+                                            v-model="line.ingredientId"
+                                            class="recipe-line-select"
+                                            :options="ingredientOptions(line)"
+                                            placeholder="Select ingredient…"
+                                            search-placeholder="Search ingredients…"
+                                        />
                                         <div class="recipe-line-qty">
                                             <input
                                                 v-model.number="line.qtyPerProductUnit"
@@ -330,6 +327,7 @@ import { hasPlanFeature, openPlanUpgradeModal } from '@/utils/planAccess';
 import { DEFAULT_CATEGORY_OPTIONS, DEFAULT_UNIT_OPTIONS } from '@/utils/catalogDefaults';
 import PlanGate from '@/components/PlanGate.vue';
 import IngredientModal from '@/components/IngredientModal.vue';
+import SearchableSelect from '@/components/SearchableSelect.vue';
 
 type IngredientOption = {
     id: string;
@@ -700,6 +698,12 @@ const availableIngredients = (line: RecipeLineDraft) => {
         return !selectedIds.has(ingredient.id);
     });
 };
+
+const ingredientOptions = (line: RecipeLineDraft) =>
+    availableIngredients(line).map((ingredient) => ({
+        value: ingredient.id,
+        label: `${ingredient.name} (${ingredient.unit})`,
+    }));
 
 const lineError = (line: RecipeLineDraft) => {
     if (!line.ingredientId) return 'Select an ingredient.';
@@ -1278,20 +1282,7 @@ watch(
 
 .recipe-line-select {
     width: 100%;
-    padding: 0.45rem 0.6rem;
-    border-radius: 6px;
-    border: 1.5px solid var(--c-border);
-    font-size: 0.84rem;
-    font-family: 'Inter', -apple-system, sans-serif;
-    color: var(--c-text);
-    background: var(--c-surface);
-    transition: border-color 0.15s;
-}
-
-.recipe-line-select:focus {
-    outline: none;
-    border-color: var(--c-accent);
-    box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
+    min-width: 0;
 }
 
 .recipe-line-qty {
