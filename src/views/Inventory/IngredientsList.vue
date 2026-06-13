@@ -87,12 +87,14 @@
                             </div>
                             <div class="toolbar-right">
                                 <template v-if="canImportExport && storeContext.currentStoreId">
-                                    <button class="ghost-button" :disabled="isExporting" @click="handleExport">
-                                        {{ isExporting ? 'Exporting…' : 'Export CSV' }}
-                                    </button>
-                                    <button class="ghost-button" :disabled="isImporting" @click="triggerImport">
-                                        {{ isImporting ? 'Importing…' : 'Import CSV' }}
-                                    </button>
+                                    <CsvActionsMenu
+                                        :can-import="canWrite"
+                                        :is-importing="isImporting"
+                                        :is-exporting="isExporting"
+                                        @export="handleExport"
+                                        @import="triggerImport"
+                                        @template="downloadTemplate"
+                                    />
                                     <input
                                         ref="importFileInput"
                                         type="file"
@@ -292,6 +294,7 @@ import { hasPlanFeature } from '@/utils/planAccess';
 import ConfirmModal from '@/components/ConfirmModal.vue';
 import IngredientModal from '@/components/IngredientModal.vue';
 import PlanGate from '@/components/PlanGate.vue';
+import CsvActionsMenu from '@/components/CsvActionsMenu.vue';
 
 const router = useRouter();
 const route = useRoute();
@@ -380,6 +383,20 @@ const handleExport = async () => {
 const triggerImport = () => {
     importResult.value = null;
     importFileInput.value?.click();
+};
+
+const downloadTemplate = () => {
+    // Columns match the importer; only Name, Unit and Cost Per Unit are required.
+    const headers = 'Name,Unit,Category,Cost Per Unit,Purchase Unit,Purchase Unit Size,Active,Low Stock Threshold';
+    const example = 'Sugar,g,RAW_MATERIAL,0.50,sack,25000,true,1000';
+    const csv = `${headers}\n${example}\n`;
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'ingredients-template.csv';
+    a.click();
+    URL.revokeObjectURL(url);
 };
 
 const handleImportFileSelected = async (event: Event) => {
@@ -1227,33 +1244,6 @@ watch(
 
 .primary-button:disabled {
     opacity: 0.5;
-    cursor: not-allowed;
-}
-
-.ghost-button {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    padding: 0.6rem 1rem;
-    border-radius: 8px;
-    border: 1.5px solid var(--c-border);
-    background: var(--c-surface);
-    color: var(--c-text);
-    font-size: 0.84rem;
-    font-weight: 600;
-    font-family: 'Inter', -apple-system, sans-serif;
-    cursor: pointer;
-    transition: all 0.15s;
-    white-space: nowrap;
-}
-
-.ghost-button:hover:not(:disabled) {
-    border-color: var(--c-accent);
-    color: var(--c-accent-dark);
-}
-
-.ghost-button:disabled {
-    opacity: 0.55;
     cursor: not-allowed;
 }
 

@@ -394,7 +394,12 @@
                             </tbody>
                         </table>
                         <div class="chart-footnote">
-                            {{ productsSoldSummary.productCount }} products with sales in this range.
+                            <template v-if="productsSoldSummary.limited">
+                                Showing top {{ productsSoldSummary.shown }} of {{ productsSoldSummary.productCount }} products by quantity.
+                            </template>
+                            <template v-else>
+                                {{ productsSoldSummary.productCount }} products with sales in this range.
+                            </template>
                         </div>
                     </div>
                 </section>
@@ -726,7 +731,7 @@ const salesSummary = ref<SalesSummaryTotals>({
 const hourlySales = ref<SalesByHourRecord[]>([]);
 const topProducts = ref<TopProductRecord[]>([]);
 const productsSold = ref<ProductsSoldRecord[]>([]);
-const productsSoldSummary = ref({ totalQty: 0, productCount: 0 });
+const productsSoldSummary = ref({ totalQty: 0, productCount: 0, shown: 0, limited: false });
 const lowStockItems = ref<LowStockItem[]>([]);
 const ingredientUsage = ref<IngredientUsageRecord[]>([]);
 const purchaseSpend = ref<PurchaseSpendRecord[]>([]);
@@ -870,7 +875,7 @@ const loadReports = async () => {
         };
         topProducts.value = [];
         productsSold.value = [];
-        productsSoldSummary.value = { totalQty: 0, productCount: 0 };
+        productsSoldSummary.value = { totalQty: 0, productCount: 0, shown: 0, limited: false };
         lowStockItems.value = [];
         ingredientUsage.value = [];
         purchaseSpend.value = [];

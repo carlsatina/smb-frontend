@@ -69,12 +69,14 @@
                         </div>
                         <div class="toolbar-right">
                             <template v-if="canImportExport && storeContext.currentStoreId">
-                                <button class="ghost-button" :disabled="isExporting" @click="handleExport">
-                                    {{ isExporting ? 'Exporting…' : 'Export CSV' }}
-                                </button>
-                                <button v-if="canWrite" class="ghost-button" :disabled="isImporting" @click="triggerImport">
-                                    {{ isImporting ? 'Importing…' : 'Import CSV' }}
-                                </button>
+                                <CsvActionsMenu
+                                    :can-import="canWrite"
+                                    :is-importing="isImporting"
+                                    :is-exporting="isExporting"
+                                    @export="handleExport"
+                                    @import="triggerImport"
+                                    @template="downloadTemplate"
+                                />
                                 <input
                                     ref="importFileInput"
                                     type="file"
@@ -126,15 +128,16 @@
                                     <tr>
                                         <th>Name</th>
                                         <th>Type</th>
-                                        <th>SKU</th>
+                                        <th v-if="showSkuColumn">SKU</th>
                                         <th>Price</th>
+                                        <th>Cost</th>
                                         <th>Status</th>
                                         <th class="align-right">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <tr v-for="product in paginatedProducts" :key="product.id">
-                                        <td>
+                                        <td class="col-name">
                                             <div class="product-name">
                                                 {{ product.name }}
                                                 <span
@@ -146,10 +149,24 @@
                                             </div>
                                             <div class="product-meta">{{ product.category || 'Uncategorized' }}</div>
                                         </td>
-                                        <td class="product-type">{{ formatProductType(product.type) }}</td>
-                                        <td class="product-sku">{{ product.sku || '—' }}</td>
+                                        <td class="product-type">
+                                            <span
+                                                class="type-chip"
+                                                :class="product.type === 'RECIPE' ? 'type-chip--recipe' : 'type-chip--ready'"
+                                            >
+                                                {{ formatProductType(product.type) }}
+                                            </span>
+                                        </td>
+                                        <td v-if="showSkuColumn" class="product-sku">{{ product.sku || '—' }}</td>
                                         <td class="product-price">{{ formatMoney(product.price) }}</td>
-                                        <td>
+                                        <td class="product-cost">
+                                            <template v-if="product.cost != null">
+                                                <span class="cost-value">{{ formatMoney(product.cost) }}</span>
+                                                <span v-if="marginOf(product) !== null" class="cost-margin">{{ marginOf(product) }}% margin</span>
+                                            </template>
+                                            <span v-else class="cost-empty">—</span>
+                                        </td>
+                                        <td class="col-status">
                                             <span
                                                 class="status-pill"
                                                 :class="product.active ? 'status-pill--active' : 'status-pill--inactive'"
@@ -166,7 +183,7 @@
                                         </td>
                                     </tr>
                                     <tr v-if="filteredProducts.length === 0">
-                                        <td colspan="6" class="empty-state">
+                                        <td :colspan="columnCount" class="empty-state">
                                             No products match your filters.
                                         </td>
                                     </tr>
@@ -176,7 +193,10 @@
 
                         <div class="pagination" v-if="totalPages > 0">
                             <div class="pagination-info">
-                                <span>{{ filteredProducts.length }} product{{ filteredProducts.length !== 1 ? 's' : '' }}</span>
+                                <span v-if="filteredProducts.length !== totalProducts">
+                                    {{ filteredProducts.length }} of {{ totalProducts }} products
+                                </span>
+                                <span v-else>{{ totalProducts }} product{{ totalProducts !== 1 ? 's' : '' }}</span>
                                 <label class="pagination-size">
                                     <span>Show</span>
                                     <select v-model.number="pageSize">
@@ -252,6 +272,7 @@ import { canAccess } from '@/utils/roleAccess';
 import { hasPlanFeature } from '@/utils/planAccess';
 import ConfirmModal from '@/components/ConfirmModal.vue';
 import SkeletonLoader from '@/components/SkeletonLoader.vue';
+import CsvActionsMenu from '@/components/CsvActionsMenu.vue';
 
 type ProductRow = {
     id: string;
@@ -261,6 +282,7 @@ type ProductRow = {
     barcode?: string | null;
     category?: string | null;
     price: number;
+    cost?: number | null;
     active?: boolean;
     recipeLineCount?: number;
 };
@@ -333,6 +355,20 @@ const triggerImport = () => {
     importFileInput.value?.click();
 };
 
+const downloadTemplate = () => {
+    // Columns match the importer; only Name and Price are required.
+    const headers = 'Name,Type,SKU,Barcode,Price,Cost,Unit,Category,Active,Low Stock Threshold';
+    const example = 'Iced Coffee,READY_MADE,SKU-001,,120,60,pcs,Beverages,true,10';
+    const csv = `${headers}\n${example}\n`;
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'products-template.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+};
+
 const handleImportFileSelected = async (event: Event) => {
     const file = (event.target as HTMLInputElement).files?.[0];
     if (!file || !storeContext.currentStoreId) return;
@@ -345,7 +381,7 @@ const handleImportFileSelected = async (event: Event) => {
         if (result.imported > 0) await loadProducts();
     } catch {
         await finishImportProgress();
-        importResult.value = { imported: 0, failed: 1, errors: [{ row: 0, message: 'Upload failed. Check the file and try again.' }] };
+        importResult.value = { imported: 0, updated: 0, failed: 1, errors: [{ row: 0, message: 'Upload failed. Check the file and try again.' }] };
     }
 };
 
@@ -446,6 +482,23 @@ const formatProductType = (type: string) => {
     if (type === 'READY_MADE') return 'Ready-made';
     if (type === 'RECIPE') return 'Recipe';
     return type;
+};
+
+// Hide the SKU column entirely for stores that don't track SKUs.
+const showSkuColumn = computed(() => products.value.some((p) => !!p.sku));
+
+// Name, Type, Price, Cost, Status, Actions (+ SKU when shown).
+const columnCount = computed(() => 6 + (showSkuColumn.value ? 1 : 0));
+
+// Gross margin % when the product has a known cost (recipe costs aren't stored
+// on the product, so those show as no margin). price/cost arrive as Decimal
+// strings over JSON, so coerce explicitly.
+const marginOf = (product: ProductRow): number | null => {
+    if (product.cost == null) return null;
+    const price = Number(product.price);
+    const cost = Number(product.cost);
+    if (!(price > 0) || Number.isNaN(cost)) return null;
+    return Math.round(((price - cost) / price) * 1000) / 10;
 };
 
 const formatMoney = (value: number) => {
@@ -861,9 +914,26 @@ watch(() => storeContext.currentStoreId, async () => {
     margin-top: 0.1rem;
 }
 
-.product-type {
-    font-size: 0.8rem;
+.product-type { white-space: nowrap; }
+
+.type-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.18rem 0.55rem;
+    border-radius: 999px;
+    font-size: 0.7rem;
     font-weight: 600;
+    letter-spacing: 0.03em;
+    white-space: nowrap;
+}
+
+.type-chip--ready {
+    background: rgba(100, 116, 139, 0.12);
+    color: #475569;
+}
+
+.type-chip--recipe {
+    background: rgba(13, 148, 136, 0.1);
     color: var(--c-accent-dark);
 }
 
@@ -877,6 +947,25 @@ watch(() => storeContext.currentStoreId, async () => {
     font-weight: 600;
     font-variant-numeric: tabular-nums;
 }
+
+.product-cost {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.cost-value {
+    font-weight: 600;
+    color: var(--c-text);
+}
+
+.cost-margin {
+    display: block;
+    font-size: 0.7rem;
+    color: var(--c-muted);
+    margin-top: 0.1rem;
+}
+
+.cost-empty { color: var(--c-muted); }
 
 .table-note {
     font-size: 0.78rem;
@@ -1040,6 +1129,7 @@ watch(() => storeContext.currentStoreId, async () => {
     font-size: 0.8rem;
 }
 
+
 .ghost-button--danger:hover {
     border-color: #f87171 !important;
     color: #dc2626 !important;
@@ -1184,7 +1274,7 @@ watch(() => storeContext.currentStoreId, async () => {
     .product-table tbody tr {
         display: grid;
         grid-template-columns: 1fr auto;
-        grid-template-rows: auto auto auto;
+        grid-template-rows: auto auto auto auto;
         padding: 0.875rem 1rem;
         gap: 0.1rem 0.625rem;
         border-bottom: 1px solid var(--c-border);
@@ -1199,23 +1289,20 @@ watch(() => storeContext.currentStoreId, async () => {
     }
 
     /* Name + category */
-    .product-table tbody td:nth-child(1) { grid-column: 1; grid-row: 1; }
+    .product-table tbody td.col-name { grid-column: 1; grid-row: 1; }
 
-    /* Type — shown inline below name */
-    .product-table tbody td:nth-child(2) {
+    /* Type chip — below name */
+    .product-table tbody td.product-type {
         grid-column: 1;
         grid-row: 2;
-        font-size: 0.72rem;
-        color: var(--c-muted);
-        font-weight: 500;
-        padding-top: 0.1rem;
+        padding-top: 0.25rem;
     }
 
-    /* SKU — hidden (already in name meta area if needed) */
-    .product-table tbody td:nth-child(3) { display: none; }
+    /* SKU — hidden on mobile (searchable, shown on desktop) */
+    .product-table tbody td.product-sku { display: none; }
 
-    /* Price */
-    .product-table tbody td:nth-child(4) {
+    /* Price — top right */
+    .product-table tbody td.product-price {
         grid-column: 2;
         grid-row: 1;
         text-align: right;
@@ -1224,19 +1311,28 @@ watch(() => storeContext.currentStoreId, async () => {
         white-space: nowrap;
     }
 
-    /* Status */
-    .product-table tbody td:nth-child(5) {
+    /* Cost — under price */
+    .product-table tbody td.product-cost {
         grid-column: 2;
         grid-row: 2;
+        text-align: right;
+        padding-top: 0.25rem;
+    }
+    .product-table tbody td.product-cost .cost-margin { text-align: right; }
+
+    /* Status */
+    .product-table tbody td.col-status {
+        grid-column: 1 / -1;
+        grid-row: 3;
         display: flex;
-        justify-content: flex-end;
-        padding-top: 0.15rem;
+        justify-content: flex-start;
+        padding-top: 0.4rem;
     }
 
     /* Actions row */
     .product-table tbody td.table-actions {
         grid-column: 1 / -1;
-        grid-row: 3;
+        grid-row: 4;
         justify-content: flex-start;
         padding-top: 0.5rem;
         margin-top: 0.35rem;

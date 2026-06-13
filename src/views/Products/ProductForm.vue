@@ -848,7 +848,7 @@ const goToIngredients = () => {
 onMounted(async () => {
     // Ensure user context is loaded for plan feature checks
     await userContext.fetchMe();
-    if (!storeContext.currentStoreId) {
+    if (!storeContext.stores.length) {
         await storeContext.fetchStores();
     }
     const routeStoreId = route.params.storeId as string | undefined;

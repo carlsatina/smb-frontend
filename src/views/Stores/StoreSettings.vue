@@ -154,18 +154,18 @@
                                 <h2 class="st-section-title">Catalog defaults</h2>
                                 <p class="st-section-sub">Define the unit and category dropdowns used when creating products.</p>
                             </div>
-                            <form class="st-form" @submit.prevent="saveSettings">
+                            <div class="st-form">
                                 <div class="st-catalog-box">
                                     <div class="st-catalog-group">
                                         <span class="st-catalog-label">Units</span>
                                         <div class="st-catalog-input">
-                                            <input v-model="newUnit" type="text" placeholder="Add unit" :disabled="!canEdit" />
-                                            <button class="st-btn-ghost" type="button" :disabled="!canEdit || !newUnit.trim()" @click="addUnitOption">Add</button>
+                                            <input v-model="newUnit" type="text" placeholder="Add unit" :disabled="!canEdit || isCatalogSaving" @keydown.enter.prevent="addUnitOption" />
+                                            <button class="st-btn-ghost" type="button" :disabled="!canEdit || isCatalogSaving || !newUnit.trim()" @click="addUnitOption">Add</button>
                                         </div>
                                         <div v-if="storeForm.unitOptions.length" class="st-catalog-tags">
                                             <span v-for="unit in storeForm.unitOptions" :key="unit" class="st-catalog-tag">
                                                 {{ unit }}
-                                                <button type="button" class="st-catalog-remove" :disabled="!canEdit" @click="removeUnitOption(unit)">&times;</button>
+                                                <button type="button" class="st-catalog-remove" :disabled="!canEdit || isCatalogSaving" @click="removeUnitOption(unit)">&times;</button>
                                             </span>
                                         </div>
                                         <div v-else class="st-catalog-empty">No units configured.</div>
@@ -173,26 +173,21 @@
                                     <div class="st-catalog-group">
                                         <span class="st-catalog-label">Categories</span>
                                         <div class="st-catalog-input">
-                                            <input v-model="newCategory" type="text" placeholder="Add category" :disabled="!canEdit" />
-                                            <button class="st-btn-ghost" type="button" :disabled="!canEdit || !newCategory.trim()" @click="addCategoryOption">Add</button>
+                                            <input v-model="newCategory" type="text" placeholder="Add category" :disabled="!canEdit || isCatalogSaving" @keydown.enter.prevent="addCategoryOption" />
+                                            <button class="st-btn-ghost" type="button" :disabled="!canEdit || isCatalogSaving || !newCategory.trim()" @click="addCategoryOption">Add</button>
                                         </div>
                                         <div v-if="storeForm.categoryOptions.length" class="st-catalog-tags">
                                             <span v-for="category in storeForm.categoryOptions" :key="category" class="st-catalog-tag">
                                                 {{ category }}
-                                                <button type="button" class="st-catalog-remove" :disabled="!canEdit" @click="removeCategoryOption(category)">&times;</button>
+                                                <button type="button" class="st-catalog-remove" :disabled="!canEdit || isCatalogSaving" @click="removeCategoryOption(category)">&times;</button>
                                             </span>
                                         </div>
                                         <div v-else class="st-catalog-empty">No categories configured.</div>
                                     </div>
                                 </div>
                                 <p v-if="!canEdit" class="st-permission-note">Only owners or admins can edit settings.</p>
-                                <div class="st-form-footer">
-                                    <button class="st-btn-ghost" type="button" @click="resetForm">Reset changes</button>
-                                    <button class="st-btn-primary" type="submit" :disabled="!canEdit || isSaving">
-                                        {{ isSaving ? 'Saving…' : 'Save changes' }}
-                                    </button>
-                                </div>
-                            </form>
+                                <span v-else class="st-field-hint">Units and categories are saved automatically.</span>
+                            </div>
                         </section>
 
                         <!-- ── Team & roles ── -->
@@ -520,6 +515,7 @@ const allPaymentMethods = [
 const activeSection = ref<'profile' | 'payment' | 'catalog' | 'team' | 'plan' | 'danger'>('profile');
 
 const isSaving = ref(false);
+const isCatalogSaving = ref(false);
 const isArchiving = ref(false);
 const newUnit = ref('');
 const newCategory = ref('');
@@ -589,8 +585,31 @@ const resetForm = () => {
     newCategory.value = '';
 };
 
-const addUnitOption = () => {
-    if (!canEdit.value) return;
+// Catalog defaults persist immediately on add/remove (no separate save step).
+const persistCatalog = async (previousUnits: string[], previousCategories: string[]) => {
+    if (!currentStore.value) return false;
+    isCatalogSaving.value = true;
+    try {
+        await updateStore(currentStore.value.id, {
+            unitOptions: normalizeOptions(storeForm.unitOptions, DEFAULT_UNIT_OPTIONS),
+            categoryOptions: normalizeOptions(storeForm.categoryOptions, DEFAULT_CATEGORY_OPTIONS),
+        });
+        await storeContext.fetchStores();
+        return true;
+    } catch (error: any) {
+        // Revert the optimistic change so the UI matches the saved state.
+        storeForm.unitOptions = previousUnits;
+        storeForm.categoryOptions = previousCategories;
+        const message = error?.body?.error?.message || 'Unable to update catalog defaults.';
+        showToast(message, 'error');
+        return false;
+    } finally {
+        isCatalogSaving.value = false;
+    }
+};
+
+const addUnitOption = async () => {
+    if (!canEdit.value || isCatalogSaving.value) return;
     const value = newUnit.value.trim();
     if (!value) return;
     if (storeForm.unitOptions.some((entry) => entry.toLowerCase() === value.toLowerCase())) {
@@ -598,22 +617,31 @@ const addUnitOption = () => {
         newUnit.value = '';
         return;
     }
+    const previousUnits = [...storeForm.unitOptions];
+    const previousCategories = [...storeForm.categoryOptions];
     storeForm.unitOptions = normalizeOptions([...storeForm.unitOptions, value], DEFAULT_UNIT_OPTIONS);
     newUnit.value = '';
-    showToast('Unit added.', 'success');
+    if (await persistCatalog(previousUnits, previousCategories)) {
+        showToast('Unit added.', 'success');
+    }
 };
 
-const removeUnitOption = (unit: string) => {
-    if (!canEdit.value) return;
+const removeUnitOption = async (unit: string) => {
+    if (!canEdit.value || isCatalogSaving.value) return;
     if (storeForm.unitOptions.length <= 1) {
         showToast('Keep at least one unit.', 'info');
         return;
     }
+    const previousUnits = [...storeForm.unitOptions];
+    const previousCategories = [...storeForm.categoryOptions];
     storeForm.unitOptions = storeForm.unitOptions.filter((entry) => entry !== unit);
+    if (await persistCatalog(previousUnits, previousCategories)) {
+        showToast('Unit removed.', 'success');
+    }
 };
 
-const addCategoryOption = () => {
-    if (!canEdit.value) return;
+const addCategoryOption = async () => {
+    if (!canEdit.value || isCatalogSaving.value) return;
     const value = newCategory.value.trim();
     if (!value) return;
     if (storeForm.categoryOptions.some((entry) => entry.toLowerCase() === value.toLowerCase())) {
@@ -621,18 +649,27 @@ const addCategoryOption = () => {
         newCategory.value = '';
         return;
     }
+    const previousUnits = [...storeForm.unitOptions];
+    const previousCategories = [...storeForm.categoryOptions];
     storeForm.categoryOptions = normalizeOptions([...storeForm.categoryOptions, value], DEFAULT_CATEGORY_OPTIONS);
     newCategory.value = '';
-    showToast('Category added.', 'success');
+    if (await persistCatalog(previousUnits, previousCategories)) {
+        showToast('Category added.', 'success');
+    }
 };
 
-const removeCategoryOption = (category: string) => {
-    if (!canEdit.value) return;
+const removeCategoryOption = async (category: string) => {
+    if (!canEdit.value || isCatalogSaving.value) return;
     if (storeForm.categoryOptions.length <= 1) {
         showToast('Keep at least one category.', 'info');
         return;
     }
+    const previousUnits = [...storeForm.unitOptions];
+    const previousCategories = [...storeForm.categoryOptions];
     storeForm.categoryOptions = storeForm.categoryOptions.filter((entry) => entry !== category);
+    if (await persistCatalog(previousUnits, previousCategories)) {
+        showToast('Category removed.', 'success');
+    }
 };
 
 const saveSettings = async () => {

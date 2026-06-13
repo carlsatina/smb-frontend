@@ -79,6 +79,8 @@ export type ProductsSoldResponse = {
     summary: {
         totalQty: number;
         productCount: number;
+        shown: number;
+        limited: boolean;
     };
     products: ProductsSoldRecord[];
 };
