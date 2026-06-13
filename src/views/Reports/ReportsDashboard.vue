@@ -115,33 +115,51 @@
             </header>
 
             <div v-if="storeContext.currentStoreId && canViewReports" class="reports-kpis">
-                <div class="kpi-card">
-                    <span class="kpi-label">Net sales</span>
+                <div class="kpi-card kpi-card--sales">
+                    <div class="kpi-head">
+                        <span class="kpi-icon"><mdicon name="cash-multiple" size="18" /></span>
+                        <span class="kpi-label">Net sales</span>
+                    </div>
                     <span class="kpi-value">{{ formatMoney(salesSummary.netSales) }}</span>
                     <span class="kpi-sub">{{ rangeLabel }}</span>
                 </div>
-                <div class="kpi-card">
-                    <span class="kpi-label">Orders</span>
+                <div class="kpi-card kpi-card--orders">
+                    <div class="kpi-head">
+                        <span class="kpi-icon"><mdicon name="receipt-text-outline" size="18" /></span>
+                        <span class="kpi-label">Orders</span>
+                    </div>
                     <span class="kpi-value">{{ salesSummary.orderCount }}</span>
                     <span class="kpi-sub">Finalized sales</span>
                 </div>
-                <div class="kpi-card">
-                    <span class="kpi-label">Avg order</span>
+                <div class="kpi-card kpi-card--avg">
+                    <div class="kpi-head">
+                        <span class="kpi-icon"><mdicon name="chart-line-variant" size="18" /></span>
+                        <span class="kpi-label">Avg order</span>
+                    </div>
                     <span class="kpi-value">{{ formatMoney(salesSummary.avgOrder) }}</span>
                     <span class="kpi-sub">Across range</span>
                 </div>
-                <div class="kpi-card">
-                    <span class="kpi-label">Discounts</span>
+                <div class="kpi-card kpi-card--discounts">
+                    <div class="kpi-head">
+                        <span class="kpi-icon"><mdicon name="ticket-percent-outline" size="18" /></span>
+                        <span class="kpi-label">Discounts</span>
+                    </div>
                     <span class="kpi-value">{{ formatMoney(salesSummary.discounts) }}</span>
                     <span class="kpi-sub">Gross {{ formatMoney(salesSummary.grossSales) }}</span>
                 </div>
-                <div class="kpi-card">
-                    <span class="kpi-label">Voids</span>
+                <div class="kpi-card kpi-card--voids">
+                    <div class="kpi-head">
+                        <span class="kpi-icon"><mdicon name="close-circle-outline" size="18" /></span>
+                        <span class="kpi-label">Voids</span>
+                    </div>
                     <span class="kpi-value">{{ salesSummary.voidCount }}</span>
                     <span class="kpi-sub">{{ formatMoney(salesSummary.voidedSales) }}</span>
                 </div>
                 <div class="kpi-card kpi-card--profit">
-                    <span class="kpi-label">Net profit</span>
+                    <div class="kpi-head">
+                        <span class="kpi-icon"><mdicon name="trending-up" size="18" /></span>
+                        <span class="kpi-label">Net profit</span>
+                    </div>
                     <span class="kpi-value" :class="{ 'kpi-value--negative': profitSummary.totalProfit < 0 }">
                         {{ formatMoney(profitSummary.totalProfit) }}
                     </span>
@@ -331,6 +349,52 @@
                                 <span class="metric">{{ formatQty(product.qtySold) }} sold</span>
                                 <strong>{{ formatMoney(product.totalSales) }}</strong>
                             </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section v-if="visibleCards['items-sold']" class="report-card report-card--wide">
+                    <div class="card-header">
+                        <div>
+                            <h2>Items sold per product</h2>
+                            <p>Units sold for each product, most sold first</p>
+                        </div>
+                        <div class="card-meta">
+                            <span class="pill">{{ formatQty(productsSoldSummary.totalQty) }} units</span>
+                        </div>
+                    </div>
+
+                    <SkeletonLoader v-if="isLoading" :rows="5" label="Loading items sold…" />
+                    <div v-else-if="productsSold.length === 0" class="panel-state">
+                        No sales data yet.
+                    </div>
+                    <div v-else class="table-wrap">
+                        <table class="low-stock-table table-compact table-compact--bordered">
+                            <thead>
+                                <tr>
+                                    <th>Product</th>
+                                    <th>Qty sold</th>
+                                    <th>Orders</th>
+                                    <th>Sales</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="item in productsSold" :key="item.productId">
+                                    <td>
+                                        <div class="item-name">{{ item.name }}</div>
+                                        <div class="item-meta">
+                                            <span v-if="item.sku">SKU {{ item.sku }}</span>
+                                            <span v-if="item.unit">{{ item.unit }}</span>
+                                        </div>
+                                    </td>
+                                    <td><strong>{{ formatQty(item.qtySold) }}</strong></td>
+                                    <td>{{ item.orderCount }}</td>
+                                    <td>{{ formatMoney(item.totalSales) }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <div class="chart-footnote">
+                            {{ productsSoldSummary.productCount }} products with sales in this range.
                         </div>
                     </div>
                 </section>
@@ -598,6 +662,8 @@ import {
     getLowStock,
     getPaymentMethodBreakdown,
     getProductMargins,
+    getProductsSold,
+    getProfitSummary,
     getPurchaseSpend,
     getSalesByDay,
     getSalesByHour,
@@ -610,6 +676,7 @@ import {
     PurchaseSpendRecord,
     PurchaseSpendSummary,
     ProductMarginRecord,
+    ProductsSoldRecord,
     SalesByHourRecord,
     SalesByDayRecord,
     SalesSummaryTotals,
@@ -658,6 +725,8 @@ const salesSummary = ref<SalesSummaryTotals>({
 });
 const hourlySales = ref<SalesByHourRecord[]>([]);
 const topProducts = ref<TopProductRecord[]>([]);
+const productsSold = ref<ProductsSoldRecord[]>([]);
+const productsSoldSummary = ref({ totalQty: 0, productCount: 0 });
 const lowStockItems = ref<LowStockItem[]>([]);
 const ingredientUsage = ref<IngredientUsageRecord[]>([]);
 const purchaseSpend = ref<PurchaseSpendRecord[]>([]);
@@ -686,6 +755,7 @@ const REPORT_CARDS: { id: string; label: string; planFeature?: PlanFeature }[] =
     { id: 'daypart-mix',        label: 'Daypart mix' },
     { id: 'payment-methods',    label: 'Payment methods' },
     { id: 'top-products',       label: 'Top products' },
+    { id: 'items-sold',         label: 'Items sold per product' },
     { id: 'item-margins',       label: 'Item margins' },
     { id: 'ingredient-usage',   label: 'Ingredient usage',   planFeature: 'ingredients' },
     { id: 'supplier-analytics', label: 'Supplier analytics', planFeature: 'purchaseOrders' },
@@ -775,31 +845,13 @@ const onClickOutsideSettings = (e: MouseEvent) => {
     }
 };
 
-const profitSummary = computed(() => {
-    const items = productMargins.value;
-    let totalRevenue = 0;
-    let totalCost = 0;
-    let itemsWithCost = 0;
-
-    for (const item of items) {
-        totalRevenue += item.revenue || 0;
-        if (item.cost !== null) {
-            totalCost += item.cost;
-            itemsWithCost++;
-        }
-    }
-
-    const totalProfit = totalRevenue - totalCost;
-    const marginPct = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
-
-    return {
-        totalRevenue,
-        totalCost,
-        totalProfit,
-        marginPct: Math.round(marginPct * 10) / 10,
-        itemsWithCost,
-        totalItems: items.length,
-    };
+const profitSummary = ref({
+    totalRevenue: 0,
+    totalCost: 0,
+    totalProfit: 0,
+    marginPct: 0,
+    itemsWithCost: 0,
+    totalItems: 0,
 });
 
 const loadReports = async () => {
@@ -817,12 +869,15 @@ const loadReports = async () => {
             voidCount: 0,
         };
         topProducts.value = [];
+        productsSold.value = [];
+        productsSoldSummary.value = { totalQty: 0, productCount: 0 };
         lowStockItems.value = [];
         ingredientUsage.value = [];
         purchaseSpend.value = [];
         hourlySales.value = [];
         productMargins.value = [];
         marginSummary.value = { costedItems: 0, totalItems: 0 };
+        profitSummary.value = { totalRevenue: 0, totalCost: 0, totalProfit: 0, marginPct: 0, itemsWithCost: 0, totalItems: 0 };
         purchaseSpendSummary.value = { totalSpend: 0, totalReceipts: 0, avgReceipt: 0 };
         paymentMethods.value = [];
         employeeSales.value = [];
@@ -831,12 +886,14 @@ const loadReports = async () => {
     isLoading.value = true;
     errorMessage.value = '';
     try {
-        const [summary, sales, hourly, top, lowStock, usage, spend, margins, paymentBreakdown, empSales] =
+        const [summary, sales, hourly, top, soldPerProduct, profit, lowStock, usage, spend, margins, paymentBreakdown, empSales] =
             await Promise.allSettled([
                 getSalesSummary(storeId, { from: filters.from, to: filters.to }),
                 getSalesByDay(storeId, { from: filters.from, to: filters.to }),
                 getSalesByHour(storeId, { from: filters.from, to: filters.to }),
-                getTopProducts(storeId, { from: filters.from, to: filters.to, limit: 8 }),
+                getTopProducts(storeId, { from: filters.from, to: filters.to, limit: 3 }),
+                getProductsSold(storeId, { from: filters.from, to: filters.to, limit: 100 }),
+                getProfitSummary(storeId, { from: filters.from, to: filters.to }),
                 getLowStock(storeId, { limit: 8 }),
                 canUseIngredients.value
                     ? getIngredientUsage(storeId, { from: filters.from, to: filters.to, limit: 8 })
@@ -852,6 +909,11 @@ const loadReports = async () => {
         if (sales.status === 'fulfilled') salesDays.value = sales.value.days;
         if (hourly.status === 'fulfilled') hourlySales.value = hourly.value.hours;
         if (top.status === 'fulfilled') topProducts.value = top.value.products;
+        if (soldPerProduct.status === 'fulfilled') {
+            productsSold.value = soldPerProduct.value.products;
+            productsSoldSummary.value = soldPerProduct.value.summary;
+        }
+        if (profit.status === 'fulfilled') profitSummary.value = profit.value.summary;
         if (lowStock.status === 'fulfilled') lowStockItems.value = lowStock.value.items;
         if (usage.status === 'fulfilled') ingredientUsage.value = usage.value.ingredients;
         if (spend.status === 'fulfilled') {
@@ -1451,15 +1513,58 @@ watch(
 }
 
 .kpi-card {
+    --kpi-accent: #0d9488;
+    position: relative;
     display: flex;
     flex-direction: column;
-    gap: 0.2rem;
+    gap: 0.35rem;
     padding: 1rem 1.25rem;
-    background: var(--c-surface);
-    border: 1px solid var(--c-border);
-    border-radius: 12px;
-    min-width: 130px;
+    background:
+        linear-gradient(135deg,
+            color-mix(in srgb, var(--kpi-accent) 7%, var(--c-surface)),
+            var(--c-surface) 65%);
+    border: 1px solid color-mix(in srgb, var(--kpi-accent) 22%, var(--c-border));
+    border-radius: 14px;
+    min-width: 140px;
     flex: 1;
+    overflow: hidden;
+    transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+/* accent rail down the left edge */
+.kpi-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 3px;
+    height: 100%;
+    background: var(--kpi-accent);
+    opacity: 0.7;
+}
+
+.kpi-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 24px color-mix(in srgb, var(--kpi-accent) 18%, transparent);
+    border-color: color-mix(in srgb, var(--kpi-accent) 45%, var(--c-border));
+}
+
+.kpi-head {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.kpi-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 9px;
+    flex-shrink: 0;
+    color: var(--kpi-accent);
+    background: color-mix(in srgb, var(--kpi-accent) 14%, var(--c-surface));
 }
 
 .kpi-label {
@@ -1471,7 +1576,7 @@ watch(
 }
 
 .kpi-value {
-    font-size: 1.55rem;
+    font-size: 1.6rem;
     font-weight: 800;
     letter-spacing: -0.03em;
     color: var(--c-text);
@@ -1484,13 +1589,16 @@ watch(
     line-height: 1.4;
 }
 
-.kpi-card--profit {
-    background: rgba(13, 148, 136, 0.04);
-    border-color: rgba(13, 148, 136, 0.25);
-}
+/* per-metric accent colors */
+.kpi-card--sales     { --kpi-accent: #0d9488; }
+.kpi-card--orders    { --kpi-accent: #2563eb; }
+.kpi-card--avg       { --kpi-accent: #7c3aed; }
+.kpi-card--discounts { --kpi-accent: #d97706; }
+.kpi-card--voids     { --kpi-accent: #dc2626; }
+.kpi-card--profit    { --kpi-accent: #059669; }
 
 .kpi-card--profit .kpi-value {
-    color: var(--c-accent-dark);
+    color: var(--kpi-accent);
 }
 
 .kpi-value--negative {

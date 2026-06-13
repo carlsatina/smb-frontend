@@ -61,6 +61,28 @@ export type TopProductRecord = {
     totalSales: number;
 };
 
+export type ProductsSoldRecord = {
+    productId: string;
+    name: string;
+    sku?: string | null;
+    unit?: string | null;
+    qtySold: number;
+    orderCount: number;
+    totalSales: number;
+};
+
+export type ProductsSoldResponse = {
+    range: {
+        from: string;
+        to: string;
+    };
+    summary: {
+        totalQty: number;
+        productCount: number;
+    };
+    products: ProductsSoldRecord[];
+};
+
 export type LowStockItem = {
     itemType: 'PRODUCT' | 'INGREDIENT';
     itemId: string;
@@ -116,6 +138,21 @@ export type ProductMarginResponse = {
     items: ProductMarginRecord[];
 };
 
+export type ProfitSummaryResponse = {
+    range: {
+        from: string;
+        to: string;
+    };
+    summary: {
+        totalRevenue: number;
+        totalCost: number;
+        totalProfit: number;
+        marginPct: number;
+        itemsWithCost: number;
+        totalItems: number;
+    };
+};
+
 const buildRangeQuery = (params?: { from?: string; to?: string }) => {
     const search = new URLSearchParams();
     if (params?.from) {
@@ -165,6 +202,33 @@ export const getTopProducts = (
     const query = search.toString();
     return apiClient.request<{ range: { from: string; to: string }; products: TopProductRecord[] }>(
         `/api/v1/stores/${storeId}/reports/top-products${query ? `?${query}` : ''}`
+    );
+};
+
+export const getProductsSold = (
+    storeId: string,
+    params?: { from?: string; to?: string; limit?: number }
+) => {
+    const search = new URLSearchParams();
+    if (params?.from) {
+        search.set('from', params.from);
+    }
+    if (params?.to) {
+        search.set('to', params.to);
+    }
+    if (params?.limit) {
+        search.set('limit', String(params.limit));
+    }
+    const query = search.toString();
+    return apiClient.request<ProductsSoldResponse>(
+        `/api/v1/stores/${storeId}/reports/products-sold${query ? `?${query}` : ''}`
+    );
+};
+
+export const getProfitSummary = (storeId: string, params?: { from?: string; to?: string }) => {
+    const query = buildRangeQuery(params);
+    return apiClient.request<ProfitSummaryResponse>(
+        `/api/v1/stores/${storeId}/reports/profit-summary${query ? `?${query}` : ''}`
     );
 };
 
