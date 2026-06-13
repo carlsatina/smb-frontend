@@ -44,3 +44,20 @@ export const deleteIngredient = (storeId: string, ingredientId: string) => {
         method: 'DELETE',
     });
 };
+
+export const exportIngredients = (storeId: string) => {
+    return apiClient.download(`/api/v1/stores/${storeId}/ingredients/export`);
+};
+
+export type ImportResult = {
+    imported: number;
+    updated: number;
+    failed: number;
+    errors: Array<{ row: number; message: string }>;
+};
+
+export const importIngredients = (storeId: string, file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return apiClient.upload<ImportResult>(`/api/v1/stores/${storeId}/ingredients/import`, formData);
+};

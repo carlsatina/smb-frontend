@@ -182,7 +182,7 @@ export const apiClient = {
         const blob = await response.blob();
         const contentDisposition = response.headers.get('content-disposition') ?? '';
         const filenameMatch =
-            contentDisposition.match(/filename\\*=UTF-8''([^;]+)/i) ||
+            contentDisposition.match(/filename\*=UTF-8''([^;]+)/i) ||
             contentDisposition.match(/filename=\"?([^\";]+)\"?/i);
         const filename = filenameMatch ? decodeURIComponent(filenameMatch[1]) : 'export.csv';
 

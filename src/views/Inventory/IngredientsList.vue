@@ -86,6 +86,21 @@
                                 </div>
                             </div>
                             <div class="toolbar-right">
+                                <template v-if="canImportExport && storeContext.currentStoreId">
+                                    <button class="ghost-button" :disabled="isExporting" @click="handleExport">
+                                        {{ isExporting ? 'Exporting…' : 'Export CSV' }}
+                                    </button>
+                                    <button class="ghost-button" :disabled="isImporting" @click="triggerImport">
+                                        {{ isImporting ? 'Importing…' : 'Import CSV' }}
+                                    </button>
+                                    <input
+                                        ref="importFileInput"
+                                        type="file"
+                                        accept=".csv,text/csv"
+                                        style="display:none"
+                                        @change="handleImportFileSelected"
+                                    />
+                                </template>
                                 <button
                                     v-if="canWrite"
                                     class="primary-button"
@@ -96,6 +111,23 @@
                                 </button>
                                 <span v-else-if="storeContext.currentStoreId" class="panel-note">View-only access</span>
                             </div>
+                        </div>
+
+                        <div v-if="isImporting" class="import-progress">
+                            <div class="import-progress__label">Importing… {{ Math.round(importProgress) }}%</div>
+                            <div class="import-progress__track">
+                                <div class="import-progress__fill" :style="{ width: importProgress + '%' }"></div>
+                            </div>
+                        </div>
+
+                        <div v-if="importResult" class="import-result" :class="importResult.failed > 0 ? 'import-result--warn' : 'import-result--ok'">
+                            <div class="import-result__summary">
+                                <span>Import complete: <strong>{{ importResult.imported }}</strong> added, <strong>{{ importResult.updated }}</strong> updated{{ importResult.failed > 0 ? `, ${importResult.failed} failed` : '' }}.</span>
+                                <button class="import-result__close" @click="importResult = null">✕</button>
+                            </div>
+                            <ul v-if="importResult.errors.length > 0" class="import-result__errors">
+                                <li v-for="err in importResult.errors" :key="err.row">Row {{ err.row }}: {{ err.message }}</li>
+                            </ul>
                         </div>
 
                         <div v-if="!storeContext.currentStoreId" class="panel-state">
@@ -245,7 +277,14 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { deleteIngredient, IngredientResponse, listIngredients } from '@/api/ingredients';
+import {
+    deleteIngredient,
+    exportIngredients,
+    importIngredients,
+    ImportResult,
+    IngredientResponse,
+    listIngredients,
+} from '@/api/ingredients';
 import { useStoreContextStore } from '@/stores/storeContext';
 import { useToast } from '@/composables/useToast';
 import { canAccess } from '@/utils/roleAccess';
@@ -278,12 +317,86 @@ const isPlanLocked = computed(
         (planKnown.value && !hasPlanFeature(ownerPlanTier.value, 'ingredients'))
 );
 
+const canAdmin = computed(() => canAccess(storeContext.currentStore?.role, 'storeSettings'));
+const canImportExport = computed(
+    () => canAdmin.value && ownerSubscriptionActive.value && hasPlanFeature(ownerPlanTier.value, 'importExport')
+);
+
 const showDeleteModal = ref(false);
 const ingredientToDelete = ref<IngredientResponse | null>(null);
 const isDeleting = ref(false);
 
 const showIngredientModal = ref(false);
 const ingredientToEdit = ref<IngredientResponse | null>(null);
+
+const isExporting = ref(false);
+const importFileInput = ref<HTMLInputElement | null>(null);
+const importResult = ref<ImportResult | null>(null);
+const isImporting = ref(false);
+const importProgress = ref(0);
+let progressTimer: ReturnType<typeof setInterval> | null = null;
+
+const startImportProgress = () => {
+    importProgress.value = 0;
+    isImporting.value = true;
+    progressTimer = setInterval(() => {
+        if (importProgress.value < 85) {
+            const remaining = 85 - importProgress.value;
+            importProgress.value = Math.min(85, importProgress.value + Math.max(0.8, remaining * 0.06));
+        }
+    }, 120);
+};
+
+const finishImportProgress = () =>
+    new Promise<void>((resolve) => {
+        if (progressTimer) { clearInterval(progressTimer); progressTimer = null; }
+        importProgress.value = 100;
+        setTimeout(() => {
+            isImporting.value = false;
+            importProgress.value = 0;
+            resolve();
+        }, 500);
+    });
+
+const handleExport = async () => {
+    const storeId = storeContext.currentStoreId;
+    if (!storeId) return;
+    isExporting.value = true;
+    try {
+        const { blob, filename } = await exportIngredients(storeId);
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(url);
+    } catch {
+        showToast('Unable to export ingredients.', 'error');
+    } finally {
+        isExporting.value = false;
+    }
+};
+
+const triggerImport = () => {
+    importResult.value = null;
+    importFileInput.value?.click();
+};
+
+const handleImportFileSelected = async (event: Event) => {
+    const file = (event.target as HTMLInputElement).files?.[0];
+    if (!file || !storeContext.currentStoreId) return;
+    (event.target as HTMLInputElement).value = '';
+    startImportProgress();
+    try {
+        const result = await importIngredients(storeContext.currentStoreId, file);
+        await finishImportProgress();
+        importResult.value = result;
+        if (result.imported > 0 || result.updated > 0) await loadIngredients();
+    } catch {
+        await finishImportProgress();
+        importResult.value = { imported: 0, updated: 0, failed: 1, errors: [{ row: 0, message: 'Upload failed. Check the file and try again.' }] };
+    }
+};
 
 const loadIngredients = async () => {
     if (isPlanLocked.value) {
@@ -1116,6 +1229,75 @@ watch(
     opacity: 0.5;
     cursor: not-allowed;
 }
+
+.ghost-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.6rem 1rem;
+    border-radius: 8px;
+    border: 1.5px solid var(--c-border);
+    background: var(--c-surface);
+    color: var(--c-text);
+    font-size: 0.84rem;
+    font-weight: 600;
+    font-family: 'Inter', -apple-system, sans-serif;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+}
+
+.ghost-button:hover:not(:disabled) {
+    border-color: var(--c-accent);
+    color: var(--c-accent-dark);
+}
+
+.ghost-button:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+/* ============================================================
+   IMPORT / EXPORT
+============================================================ */
+.import-progress {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    padding: 0.75rem 1rem;
+    background: rgba(13, 148, 136, 0.06);
+    border: 1px solid rgba(13, 148, 136, 0.22);
+    border-radius: 8px;
+}
+.import-progress__label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #0f766e;
+}
+.import-progress__track {
+    height: 6px;
+    background: rgba(13, 148, 136, 0.15);
+    border-radius: 999px;
+    overflow: hidden;
+}
+.import-progress__fill {
+    height: 100%;
+    background: #0d9488;
+    border-radius: 999px;
+    transition: width 0.15s ease;
+}
+
+.import-result {
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    font-size: 0.875rem;
+}
+.import-result--ok { background: #f0fdf4; border: 1px solid #86efac; color: #15803d; }
+.import-result--warn { background: #fffbeb; border: 1px solid #fcd34d; color: #92400e; }
+.import-result__summary { display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; }
+.import-result__close { background: none; border: none; cursor: pointer; font-size: 1rem; opacity: 0.6; }
+.import-result__close:hover { opacity: 1; }
+.import-result__errors { margin: 0.5rem 0 0; padding-left: 1.25rem; display: flex; flex-direction: column; gap: 0.2rem; }
 
 /* ============================================================
    RESPONSIVE
