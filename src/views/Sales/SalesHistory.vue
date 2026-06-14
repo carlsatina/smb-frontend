@@ -802,7 +802,9 @@ const formatMoney = (value: number) => {
 
 const formatDate = (value: string) => {
     const date = new Date(value);
-    return date.toLocaleString();
+    return date.toLocaleString(undefined, {
+        timeZone: storeContext.currentStore?.timezone || 'Asia/Manila',
+    });
 };
 
 const formatStatus = (status: string) => {

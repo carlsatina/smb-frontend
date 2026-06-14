@@ -362,7 +362,7 @@ const ownerPlanTier = computed(() => storeContext.currentStore?.ownerPlanTier ??
 const planKnown = computed(() => ownerPlanTier.value !== null);
 const canUseIngredients = computed(() => planKnown.value && hasPlanFeature(ownerPlanTier.value, 'ingredients'));
 const showIngredients = computed(() => !planKnown.value || canUseIngredients.value);
-const canExport = computed(() => planKnown.value && hasPlanFeature(ownerPlanTier.value, 'exports'));
+const canExport = computed(() => planKnown.value && hasPlanFeature(ownerPlanTier.value, 'importExport'));
 
 const currentStoreLabel = computed(() => {
     const store = storeContext.currentStore;
@@ -437,7 +437,9 @@ const formatQty = (value: number) => {
 const formatDate = (value: string) => {
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return value;
-    return date.toLocaleString();
+    return date.toLocaleString(undefined, {
+        timeZone: storeContext.currentStore?.timezone || 'Asia/Manila',
+    });
 };
 
 const getReferenceLabel = (movement: MovementRecord) => {
@@ -491,7 +493,7 @@ const exportMovements = async () => {
     if (!storeId) return;
     if (isExporting.value) return;
     if (!canExport.value) {
-        openPlanUpgradeModal('exports');
+        openPlanUpgradeModal('importExport');
         return;
     }
     isExporting.value = true;

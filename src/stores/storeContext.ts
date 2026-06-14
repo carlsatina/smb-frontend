@@ -14,6 +14,7 @@ export type StoreSummary = {
     lowStockThreshold: number;
     unitOptions: string[];
     categoryOptions: string[];
+    expenseCategoryOptions: string[];
     defaultTaxRate: number;
     defaultDiscount: number;
     cashierSalesHistoryLimit: number | null;

@@ -106,6 +106,25 @@
                                     <mdicon name="lock" size="14" class="lock-icon" />
                                 </button>
                                 <RouterLink
+                                    v-if="canViewExpenses && !isExpensesLocked"
+                                    :to="`/stores/${currentStoreId}/expenses`"
+                                    class="topnav__dropdown-item"
+                                    @click="closeMore"
+                                >
+                                    <mdicon name="cash-minus" size="18" />
+                                    <span>Expenses</span>
+                                </RouterLink>
+                                <button
+                                    v-else-if="canViewExpenses && isExpensesLocked"
+                                    type="button"
+                                    class="topnav__dropdown-item topnav__dropdown-item--locked"
+                                    @click="openUpgradeFromMore('expenses')"
+                                >
+                                    <mdicon name="cash-minus" size="18" />
+                                    <span>Expenses</span>
+                                    <mdicon name="lock" size="14" class="lock-icon" />
+                                </button>
+                                <RouterLink
                                     v-if="canViewSettings"
                                     :to="`/stores/${currentStoreId}/settings`"
                                     class="topnav__dropdown-item"
@@ -286,6 +305,9 @@
                     <RouterLink v-if="canViewSuppliers && !isPurchaseOrdersLocked" :to="`/stores/${currentStoreId}/suppliers`" class="topnav__mobile-item" @click="closeMobileMenu">
                         <mdicon name="account-group" size="20" /><span>Suppliers</span>
                     </RouterLink>
+                    <RouterLink v-if="canViewExpenses && !isExpensesLocked" :to="`/stores/${currentStoreId}/expenses`" class="topnav__mobile-item" @click="closeMobileMenu">
+                        <mdicon name="cash-minus" size="20" /><span>Expenses</span>
+                    </RouterLink>
                     <RouterLink v-if="canViewSettings" :to="`/stores/${currentStoreId}/settings`" class="topnav__mobile-item" @click="closeMobileMenu">
                         <mdicon name="cog" size="20" /><span>Settings</span>
                     </RouterLink>
@@ -388,9 +410,11 @@ const canViewDailySales = computed(() =>
     userContext.features.includes('DAILY_SALES') &&
     ['OWNER', 'CASHIER'].includes(storeContext.currentStore?.role ?? '')
 );
+const canViewExpenses = computed(() => canAccess(storeContext.currentStore?.role, 'expenses'));
 const planKnown = computed(() => userContext.planTier !== null);
 const isPurchaseOrdersLocked = computed(() => planKnown.value && !hasPlanFeature(userContext.effectivePlan, 'purchaseOrders'));
-const showMoreMenu = computed(() => Boolean(currentStoreId.value) && (canViewPurchaseOrders.value || canViewSuppliers.value || canViewSettings.value));
+const isExpensesLocked = computed(() => planKnown.value && !hasPlanFeature(userContext.effectivePlan, 'expenses'));
+const showMoreMenu = computed(() => Boolean(currentStoreId.value) && (canViewPurchaseOrders.value || canViewSuppliers.value || canViewExpenses.value || canViewSettings.value));
 
 // ── Profile display ───────────────────────────────────────
 const displayName = computed(() => {
@@ -513,7 +537,7 @@ const handleLogout = async () => {
     }
 };
 
-const openUpgradeFromMore = (feature: 'purchaseOrders') => {
+const openUpgradeFromMore = (feature: 'purchaseOrders' | 'expenses') => {
     closeMore();
     openPlanUpgradeModal(feature);
 };

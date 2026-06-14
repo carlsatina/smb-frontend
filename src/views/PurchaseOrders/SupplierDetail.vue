@@ -571,7 +571,9 @@ const statusClass = (status: string) => {
 const formatDate = (value: string) => {
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return value;
-    return date.toLocaleDateString();
+    return date.toLocaleDateString(undefined, {
+        timeZone: storeContext.currentStore?.timezone || 'Asia/Manila',
+    });
 };
 
 const formatQty = (value: number) => {

@@ -85,7 +85,8 @@ const featureLabels: Record<PlanFeature, string> = {
     ingredients: 'ingredients and recipes',
     recipes: 'recipe workflows',
     purchaseOrders: 'purchase orders and suppliers',
-    exports: 'data exports',
+    importExport: 'data exports',
+    expenses: 'expense tracking',
 };
 
 const planTaglines: Record<PlanTier, string> = {
@@ -98,7 +99,7 @@ const advancedFeatures = [
     { key: 'ingredients' as PlanFeature, label: 'Ingredients & raw materials' },
     { key: 'recipes' as PlanFeature, label: 'Recipes & product costing' },
     { key: 'purchaseOrders' as PlanFeature, label: 'Purchase orders & suppliers' },
-    { key: 'exports' as PlanFeature, label: 'Data exports (CSV)' },
+    { key: 'importExport' as PlanFeature, label: 'Data exports (CSV)' },
 ];
 
 const allPlans = computed(() => planTierOrder.map((tier) => planConfigs[tier]));

@@ -184,6 +184,20 @@
                                         </div>
                                         <div v-else class="st-catalog-empty">No categories configured.</div>
                                     </div>
+                                    <div class="st-catalog-group">
+                                        <span class="st-catalog-label">Expense categories</span>
+                                        <div class="st-catalog-input">
+                                            <input v-model="newExpenseCategory" type="text" placeholder="Add expense category" :disabled="!canEdit || isCatalogSaving" @keydown.enter.prevent="addExpenseCategoryOption" />
+                                            <button class="st-btn-ghost" type="button" :disabled="!canEdit || isCatalogSaving || !newExpenseCategory.trim()" @click="addExpenseCategoryOption">Add</button>
+                                        </div>
+                                        <div v-if="storeForm.expenseCategoryOptions.length" class="st-catalog-tags">
+                                            <span v-for="category in storeForm.expenseCategoryOptions" :key="category" class="st-catalog-tag">
+                                                {{ category }}
+                                                <button type="button" class="st-catalog-remove" :disabled="!canEdit || isCatalogSaving" @click="removeExpenseCategoryOption(category)">&times;</button>
+                                            </span>
+                                        </div>
+                                        <div v-else class="st-catalog-empty">No expense categories configured.</div>
+                                    </div>
                                 </div>
                                 <p v-if="!canEdit" class="st-permission-note">Only owners or admins can edit settings.</p>
                                 <span v-else class="st-field-hint">Units and categories are saved automatically.</span>
@@ -506,7 +520,7 @@ import { deleteStore, updateStore } from '@/api/stores';
 import { useToast } from '@/composables/useToast';
 import { useStoreContextStore } from '@/stores/storeContext';
 import { useUserContextStore } from '@/stores/userContext';
-import { DEFAULT_CATEGORY_OPTIONS, DEFAULT_UNIT_OPTIONS } from '@/utils/catalogDefaults';
+import { DEFAULT_CATEGORY_OPTIONS, DEFAULT_EXPENSE_CATEGORY_OPTIONS, DEFAULT_UNIT_OPTIONS } from '@/utils/catalogDefaults';
 import { getPlanConfig, planTierOrder, planConfigs, type PlanTier, type PlanFeature } from '@/utils/planAccess';
 import { getMe } from '@/api/auth';
 import ConfirmModal from '@/components/ConfirmModal.vue';
@@ -541,6 +555,7 @@ const storeForm = reactive({
     paymentMethods: ['CASH', 'CARD', 'TRANSFER', 'GCASH', 'MAYA', 'OTHER'] as string[],
     unitOptions: [...DEFAULT_UNIT_OPTIONS],
     categoryOptions: [...DEFAULT_CATEGORY_OPTIONS],
+    expenseCategoryOptions: [...DEFAULT_EXPENSE_CATEGORY_OPTIONS],
 });
 
 const baseTimezoneOptions = [
@@ -579,6 +594,7 @@ const isCatalogSaving = ref(false);
 const isArchiving = ref(false);
 const newUnit = ref('');
 const newCategory = ref('');
+const newExpenseCategory = ref('');
 
 const routeStoreId = computed(() => route.params.storeId as string | undefined);
 
@@ -641,18 +657,25 @@ const resetForm = () => {
         : ['CASH', 'CARD', 'TRANSFER', 'GCASH', 'MAYA', 'OTHER'];
     storeForm.unitOptions = normalizeOptions(currentStore.value.unitOptions ?? [], DEFAULT_UNIT_OPTIONS);
     storeForm.categoryOptions = normalizeOptions(currentStore.value.categoryOptions ?? [], DEFAULT_CATEGORY_OPTIONS);
+    storeForm.expenseCategoryOptions = normalizeOptions(currentStore.value.expenseCategoryOptions ?? [], DEFAULT_EXPENSE_CATEGORY_OPTIONS);
     newUnit.value = '';
     newCategory.value = '';
+    newExpenseCategory.value = '';
 };
 
 // Catalog defaults persist immediately on add/remove (no separate save step).
-const persistCatalog = async (previousUnits: string[], previousCategories: string[]) => {
+const persistCatalog = async (
+    previousUnits: string[],
+    previousCategories: string[],
+    previousExpenseCategories: string[] = [...storeForm.expenseCategoryOptions]
+) => {
     if (!currentStore.value) return false;
     isCatalogSaving.value = true;
     try {
         await updateStore(currentStore.value.id, {
             unitOptions: normalizeOptions(storeForm.unitOptions, DEFAULT_UNIT_OPTIONS),
             categoryOptions: normalizeOptions(storeForm.categoryOptions, DEFAULT_CATEGORY_OPTIONS),
+            expenseCategoryOptions: normalizeOptions(storeForm.expenseCategoryOptions, DEFAULT_EXPENSE_CATEGORY_OPTIONS),
         });
         await storeContext.fetchStores();
         return true;
@@ -660,6 +683,7 @@ const persistCatalog = async (previousUnits: string[], previousCategories: strin
         // Revert the optimistic change so the UI matches the saved state.
         storeForm.unitOptions = previousUnits;
         storeForm.categoryOptions = previousCategories;
+        storeForm.expenseCategoryOptions = previousExpenseCategories;
         const message = error?.body?.error?.message || 'Unable to update catalog defaults.';
         showToast(message, 'error');
         return false;
@@ -732,6 +756,36 @@ const removeCategoryOption = async (category: string) => {
     }
 };
 
+const addExpenseCategoryOption = async () => {
+    if (!canEdit.value || isCatalogSaving.value) return;
+    const value = newExpenseCategory.value.trim();
+    if (!value) return;
+    if (storeForm.expenseCategoryOptions.some((entry) => entry.toLowerCase() === value.toLowerCase())) {
+        showToast('Expense category already added.', 'info');
+        newExpenseCategory.value = '';
+        return;
+    }
+    const previous = [...storeForm.expenseCategoryOptions];
+    storeForm.expenseCategoryOptions = normalizeOptions([...storeForm.expenseCategoryOptions, value], DEFAULT_EXPENSE_CATEGORY_OPTIONS);
+    newExpenseCategory.value = '';
+    if (await persistCatalog([...storeForm.unitOptions], [...storeForm.categoryOptions], previous)) {
+        showToast('Expense category added.', 'success');
+    }
+};
+
+const removeExpenseCategoryOption = async (category: string) => {
+    if (!canEdit.value || isCatalogSaving.value) return;
+    if (storeForm.expenseCategoryOptions.length <= 1) {
+        showToast('Keep at least one expense category.', 'info');
+        return;
+    }
+    const previous = [...storeForm.expenseCategoryOptions];
+    storeForm.expenseCategoryOptions = storeForm.expenseCategoryOptions.filter((entry) => entry !== category);
+    if (await persistCatalog([...storeForm.unitOptions], [...storeForm.categoryOptions], previous)) {
+        showToast('Expense category removed.', 'success');
+    }
+};
+
 const saveSettings = async () => {
     if (!currentStore.value || !canEdit.value) return;
     isSaving.value = true;
@@ -740,6 +794,7 @@ const saveSettings = async () => {
             ...storeForm,
             unitOptions: normalizeOptions(storeForm.unitOptions, DEFAULT_UNIT_OPTIONS),
             categoryOptions: normalizeOptions(storeForm.categoryOptions, DEFAULT_CATEGORY_OPTIONS),
+            expenseCategoryOptions: normalizeOptions(storeForm.expenseCategoryOptions, DEFAULT_EXPENSE_CATEGORY_OPTIONS),
         };
         await updateStore(currentStore.value.id, payload);
         await storeContext.fetchStores();
@@ -999,7 +1054,7 @@ const copyInviteLink = async () => {
 
 const formatInviteDate = (value: string) => {
     const d = new Date(value);
-    return isNaN(d.getTime()) ? value : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+    return isNaN(d.getTime()) ? value : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric', timeZone: currentStore.value?.timezone || 'Asia/Manila' });
 };
 
 const inviteStatusClass = (status: string) => {

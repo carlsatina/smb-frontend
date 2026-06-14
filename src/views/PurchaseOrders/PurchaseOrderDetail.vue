@@ -818,7 +818,9 @@ const statusClass = (status: string) => {
 };
 
 const formatDate = (value: string) => {
-    return new Date(value).toLocaleDateString();
+    return new Date(value).toLocaleDateString(undefined, {
+        timeZone: storeContext.currentStore?.timezone || 'Asia/Manila',
+    });
 };
 
 const formatQty = (value: number) => {

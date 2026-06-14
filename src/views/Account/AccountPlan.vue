@@ -142,7 +142,7 @@ import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useStoreContextStore } from '@/stores/storeContext';
 import { useUserContextStore } from '@/stores/userContext';
-import { getPlanConfig, planTierOrder, planConfigs, PlanTier } from '@/utils/planAccess';
+import { getPlanConfig, planTierOrder, planConfigs, PlanTier, type PlanFeature } from '@/utils/planAccess';
 import { useToast } from '@/composables/useToast';
 
 const router = useRouter();
@@ -182,11 +182,11 @@ const coreFeatures = [
     { key: 'reports', label: 'Sales reports' },
 ];
 
-const advancedFeatures = [
+const advancedFeatures: Array<{ key: PlanFeature; label: string }> = [
     { key: 'ingredients', label: 'Ingredients & raw materials' },
     { key: 'recipes', label: 'Recipes & product costing' },
     { key: 'purchaseOrders', label: 'Purchase orders & suppliers' },
-    { key: 'exports', label: 'Data exports (CSV)' },
+    { key: 'importExport', label: 'Data exports (CSV)' },
 ];
 
 const isUpgrading = ref(false);

@@ -170,6 +170,30 @@
                         </span>
                     </span>
                 </div>
+                <div v-if="canUseExpenses" class="kpi-card kpi-card--expense">
+                    <div class="kpi-head">
+                        <span class="kpi-icon"><mdicon name="cash-minus" size="18" /></span>
+                        <span class="kpi-label">Expenses</span>
+                    </div>
+                    <span class="kpi-value">{{ formatMoney(expenseSummary.total) }}</span>
+                    <span class="kpi-sub">
+                        <template v-if="expenseSummary.byCategory.length">
+                            {{ expenseSummary.byCategory[0].category }} {{ formatMoney(expenseSummary.byCategory[0].total) }}
+                            <span v-if="expenseSummary.byCategory.length > 1"> +{{ expenseSummary.byCategory.length - 1 }} more</span>
+                        </template>
+                        <template v-else>No expenses recorded</template>
+                    </span>
+                </div>
+                <div v-if="canUseExpenses" class="kpi-card kpi-card--net">
+                    <div class="kpi-head">
+                        <span class="kpi-icon"><mdicon name="scale-balance" size="18" /></span>
+                        <span class="kpi-label">Net after expenses</span>
+                    </div>
+                    <span class="kpi-value" :class="{ 'kpi-value--negative': netAfterExpenses < 0 }">
+                        {{ formatMoney(netAfterExpenses) }}
+                    </span>
+                    <span class="kpi-sub">Profit {{ formatMoney(profitSummary.totalProfit) }} − expenses {{ formatMoney(expenseSummary.total) }}</span>
+                </div>
             </div>
 
             <div v-if="!storeContext.currentStoreId" class="panel-state">
@@ -687,6 +711,7 @@ import {
     SalesSummaryTotals,
     TopProductRecord,
 } from '@/api/reports';
+import { getExpenseSummary } from '@/api/expenses';
 import { useStoreContextStore } from '@/stores/storeContext';
 import { useUserContextStore } from '@/stores/userContext';
 import { canAccess } from '@/utils/roleAccess';
@@ -754,6 +779,7 @@ const canViewReports = computed(() => canAccess(storeContext.currentStore?.role,
 const isSingleDay = computed(() => filters.from === filters.to);
 const canUseIngredients = computed(() => hasPlanFeature(userContext.planTier, 'ingredients'));
 const canUsePurchaseOrders = computed(() => hasPlanFeature(userContext.planTier, 'purchaseOrders'));
+const canUseExpenses = computed(() => hasPlanFeature(userContext.planTier, 'expenses'));
 
 const REPORT_CARDS: { id: string; label: string; planFeature?: PlanFeature }[] = [
     { id: 'sales-charts',       label: 'Sales by day / hour' },
@@ -859,6 +885,13 @@ const profitSummary = ref({
     totalItems: 0,
 });
 
+const expenseSummary = ref<{ total: number; byCategory: Array<{ category: string; total: number }> }>({
+    total: 0,
+    byCategory: [],
+});
+
+const netAfterExpenses = computed(() => profitSummary.value.totalProfit - expenseSummary.value.total);
+
 const loadReports = async () => {
     const storeId = storeContext.currentStoreId;
     if (!storeId || !canViewReports.value) {
@@ -883,6 +916,7 @@ const loadReports = async () => {
         productMargins.value = [];
         marginSummary.value = { costedItems: 0, totalItems: 0 };
         profitSummary.value = { totalRevenue: 0, totalCost: 0, totalProfit: 0, marginPct: 0, itemsWithCost: 0, totalItems: 0 };
+        expenseSummary.value = { total: 0, byCategory: [] };
         purchaseSpendSummary.value = { totalSpend: 0, totalReceipts: 0, avgReceipt: 0 };
         paymentMethods.value = [];
         employeeSales.value = [];
@@ -891,7 +925,7 @@ const loadReports = async () => {
     isLoading.value = true;
     errorMessage.value = '';
     try {
-        const [summary, sales, hourly, top, soldPerProduct, profit, lowStock, usage, spend, margins, paymentBreakdown, empSales] =
+        const [summary, sales, hourly, top, soldPerProduct, profit, lowStock, usage, spend, margins, paymentBreakdown, empSales, expense] =
             await Promise.allSettled([
                 getSalesSummary(storeId, { from: filters.from, to: filters.to }),
                 getSalesByDay(storeId, { from: filters.from, to: filters.to }),
@@ -909,6 +943,9 @@ const loadReports = async () => {
                 getProductMargins(storeId, { from: filters.from, to: filters.to, limit: 8 }),
                 getPaymentMethodBreakdown(storeId, { from: filters.from, to: filters.to }),
                 getEmployeeSales(storeId, { from: filters.from, to: filters.to }),
+                canUseExpenses.value
+                    ? getExpenseSummary(storeId, filters.from, filters.to)
+                    : Promise.resolve({ range: { from: filters.from, to: filters.to }, total: 0, byCategory: [] }),
             ]);
         if (summary.status === 'fulfilled') salesSummary.value = summary.value.totals;
         if (sales.status === 'fulfilled') salesDays.value = sales.value.days;
@@ -931,6 +968,7 @@ const loadReports = async () => {
         }
         if (paymentBreakdown.status === 'fulfilled') paymentMethods.value = paymentBreakdown.value.methods;
         if (empSales.status === 'fulfilled') employeeSales.value = empSales.value.employees;
+        if (expense.status === 'fulfilled') expenseSummary.value = { total: expense.value.total, byCategory: expense.value.byCategory };
         if (summary.status === 'rejected') {
             errorMessage.value = (summary.reason as any)?.body?.error?.message || 'Unable to load reports.';
         }
@@ -1601,8 +1639,11 @@ watch(
 .kpi-card--discounts { --kpi-accent: #d97706; }
 .kpi-card--voids     { --kpi-accent: #dc2626; }
 .kpi-card--profit    { --kpi-accent: #059669; }
+.kpi-card--expense   { --kpi-accent: #d97706; }
+.kpi-card--net       { --kpi-accent: #0f766e; }
 
-.kpi-card--profit .kpi-value {
+.kpi-card--profit .kpi-value,
+.kpi-card--net .kpi-value {
     color: var(--kpi-accent);
 }
 

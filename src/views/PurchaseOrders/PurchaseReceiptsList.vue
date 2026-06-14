@@ -270,7 +270,7 @@ const isPlanLocked = computed(
         !ownerSubscriptionActive.value ||
         (planKnown.value && !hasPlanFeature(ownerPlanTier.value, 'purchaseOrders'))
 );
-const canExport = computed(() => planKnown.value && hasPlanFeature(ownerPlanTier.value, 'exports'));
+const canExport = computed(() => planKnown.value && hasPlanFeature(ownerPlanTier.value, 'importExport'));
 
 const loadReceipts = async () => {
     if (isPlanLocked.value) {
@@ -446,13 +446,13 @@ const formatQty = (value: number) => {
 const formatDate = (value: string) => {
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return value;
-    return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+    return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric', timeZone: storeContext.currentStore?.timezone || 'Asia/Manila' });
 };
 
 const formatTime = (value: string) => {
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return '';
-    return date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+    return date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', timeZone: storeContext.currentStore?.timezone || 'Asia/Manila' });
 };
 
 const escapeCsvValue = (value: string | number | null | undefined) => {
@@ -479,7 +479,7 @@ const exportReceipts = async () => {
     const storeId = storeContext.currentStoreId;
     if (!storeId || isExporting.value) return;
     if (!canExport.value) {
-        openPlanUpgradeModal('exports');
+        openPlanUpgradeModal('importExport');
         return;
     }
     isExporting.value = true;

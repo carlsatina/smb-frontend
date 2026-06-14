@@ -278,7 +278,7 @@ const currentStoreLabel = computed(() => {
 });
 
 const planKnown = computed(() => userContext.planTier !== null);
-const canExport = computed(() => planKnown.value && hasPlanFeature(userContext.planTier, 'exports'));
+const canExport = computed(() => planKnown.value && hasPlanFeature(userContext.planTier, 'importExport'));
 
 const normalizeDateParam = (value: unknown) => {
     if (typeof value !== 'string') return '';
@@ -413,7 +413,7 @@ const clearDateRange = async () => {
 const exportAuditLog = async () => {
     if (!currentStore.value || auditExporting.value) return;
     if (!canExport.value) {
-        openPlanUpgradeModal('exports');
+        openPlanUpgradeModal('importExport');
         return;
     }
     auditExporting.value = true;
@@ -521,7 +521,7 @@ const formatRelativeTime = (value: string) => {
     if (minutes < 60) return `${minutes}m ago`;
     if (hours < 24) return `${hours}h ago`;
     if (days < 7) return `${days}d ago`;
-    return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', timeZone: storeContext.currentStore?.timezone || 'Asia/Manila' });
 };
 
 const formatActionLabel = (action: string) => {

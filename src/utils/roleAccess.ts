@@ -12,6 +12,8 @@ const accessMap = {
     purchaseOrders: ['OWNER', 'ADMIN', 'INVENTORY_MANAGER', 'VIEWER'],
     purchaseOrdersWrite: ['OWNER', 'ADMIN', 'INVENTORY_MANAGER'],
     reports: ['OWNER', 'ADMIN', 'INVENTORY_MANAGER', 'VIEWER'],
+    expenses: ['OWNER', 'ADMIN', 'INVENTORY_MANAGER', 'VIEWER', 'CASHIER'],
+    expensesWrite: ['OWNER', 'ADMIN', 'INVENTORY_MANAGER', 'CASHIER'],
 } as const;
 
 export type FeatureKey = keyof typeof accessMap;
@@ -33,6 +35,8 @@ const featureRouteMap: Record<FeatureKey, string> = {
     purchaseOrders: 'purchase-orders',
     purchaseOrdersWrite: 'purchase-orders',
     reports: 'reports',
+    expenses: 'expenses',
+    expensesWrite: 'expenses',
 };
 
 const defaultFeatureOrder: FeatureKey[] = ['products', 'inventory', 'purchaseOrders', 'reports', 'salesPos'];

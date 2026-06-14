@@ -13,6 +13,7 @@ export const listStores = () => {
             lowStockThreshold: number;
             unitOptions: string[];
             categoryOptions: string[];
+            expenseCategoryOptions: string[];
             defaultTaxRate: number;
             defaultDiscount: number;
             cashierSalesHistoryLimit: number | null;
@@ -50,6 +51,7 @@ export const updateStore = (
         lowStockThreshold?: number;
         unitOptions?: string[];
         categoryOptions?: string[];
+        expenseCategoryOptions?: string[];
         defaultTaxRate?: number;
         defaultDiscount?: number;
         cashierSalesHistoryLimit?: number | null;

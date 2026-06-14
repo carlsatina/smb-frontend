@@ -314,7 +314,10 @@ const statusClass = (status: string) => {
     return '';
 };
 
-const formatDate = (value: string) => new Date(value).toLocaleDateString();
+const formatDate = (value: string) =>
+    new Date(value).toLocaleDateString(undefined, {
+        timeZone: storeContext.currentStore?.timezone || 'Asia/Manila',
+    });
 
 const formatQty = (value: number) => {
     if (!Number.isFinite(value)) return '0';
