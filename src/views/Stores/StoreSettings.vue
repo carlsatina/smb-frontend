@@ -438,6 +438,52 @@
 
         </div>
 
+        <!-- ── Archive store: type-to-confirm modal ── -->
+        <div v-if="archiveModal.show" class="st-archive-overlay" @click.self="closeArchiveModal">
+            <div class="st-archive-modal" role="dialog" aria-modal="true">
+                <h3 class="st-archive-title">Archive store</h3>
+                <p class="st-archive-text">
+                    This hides <strong>{{ currentStore?.name }}</strong> from all members and disables new
+                    activity. Data is retained but this cannot be reversed without database access.
+                </p>
+                <p class="st-archive-label">
+                    To confirm, type the store name
+                    <span class="st-archive-name-text">{{ currentStore?.name }}</span>
+                    <button
+                        class="st-archive-copy"
+                        type="button"
+                        title="Copy store name"
+                        aria-label="Copy store name"
+                        @click="copyStoreName"
+                    >
+                        <mdicon name="content-copy" size="15" />
+                    </button>
+                    below:
+                </p>
+                <input
+                    v-model="archiveModal.confirmName"
+                    type="text"
+                    class="st-archive-input"
+                    :placeholder="currentStore?.name"
+                    autocomplete="off"
+                    @keyup.enter="archiveNameMatches && confirmArchiveStore()"
+                />
+                <div class="st-archive-actions">
+                    <button class="st-btn-ghost" type="button" :disabled="isArchiving" @click="closeArchiveModal">
+                        Cancel
+                    </button>
+                    <button
+                        class="st-btn-danger"
+                        type="button"
+                        :disabled="!archiveNameMatches || isArchiving"
+                        @click="confirmArchiveStore"
+                    >
+                        {{ isArchiving ? 'Archiving…' : 'Archive store' }}
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <ConfirmModal
             :show="confirmModal.show"
             :title="confirmModal.title"
@@ -706,16 +752,41 @@ const saveSettings = async () => {
     }
 };
 
-const archiveStore = async () => {
+// ── Archive store (type-to-confirm) ──────────────────────────
+const archiveModal = reactive({ show: false, confirmName: '' });
+
+const archiveNameMatches = computed(
+    () => archiveModal.confirmName.trim() === (currentStore.value?.name ?? '').trim()
+);
+
+const archiveStore = () => {
     if (!currentStore.value || !canArchive.value) return;
-    const confirmed = window.confirm(
-        `Archive ${currentStore.value.name}? This will remove it from active use for all members.`,
-    );
-    if (!confirmed) return;
+    archiveModal.confirmName = '';
+    archiveModal.show = true;
+};
+
+const closeArchiveModal = () => {
+    if (isArchiving.value) return;
+    archiveModal.show = false;
+};
+
+const copyStoreName = async () => {
+    if (!currentStore.value) return;
+    try {
+        await navigator.clipboard.writeText(currentStore.value.name);
+        showToast('Store name copied.', 'success');
+    } catch {
+        showToast('Unable to copy store name.', 'error');
+    }
+};
+
+const confirmArchiveStore = async () => {
+    if (!currentStore.value || !canArchive.value || !archiveNameMatches.value) return;
     isArchiving.value = true;
     try {
         await deleteStore(currentStore.value.id);
         showToast('Store archived.', 'success');
+        archiveModal.show = false;
         await storeContext.fetchStores();
         if (storeContext.stores.length > 0) {
             storeContext.setCurrentStore(storeContext.stores[0].id);
@@ -2002,5 +2073,103 @@ watch(
     }
 
     .st-plan-summary-item { min-width: 100%; }
+}
+
+/* ── Archive store modal ── */
+.st-archive-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.45);
+    backdrop-filter: blur(2px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 1rem;
+}
+
+.st-archive-modal {
+    background: var(--c-surface);
+    border-radius: 16px;
+    box-shadow: 0 24px 48px rgba(15, 23, 42, 0.2);
+    width: 100%;
+    max-width: 460px;
+    padding: 1.5rem;
+    font-family: var(--app-font-sans);
+}
+
+.st-archive-title {
+    margin: 0 0 0.6rem;
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: #b91c1c;
+}
+
+.st-archive-text {
+    margin: 0 0 1rem;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    color: var(--c-muted);
+}
+
+.st-archive-label {
+    margin: 0 0 0.5rem;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--c-text);
+    line-height: 1.7;
+}
+
+.st-archive-name-text {
+    font-weight: 700;
+    color: var(--c-text);
+    background: #f1f5f9;
+    border-radius: 5px;
+    padding: 0.1rem 0.35rem;
+    word-break: break-word;
+}
+
+.st-archive-copy {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    vertical-align: middle;
+    border: none;
+    background: transparent;
+    color: var(--c-muted);
+    cursor: pointer;
+    padding: 0.15rem;
+    border-radius: 5px;
+    transition: background 0.15s, color 0.15s;
+}
+
+.st-archive-copy:hover {
+    background: #e2e8f0;
+    color: var(--c-accent-dark);
+}
+
+.st-archive-input {
+    width: 100%;
+    border-radius: 8px;
+    border: 1px solid var(--c-border);
+    padding: 0.6rem 0.75rem;
+    font-size: 0.9rem;
+    font-family: var(--app-font-sans);
+    color: var(--c-text);
+    background: var(--c-surface);
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.st-archive-input:focus {
+    outline: none;
+    border-color: var(--c-accent);
+    box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.12);
+}
+
+.st-archive-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.6rem;
+    margin-top: 1.25rem;
 }
 </style>
