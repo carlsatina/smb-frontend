@@ -31,17 +31,30 @@ const status = ref<'idle' | 'accepting' | 'success' | 'error'>('idle');
 const errorMessage = ref('');
 const invitedEmail = ref('');
 
+// The invite may arrive via the URL (direct link) or via the pendingInvite we
+// stashed before bouncing the user through register/login. Read both so the
+// token can't be "lost" on the return trip if the redirect param is dropped.
+const pendingInvite = (() => {
+    try {
+        const raw = sessionStorage.getItem('pendingInvite');
+        return raw ? (JSON.parse(raw) as { storeId?: string; token?: string }) : null;
+    } catch {
+        return null;
+    }
+})();
+
 const storeId = computed<string | undefined>(() => {
     const fromRoute = route.params.storeId as string | undefined;
     if (fromRoute) return fromRoute;
     const m = window.location.pathname.match(/\/stores\/([^/]+)\/invites\/accept/);
-    return m?.[1] || undefined;
+    return m?.[1] || pendingInvite?.storeId || undefined;
 });
 
 const token = computed<string | undefined>(() => {
     const fromRoute = route.query.token as string | undefined;
     if (fromRoute) return fromRoute;
-    return new URLSearchParams(window.location.search).get('token') || undefined;
+    const fromSearch = new URLSearchParams(window.location.search).get('token');
+    return fromSearch || pendingInvite?.token || undefined;
 });
 
 const isAuthenticated = computed(() =>
@@ -91,26 +104,42 @@ const acceptInvite = async () => {
 };
 
 onMounted(async () => {
+    const sid = storeId.value;
+    const tok = token.value;
+    if (!sid || !tok) {
+        status.value = 'error';
+        errorMessage.value = 'This invite link is missing required details.';
+        return;
+    }
+
     if (isAuthenticated.value) {
         acceptInvite();
         return;
     }
 
-    // Fetch the invited email so register can pre-fill it
-    if (storeId.value && token.value) {
-        try {
-            const res = await previewStoreInvite(storeId.value, token.value);
-            invitedEmail.value = res.preview.email;
-        } catch {
-            // Non-fatal — redirect without email pre-fill
+    // Preview the invite up front: it both validates the invite and gives us the
+    // email to pre-fill on the register form.
+    try {
+        const res = await previewStoreInvite(sid, tok);
+        invitedEmail.value = res.preview.email;
+    } catch (error: any) {
+        const httpStatus = error?.status;
+        // Definitive invite problems (not found / already used / expired) — surface a
+        // clear message instead of bouncing the user to a register form that can't work.
+        if (httpStatus === 404 || httpStatus === 409 || httpStatus === 410) {
+            status.value = 'error';
+            errorMessage.value = error?.body?.error?.message || 'This invite is no longer valid.';
+            return;
         }
+        // Transient/unexpected error: fall through to register so sign-up still works;
+        // the email just won't be pre-filled, and the invite is re-checked on accept.
     }
 
     // Persist invite (+ email) so it survives the register/login redirect chain
-    sessionStorage.setItem('pendingInvite', JSON.stringify({ storeId: storeId.value, token: token.value, email: invitedEmail.value || null }));
+    sessionStorage.setItem('pendingInvite', JSON.stringify({ storeId: sid, token: tok, email: invitedEmail.value || null }));
 
     // Redirect straight to register; user can switch to login from there
-    const redirectPath = `/stores/${storeId.value}/invites/accept?token=${encodeURIComponent(token.value ?? '')}`;
+    const redirectPath = `/stores/${sid}/invites/accept?token=${encodeURIComponent(tok)}`;
     const params = new URLSearchParams({ redirect: redirectPath });
     if (invitedEmail.value) params.set('email', invitedEmail.value);
     router.replace(`/register?${params.toString()}`);

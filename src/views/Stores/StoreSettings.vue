@@ -437,6 +437,19 @@
             </div>
 
         </div>
+
+        <ConfirmModal
+            :show="confirmModal.show"
+            :title="confirmModal.title"
+            :message="confirmModal.message"
+            :confirm-text="confirmModal.confirmText"
+            cancel-text="Cancel"
+            variant="danger"
+            :loading="confirmModal.loading"
+            @confirm="onConfirmModalConfirm"
+            @cancel="onConfirmModalCancel"
+            @update:show="confirmModal.show = $event"
+        />
     </section>
 </template>
 
@@ -450,6 +463,7 @@ import { useUserContextStore } from '@/stores/userContext';
 import { DEFAULT_CATEGORY_OPTIONS, DEFAULT_UNIT_OPTIONS } from '@/utils/catalogDefaults';
 import { getPlanConfig, planTierOrder, planConfigs, type PlanTier, type PlanFeature } from '@/utils/planAccess';
 import { getMe } from '@/api/auth';
+import ConfirmModal from '@/components/ConfirmModal.vue';
 import {
     createStoreInvite,
     listStoreInvites,
@@ -792,13 +806,54 @@ const changeMemberRole = async (member: StoreMember, event: Event) => {
     }
 };
 
-const removeMember = async (member: StoreMember) => {
+// Shared confirmation modal — drives both member removal and invite revocation.
+const confirmModal = reactive<{
+    show: boolean;
+    title: string;
+    message: string;
+    confirmText: string;
+    loading: boolean;
+    onConfirm: (() => Promise<void>) | null;
+}>({
+    show: false,
+    title: '',
+    message: '',
+    confirmText: 'Confirm',
+    loading: false,
+    onConfirm: null,
+});
+
+const onConfirmModalConfirm = async () => {
+    if (!confirmModal.onConfirm) return;
+    confirmModal.loading = true;
+    try {
+        await confirmModal.onConfirm();
+        confirmModal.show = false;
+    } finally {
+        confirmModal.loading = false;
+    }
+};
+
+const onConfirmModalCancel = () => {
+    if (confirmModal.loading) return;
+    confirmModal.show = false;
+};
+
+const removeMember = (member: StoreMember) => {
     if (!currentStore.value || !canManageMembers.value) return;
     if (member.userId === currentUserId.value) {
         showToast('You cannot remove yourself from the store.', 'error');
         return;
     }
-    if (!window.confirm(`Remove ${member.email} from this store?`)) return;
+    confirmModal.title = 'Remove member';
+    confirmModal.message = `Remove ${member.email} from this store? They will immediately lose access.`;
+    confirmModal.confirmText = 'Remove';
+    confirmModal.onConfirm = () => performRemoveMember(member);
+    confirmModal.show = true;
+};
+
+const performRemoveMember = async (member: StoreMember) => {
+    if (!currentStore.value) return;
     removingMemberId.value = member.id;
     try {
         await removeStoreMember(currentStore.value.id, member.id);
@@ -833,9 +888,17 @@ const createInvite = async () => {
     }
 };
 
-const revokeInvite = async (invite: StoreInvite) => {
+const revokeInvite = (invite: StoreInvite) => {
     if (!currentStore.value || !canManageMembers.value) return;
-    if (!window.confirm(`Revoke invite for ${invite.email}?`)) return;
+    confirmModal.title = 'Revoke invite';
+    confirmModal.message = `Revoke the invite for ${invite.email}? The invite link will stop working.`;
+    confirmModal.confirmText = 'Revoke';
+    confirmModal.onConfirm = () => performRevokeInvite(invite);
+    confirmModal.show = true;
+};
+
+const performRevokeInvite = async (invite: StoreInvite) => {
+    if (!currentStore.value) return;
     revokingInviteId.value = invite.id;
     try {
         await revokeStoreInvite(currentStore.value.id, invite.id);
