@@ -153,6 +153,7 @@
                                         :class="{ 'recipe-line-row--error': lineError(line) }"
                                     >
                                         <SearchableSelect
+                                            :ref="setSelectRef(line.key)"
                                             v-model="line.ingredientId"
                                             class="recipe-line-select"
                                             :options="ingredientOptions(line)"
@@ -310,6 +311,24 @@
             @close="showIngredientModal = false"
             @created="onIngredientCreated"
         />
+
+        <teleport to="body">
+            <div v-if="showTypeChangeModal" class="type-modal-overlay" @click.self="cancelTypeChange">
+                <div class="type-modal" role="dialog" aria-modal="true">
+                    <h3 class="type-modal__title">Switch to Ready-made?</h3>
+                    <p class="type-modal__body">
+                        This product's recipe ingredients will be removed. If you switch back to
+                        Recipe later, you'll need to add them again manually.
+                    </p>
+                    <div class="type-modal__actions">
+                        <button type="button" class="type-modal__cancel" @click="cancelTypeChange">Keep recipe</button>
+                        <button type="button" class="type-modal__confirm" @click="confirmTypeChange">
+                            Switch &amp; remove ingredients
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </teleport>
     </section>
 </template>
 
@@ -383,6 +402,28 @@ const stockLoading = ref(false);
 const stockError = ref('');
 const isSaving = ref(false);
 const showIngredientModal = ref(false);
+const showTypeChangeModal = ref(false);
+// Set while we programmatically revert form.type so the type watcher ignores it.
+let typeChangeGuard = false;
+
+const clearRecipeState = () => {
+    recipeLines.value = [];
+    recipeError.value = '';
+    recipeSuccess.value = false;
+    ingredientStock.value = [];
+};
+
+const confirmTypeChange = () => {
+    showTypeChangeModal.value = false;
+    clearRecipeState();
+    typeChangeGuard = true;
+    form.value.type = 'READY_MADE';
+};
+
+const cancelTypeChange = () => {
+    // form.type was already reverted to RECIPE when the modal opened.
+    showTypeChangeModal.value = false;
+};
 
 const recipeLinesValid = computed(() => {
     if (form.value.type !== 'RECIPE') return true;
@@ -678,12 +719,23 @@ const loadRecipeLines = async () => {
     }
 };
 
+const selectInstances = new Map<string, { open: () => void }>();
+const setSelectRef = (key: string) => (el: unknown) => {
+    if (el) {
+        selectInstances.set(key, el as { open: () => void });
+    } else {
+        selectInstances.delete(key);
+    }
+};
+
 const addRecipeLine = () => {
+    const key = buildLineKey();
     recipeLines.value.push({
-        key: buildLineKey(),
+        key,
         ingredientId: '',
         qtyPerProductUnit: 1,
     });
+    nextTick(() => selectInstances.get(key)?.open());
 };
 
 const removeRecipeLine = (index: number) => {
@@ -892,17 +944,27 @@ watch(
 
 watch(
     () => form.value.type,
-    async (nextType) => {
+    async (nextType, prevType) => {
+        // Ignore the programmatic revert/commit we trigger ourselves.
+        if (typeChangeGuard) {
+            typeChangeGuard = false;
+            return;
+        }
         if (nextType === 'RECIPE') {
             await loadIngredients();
             await loadIngredientStock();
             await loadRecipeLines();
-        } else {
-            recipeLines.value = [];
-            recipeError.value = '';
-            recipeSuccess.value = false;
-            ingredientStock.value = [];
+            return;
         }
+        // Switching a recipe to ready-made discards its recipe lines, so confirm
+        // first when there's something to lose (lines in the editor or a saved recipe).
+        if (prevType === 'RECIPE' && (recipeLines.value.length > 0 || isEdit.value)) {
+            typeChangeGuard = true;
+            form.value.type = 'RECIPE'; // revert until the user confirms
+            showTypeChangeModal.value = true;
+            return;
+        }
+        clearRecipeState();
     }
 );
 
@@ -926,6 +988,83 @@ watch(
 
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+/* ============================================================
+   TYPE-CHANGE CONFIRM MODAL (teleported to <body>)
+   Self-contained colors — CSS vars from .product-page don't reach here.
+============================================================ */
+.type-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.45);
+    backdrop-filter: blur(2px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    padding: 1rem;
+}
+
+.type-modal {
+    width: 100%;
+    max-width: 420px;
+    background: #ffffff;
+    border-radius: 16px;
+    box-shadow: 0 24px 48px rgba(15, 23, 42, 0.25);
+    padding: 1.5rem;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.type-modal__title {
+    margin: 0 0 0.6rem;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.type-modal__body {
+    margin: 0 0 1.4rem;
+    font-size: 0.9rem;
+    line-height: 1.55;
+    color: #64748b;
+}
+
+.type-modal__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.6rem;
+}
+
+.type-modal__cancel,
+.type-modal__confirm {
+    padding: 0.6rem 1.1rem;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.type-modal__cancel {
+    border: 1.5px solid #e2e8f0;
+    background: #ffffff;
+    color: #0f172a;
+}
+
+.type-modal__cancel:hover {
+    background: #f1f5f9;
+}
+
+.type-modal__confirm {
+    border: none;
+    background: #dc2626;
+    color: #ffffff;
+}
+
+.type-modal__confirm:hover {
+    background: #b91c1c;
+}
 
 /* ============================================================
    TOKENS

@@ -53,21 +53,22 @@
 
                     <!-- TOOLBAR -->
                     <div class="prod-toolbar">
-                        <div class="toolbar-left">
-                            <div class="filter-pills">
-                                <button class="pill" :class="{ active: filterType === 'ALL' }" @click="filterType = 'ALL'">All</button>
-                                <button class="pill" :class="{ active: filterType === 'ACTIVE' }" @click="filterType = 'ACTIVE'">Active</button>
-                                <button class="pill" :class="{ active: filterType === 'INACTIVE' }" @click="filterType = 'INACTIVE'">Inactive</button>
-                                <button class="pill" :class="{ active: filterType === 'RECIPE' }" @click="filterType = 'RECIPE'">Recipe</button>
+                        <div class="toolbar-row">
+                            <div class="toolbar-left">
+                                <div class="filter-group">
+                                    <span class="filter-group__label">Type</span>
+                                    <div class="filter-pills">
+                                        <button class="pill" :class="{ active: filterType === 'ALL' }" @click="filterType = 'ALL'">All</button>
+                                        <button class="pill" :class="{ active: filterType === 'READY_MADE' }" @click="filterType = 'READY_MADE'">Ready-made</button>
+                                        <button class="pill" :class="{ active: filterType === 'RECIPE' }" @click="filterType = 'RECIPE'">Recipe</button>
+                                    </div>
+                                </div>
+                                <label class="active-toggle">
+                                    <input v-model="activeOnly" type="checkbox" />
+                                    <span>Active only</span>
+                                </label>
                             </div>
-                            <input
-                                v-model="searchQuery"
-                                type="text"
-                                class="search-input"
-                                placeholder="Search name, SKU, barcode..."
-                            />
-                        </div>
-                        <div class="toolbar-right">
+                            <div class="toolbar-right">
                             <template v-if="canImportExport && storeContext.currentStoreId">
                                 <CsvActionsMenu
                                     :can-import="canWrite"
@@ -94,7 +95,14 @@
                                 + New product
                             </button>
                             <span v-else-if="storeContext.currentStoreId && !canImportExport" class="panel-note">View-only access</span>
+                            </div>
                         </div>
+                        <input
+                            v-model="searchQuery"
+                            type="text"
+                            class="search-input"
+                            placeholder="Search name, SKU, barcode..."
+                        />
                     </div>
 
                     <!-- IMPORT PROGRESS -->
@@ -193,10 +201,10 @@
 
                         <div class="pagination" v-if="totalPages > 0">
                             <div class="pagination-info">
-                                <span v-if="filteredProducts.length !== totalProducts">
-                                    {{ filteredProducts.length }} of {{ totalProducts }} products
+                                <span>
+                                    Showing {{ rangeStart }}–{{ rangeEnd }} of {{ filteredProducts.length }} product{{ filteredProducts.length !== 1 ? 's' : '' }}
+                                    <template v-if="filteredProducts.length !== totalProducts"> (filtered from {{ totalProducts }})</template>
                                 </span>
-                                <span v-else>{{ totalProducts }} product{{ totalProducts !== 1 ? 's' : '' }}</span>
                                 <label class="pagination-size">
                                     <span>Show</span>
                                     <select v-model.number="pageSize">
@@ -243,7 +251,7 @@
                                 <span class="breakdown-value breakdown-value--warn">{{ recipeMissingCount }}</span>
                             </li>
                         </ul>
-                        <button v-if="recipeMissingCount > 0" class="aside-filter-link" @click="filterType = 'RECIPE'; searchQuery = ''">
+                        <button v-if="recipeMissingCount > 0" class="aside-filter-link" @click="filterType = 'RECIPE'; activeOnly = false; searchQuery = ''">
                             View incomplete recipes →
                         </button>
                     </div>
@@ -294,7 +302,8 @@ const userContext = useUserContextStore();
 const products = ref<ProductRow[]>([]);
 const isLoading = ref(false);
 const searchQuery = ref('');
-const filterType = ref<'ALL' | 'ACTIVE' | 'INACTIVE' | 'RECIPE'>('ALL');
+const filterType = ref<'ALL' | 'READY_MADE' | 'RECIPE'>('ALL');
+const activeOnly = ref(false);
 const page = ref(1);
 const pageSize = ref(10);
 const pageSizeOptions = [10, 20, 50];
@@ -442,9 +451,8 @@ const filteredProducts = computed(() => {
     const query = searchQuery.value.trim().toLowerCase();
     const type = filterType.value;
     return products.value.filter((product) => {
-        if (type === 'ACTIVE' && !product.active) return false;
-        if (type === 'INACTIVE' && product.active) return false;
-        if (type === 'RECIPE' && product.type !== 'RECIPE') return false;
+        if (type !== 'ALL' && product.type !== type) return false;
+        if (activeOnly.value && !product.active) return false;
         if (query && !product.name.toLowerCase().includes(query) && !(product.sku || '').toLowerCase().includes(query) && !(product.barcode || '').toLowerCase().includes(query) && !(product.category || '').toLowerCase().includes(query)) return false;
         return true;
     });
@@ -459,6 +467,13 @@ const paginatedProducts = computed(() => {
     const start = (page.value - 1) * pageSize.value;
     return filteredProducts.value.slice(start, start + pageSize.value);
 });
+
+const rangeStart = computed(() =>
+    filteredProducts.value.length === 0 ? 0 : (page.value - 1) * pageSize.value + 1
+);
+const rangeEnd = computed(() =>
+    Math.min(page.value * pageSize.value, filteredProducts.value.length)
+);
 
 const changePage = (nextPage: number) => {
     if (nextPage < 1 || nextPage > totalPages.value) return;
@@ -528,6 +543,7 @@ watch(() => route.params.storeId, (value) => {
 
 watch(() => searchQuery.value, () => { page.value = 1; });
 watch(() => filterType.value, () => { page.value = 1; });
+watch(() => activeOnly.value, () => { page.value = 1; });
 watch(() => pageSize.value, () => { page.value = 1; });
 
 watch(() => filteredProducts.value.length, () => {
@@ -740,6 +756,12 @@ watch(() => storeContext.currentStoreId, async () => {
 ============================================================ */
 .prod-toolbar {
     display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.toolbar-row {
+    display: flex;
     gap: 0.75rem;
     align-items: center;
     justify-content: space-between;
@@ -751,7 +773,6 @@ watch(() => storeContext.currentStoreId, async () => {
     gap: 0.65rem;
     align-items: center;
     flex-wrap: wrap;
-    flex: 1;
 }
 
 .toolbar-right {
@@ -764,6 +785,20 @@ watch(() => storeContext.currentStoreId, async () => {
 /* ============================================================
    FILTER PILLS
 ============================================================ */
+.filter-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+}
+
+.filter-group__label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--c-muted);
+}
+
 .filter-pills {
     display: inline-flex;
     background: #f1f5f9;
@@ -798,7 +833,27 @@ watch(() => storeContext.currentStoreId, async () => {
 /* ============================================================
    SEARCH
 ============================================================ */
+.active-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--c-text);
+    cursor: pointer;
+    white-space: nowrap;
+    user-select: none;
+}
+
+.active-toggle input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--c-accent);
+    cursor: pointer;
+}
+
 .search-input {
+    width: 100%;
     border-radius: 8px;
     border: 1.5px solid var(--c-border);
     padding: 0.6rem 0.9rem;
@@ -1253,12 +1308,13 @@ watch(() => storeContext.currentStoreId, async () => {
 }
 
 @media (max-width: 768px) {
-    .prod-toolbar { flex-direction: column; align-items: stretch; }
+    .toolbar-row { flex-direction: column; align-items: stretch; }
     .toolbar-left { flex-direction: column; align-items: stretch; }
     .toolbar-right { width: 100%; }
     .toolbar-right .primary-button { width: 100%; justify-content: center; }
     .search-input { min-width: 0; width: 100%; }
-    .filter-pills { width: 100%; }
+    .filter-group { width: 100%; }
+    .filter-pills { flex: 1; }
 }
 
 @media (max-width: 640px) {

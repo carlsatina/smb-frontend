@@ -127,6 +127,8 @@ const handleClickOutside = (event: MouseEvent) => {
 
 onMounted(() => document.addEventListener('mousedown', handleClickOutside));
 onBeforeUnmount(() => document.removeEventListener('mousedown', handleClickOutside));
+
+defineExpose({ open });
 </script>
 
 <style scoped>
