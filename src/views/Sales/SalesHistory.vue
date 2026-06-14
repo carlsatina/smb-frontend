@@ -1,5 +1,14 @@
 <template>
     <section class="sales-page">
+        <CsvImportPreviewModal
+            :show="showImportPreview"
+            :file="pendingImportFile"
+            title="Import Sales"
+            :confirming="isImporting"
+            @confirm="confirmImport"
+            @cancel="cancelImport"
+            @update:show="showImportPreview = $event"
+        />
         <div class="sales-shell">
 
             <!-- HEADER -->
@@ -298,6 +307,7 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import SkeletonLoader from '@/components/SkeletonLoader.vue';
+import CsvImportPreviewModal from '@/components/CsvImportPreviewModal.vue';
 import { listProducts, ProductResponse } from '@/api/products';
 import { exportSales, getSale, importSales, listSales, SaleDetail, SalesImportResult, SaleSummary, voidSale } from '@/api/sales';
 import { listStoreMembers, StoreMember } from '@/api/storeMembers';
@@ -317,6 +327,8 @@ const isExporting = ref(false);
 const isImporting = ref(false);
 const importProgress = ref(0);
 const importFileInput = ref<HTMLInputElement | null>(null);
+const pendingImportFile = ref<File | null>(null);
+const showImportPreview = ref(false);
 const importResult = ref<SalesImportResult | null>(null);
 let progressTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -828,10 +840,23 @@ const triggerImport = () => {
     importFileInput.value?.click();
 };
 
-const handleImportFileSelected = async (event: Event) => {
+const handleImportFileSelected = (event: Event) => {
     const file = (event.target as HTMLInputElement).files?.[0];
     if (!file || !storeContext.currentStoreId) return;
     (event.target as HTMLInputElement).value = '';
+    importResult.value = null;
+    pendingImportFile.value = file;
+    showImportPreview.value = true;
+};
+
+const cancelImport = () => {
+    showImportPreview.value = false;
+    pendingImportFile.value = null;
+};
+
+const confirmImport = async () => {
+    const file = pendingImportFile.value;
+    if (!file || !storeContext.currentStoreId) return;
     startImportProgress();
     try {
         const result = await importSales(storeContext.currentStoreId, file);
@@ -841,6 +866,9 @@ const handleImportFileSelected = async (event: Event) => {
     } catch {
         await finishImportProgress();
         importResult.value = { imported: 0, failed: 1, errors: [{ saleId: '—', message: 'Upload failed. Check the file and try again.' }] };
+    } finally {
+        showImportPreview.value = false;
+        pendingImportFile.value = null;
     }
 };
 

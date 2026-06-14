@@ -18,6 +18,15 @@
             @created="onIngredientCreated"
             @updated="onIngredientUpdated"
         />
+        <CsvImportPreviewModal
+            :show="showImportPreview"
+            :file="pendingImportFile"
+            title="Import Ingredients"
+            :confirming="isImporting"
+            @confirm="confirmImport"
+            @cancel="cancelImport"
+            @update:show="showImportPreview = $event"
+        />
         <div class="ingredients-shell">
             <header class="ingredients-header">
                 <div class="ingredients-title">
@@ -295,6 +304,7 @@ import ConfirmModal from '@/components/ConfirmModal.vue';
 import IngredientModal from '@/components/IngredientModal.vue';
 import PlanGate from '@/components/PlanGate.vue';
 import CsvActionsMenu from '@/components/CsvActionsMenu.vue';
+import CsvImportPreviewModal from '@/components/CsvImportPreviewModal.vue';
 
 const router = useRouter();
 const route = useRoute();
@@ -334,6 +344,8 @@ const ingredientToEdit = ref<IngredientResponse | null>(null);
 
 const isExporting = ref(false);
 const importFileInput = ref<HTMLInputElement | null>(null);
+const pendingImportFile = ref<File | null>(null);
+const showImportPreview = ref(false);
 const importResult = ref<ImportResult | null>(null);
 const isImporting = ref(false);
 const importProgress = ref(0);
@@ -399,10 +411,23 @@ const downloadTemplate = () => {
     URL.revokeObjectURL(url);
 };
 
-const handleImportFileSelected = async (event: Event) => {
+const handleImportFileSelected = (event: Event) => {
     const file = (event.target as HTMLInputElement).files?.[0];
     if (!file || !storeContext.currentStoreId) return;
     (event.target as HTMLInputElement).value = '';
+    importResult.value = null;
+    pendingImportFile.value = file;
+    showImportPreview.value = true;
+};
+
+const cancelImport = () => {
+    showImportPreview.value = false;
+    pendingImportFile.value = null;
+};
+
+const confirmImport = async () => {
+    const file = pendingImportFile.value;
+    if (!file || !storeContext.currentStoreId) return;
     startImportProgress();
     try {
         const result = await importIngredients(storeContext.currentStoreId, file);
@@ -412,6 +437,9 @@ const handleImportFileSelected = async (event: Event) => {
     } catch {
         await finishImportProgress();
         importResult.value = { imported: 0, updated: 0, failed: 1, errors: [{ row: 0, message: 'Upload failed. Check the file and try again.' }] };
+    } finally {
+        showImportPreview.value = false;
+        pendingImportFile.value = null;
     }
 };
 

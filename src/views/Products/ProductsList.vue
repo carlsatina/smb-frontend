@@ -11,6 +11,15 @@
             @confirm="confirmDelete"
             @cancel="cancelDelete"
         />
+        <CsvImportPreviewModal
+            :show="showImportPreview"
+            :file="pendingImportFile"
+            title="Import Products"
+            :confirming="isImporting"
+            @confirm="confirmImport"
+            @cancel="cancelImport"
+            @update:show="showImportPreview = $event"
+        />
         <div class="product-shell">
 
             <!-- HEADER -->
@@ -281,6 +290,7 @@ import { hasPlanFeature } from '@/utils/planAccess';
 import ConfirmModal from '@/components/ConfirmModal.vue';
 import SkeletonLoader from '@/components/SkeletonLoader.vue';
 import CsvActionsMenu from '@/components/CsvActionsMenu.vue';
+import CsvImportPreviewModal from '@/components/CsvImportPreviewModal.vue';
 
 type ProductRow = {
     id: string;
@@ -315,6 +325,8 @@ const productToDelete = ref<ProductRow | null>(null);
 const isDeleting = ref(false);
 const isExporting = ref(false);
 const importFileInput = ref<HTMLInputElement | null>(null);
+const pendingImportFile = ref<File | null>(null);
+const showImportPreview = ref(false);
 const importResult = ref<ImportResult | null>(null);
 const isImporting = ref(false);
 const importProgress = ref(0);
@@ -366,8 +378,13 @@ const triggerImport = () => {
 
 const downloadTemplate = () => {
     // Columns match the importer; only Name and Price are required.
-    const headers = 'Name,Type,SKU,Barcode,Price,Cost,Unit,Category,Active,Low Stock Threshold';
-    const example = 'Iced Coffee,READY_MADE,SKU-001,,120,60,pcs,Beverages,true,10';
+    // Recipe holds "Ingredient Name:qty | Ingredient Name:qty" for RECIPE products;
+    // leave it blank for READY_MADE. Ingredient names must already exist in the store.
+    const headers = 'Name,Type,SKU,Barcode,Price,Cost,Unit,Category,Active,Low Stock Threshold,Recipe';
+    const example = [
+        'Iced Coffee,READY_MADE,SKU-001,,120,60,pcs,Beverages,true,10,',
+        'Latte,RECIPE,SKU-002,,150,,pcs,Beverages,true,,"Espresso Beans:18 | Milk:200 | Sugar:10"',
+    ].join('\n');
     const csv = `${headers}\n${example}\n`;
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -378,10 +395,23 @@ const downloadTemplate = () => {
     URL.revokeObjectURL(url);
 };
 
-const handleImportFileSelected = async (event: Event) => {
+const handleImportFileSelected = (event: Event) => {
     const file = (event.target as HTMLInputElement).files?.[0];
     if (!file || !storeContext.currentStoreId) return;
     (event.target as HTMLInputElement).value = '';
+    importResult.value = null;
+    pendingImportFile.value = file;
+    showImportPreview.value = true;
+};
+
+const cancelImport = () => {
+    showImportPreview.value = false;
+    pendingImportFile.value = null;
+};
+
+const confirmImport = async () => {
+    const file = pendingImportFile.value;
+    if (!file || !storeContext.currentStoreId) return;
     startImportProgress();
     try {
         const result = await importProducts(storeContext.currentStoreId, file);
@@ -391,6 +421,9 @@ const handleImportFileSelected = async (event: Event) => {
     } catch {
         await finishImportProgress();
         importResult.value = { imported: 0, updated: 0, failed: 1, errors: [{ row: 0, message: 'Upload failed. Check the file and try again.' }] };
+    } finally {
+        showImportPreview.value = false;
+        pendingImportFile.value = null;
     }
 };
 

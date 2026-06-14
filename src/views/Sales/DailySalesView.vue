@@ -10,10 +10,48 @@
                     <mdicon name="target" size="16" />
                     Goal: {{ goal > 0 ? formatMoney(goal) : 'Not set' }}
                 </button>
+                <template v-if="!isCashierRole">
+                    <CsvActionsMenu
+                        :can-import="true"
+                        :is-importing="isImporting"
+                        :is-exporting="isExporting"
+                        @export="handleExport"
+                        @import="triggerImport"
+                        @template="downloadTemplate"
+                    />
+                    <input
+                        ref="importFileInput"
+                        type="file"
+                        accept=".csv,text/csv"
+                        style="display:none"
+                        @change="handleImportFileSelected"
+                    />
+                </template>
                 <button class="primary-button button-compact" :disabled="isAdding" @click="startAdding">
                     <mdicon name="plus" size="16" /> Add Entry
                 </button>
             </div>
+        </div>
+
+        <div v-if="isImporting" class="ds-import-progress">
+            <div class="ds-import-progress__label">Importing… {{ Math.round(importProgress) }}%</div>
+            <div class="ds-import-progress__track">
+                <div class="ds-import-progress__fill" :style="{ width: importProgress + '%' }"></div>
+            </div>
+        </div>
+
+        <div
+            v-if="importResult"
+            class="ds-import-result"
+            :class="importResult.failed > 0 ? 'ds-import-result--warn' : 'ds-import-result--ok'"
+        >
+            <div class="ds-import-result__summary">
+                <span>Import complete: <strong>{{ importResult.imported }}</strong> added, <strong>{{ importResult.updated }}</strong> updated{{ importResult.failed > 0 ? `, ${importResult.failed} failed` : '' }}.</span>
+                <button class="ds-import-result__close" @click="importResult = null">✕</button>
+            </div>
+            <ul v-if="importResult.errors.length > 0" class="ds-import-result__errors">
+                <li v-for="err in importResult.errors" :key="err.row">Row {{ err.row }}: {{ err.message }}</li>
+            </ul>
         </div>
 
         <div class="ds-controls">
@@ -492,6 +530,17 @@
             @close="denomModal.open = false"
         />
 
+        <!-- CSV import preview / confirmation -->
+        <CsvImportPreviewModal
+            :show="showImportPreview"
+            :file="pendingImportFile"
+            title="Import Daily Sales"
+            :confirming="isImporting"
+            @confirm="confirmImport"
+            @cancel="cancelImport"
+            @update:show="showImportPreview = $event"
+        />
+
         <!-- Delete confirm modal -->
         <ConfirmModal
             :show="deleteModal.show"
@@ -546,6 +595,8 @@ import {
 import { listStoreMembers, type StoreMember } from '@/api/storeMembers';
 import DenominationModal from '@/components/DenominationModal.vue';
 import ConfirmModal from '@/components/ConfirmModal.vue';
+import CsvActionsMenu from '@/components/CsvActionsMenu.vue';
+import CsvImportPreviewModal from '@/components/CsvImportPreviewModal.vue';
 import { useToast } from '@/composables/useToast';
 
 const storeContext = useStoreContextStore();
@@ -972,6 +1023,306 @@ const onDeleteConfirm = async () => {
     }
 };
 
+// ── CSV import / export ──────────────────────────────────────
+// CSV layout (matches exported daily-sales spreadsheets):
+//   Date, COH (cashier…), GCash (cashier…), Senior, Expense,
+//   Total GCash, Total COH, Total Sales, POS, Actual COH,
+//   Kulang Remit, Short if (-), Sales Needed
+type ImportResult = {
+    imported: number;
+    updated: number;
+    failed: number;
+    errors: Array<{ row: number; message: string }>;
+};
+
+const isExporting = ref(false);
+const isImporting = ref(false);
+const importProgress = ref(0);
+const importResult = ref<ImportResult | null>(null);
+const importFileInput = ref<HTMLInputElement | null>(null);
+
+// Quote a CSV cell only when it contains a comma, quote or newline.
+const csvCell = (v: string | number) => {
+    const s = String(v ?? '');
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+};
+
+// "5/31/2026 (Sun)" — the spreadsheet's date format, in the store timezone.
+const csvDate = (d: string | Date) => {
+    const date = typeof d === 'string' ? new Date(d) : d;
+    const tz = storeTimezone.value;
+    const md = new Intl.DateTimeFormat('en-US', {
+        timeZone: tz, month: 'numeric', day: 'numeric', year: 'numeric',
+    }).format(date);
+    const wd = new Intl.DateTimeFormat('en-US', { timeZone: tz, weekday: 'short' }).format(date);
+    return `${md} (${wd})`;
+};
+
+// YYYY-MM-DD in the store timezone — used both as the API date and as a dedupe key.
+const isoDateKey = (d: string | Date) => {
+    const date = typeof d === 'string' ? new Date(d) : d;
+    const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: storeTimezone.value, year: 'numeric', month: '2-digit', day: '2-digit',
+    }).formatToParts(date);
+    const p: Record<string, string> = {};
+    parts.forEach((x) => { if (x.type !== 'literal') p[x.type] = x.value; });
+    return `${p.year}-${p.month}-${p.day}`;
+};
+
+const handleExport = () => {
+    isExporting.value = true;
+    try {
+        const cashiers = cashierMembers.value;
+        const header = [
+            'Date',
+            ...cashiers.map((m) => `COH (${memberName(m)})`),
+            ...cashiers.map((m) => `GCash (${memberName(m)})`),
+            'Senior', 'Expense', 'Total GCash', 'Total COH', 'Total Sales',
+            'POS', 'Actual COH', 'Kulang Remit', 'Short if (-)', 'Sales Needed',
+        ];
+        const lines = [header.map(csvCell).join(',')];
+        for (const row of rows.value) {
+            lines.push([
+                csvDate(row.date),
+                ...cashiers.map((m) => getCashierCoh(row, m.userId)),
+                ...cashiers.map((m) => getCashierGcash(row, m.userId)),
+                row.totalSenior, row.expense, row.totalGcash, row.totalCoh, row.totalSales,
+                row.pos, row.actualCoh, row.kulangRemit, row.shortIf, row.salesNeeded,
+            ].map(csvCell).join(','));
+        }
+        // Trailing totals row, to match the source spreadsheets.
+        lines.push([
+            'Total',
+            ...cashiers.map((m) => sumCashierField(m.userId, 'cashAmount')),
+            ...cashiers.map((m) => sumCashierField(m.userId, 'gcashAmount')),
+            sumAll('totalSenior'), sumAll('expense'), sumAll('totalGcash'),
+            sumAll('totalCoh'), sumAll('totalSales'), sumAll('pos'), sumAll('actualCoh'),
+            '', '', '',
+        ].map(csvCell).join(','));
+
+        const blob = new Blob(['﻿' + lines.join('\n') + '\n'], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `daily-sales-${year.value}-${String(month.value).padStart(2, '0')}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+    } catch {
+        showToast('Unable to export daily sales.', 'error');
+    } finally {
+        isExporting.value = false;
+    }
+};
+
+const triggerImport = () => {
+    importResult.value = null;
+    importFileInput.value?.click();
+};
+
+const downloadTemplate = () => {
+    const cashiers = cashierMembers.value;
+    const header = [
+        'Date',
+        ...cashiers.map((m) => `COH (${memberName(m)})`),
+        ...cashiers.map((m) => `GCash (${memberName(m)})`),
+        'Senior', 'Expense', 'Total GCash', 'Total COH', 'Total Sales',
+        'POS', 'Actual COH', 'Kulang Remit', 'Short if (-)', 'Sales Needed',
+    ];
+    // Only Date, the per-cashier COH/GCash columns, Expense and Actual COH are
+    // imported; the remaining columns are computed and ignored on import.
+    const example = [
+        csvDate(new Date()),
+        ...cashiers.map(() => 0),
+        ...cashiers.map(() => 0),
+        0, 0, 0, 0, 0, 0, 0, '', '', '',
+    ];
+    const csv = `${header.map(csvCell).join(',')}\n${example.map(csvCell).join(',')}\n`;
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'daily-sales-template.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+};
+
+// Minimal RFC-4180 line splitter (handles quoted fields with embedded commas).
+const parseCsvLine = (line: string): string[] => {
+    const out: string[] = [];
+    let cur = '';
+    let quoted = false;
+    for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (quoted) {
+            if (ch === '"') {
+                if (line[i + 1] === '"') { cur += '"'; i++; }
+                else quoted = false;
+            } else cur += ch;
+        } else if (ch === '"') quoted = true;
+        else if (ch === ',') { out.push(cur); cur = ''; }
+        else cur += ch;
+    }
+    out.push(cur);
+    return out.map((c) => c.trim());
+};
+
+const toNum = (v: string | undefined): number => {
+    if (!v) return 0;
+    const n = Number(v.replace(/[₱,\s]/g, ''));
+    return Number.isFinite(n) ? n : 0;
+};
+
+// Parse "5/31/2026 (Sun)" / "5/31/2026" / "2026-05-31" → YYYY-MM-DD (or null).
+const parseCsvDate = (raw: string): string | null => {
+    const token = raw.replace(/\(.*?\)/, '').trim();
+    if (!token) return null;
+    let y: number, mo: number, d: number;
+    const iso = token.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+    const mdy = token.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (iso) { y = +iso[1]; mo = +iso[2]; d = +iso[3]; }
+    else if (mdy) { mo = +mdy[1]; d = +mdy[2]; y = +mdy[3]; }
+    else return null;
+    if (mo < 1 || mo > 12 || d < 1 || d > 31) return null;
+    return `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+};
+
+// Spread a flat COH total across bill denominations (largest first), so the
+// imported cash total round-trips even without a real denomination breakdown.
+const decomposeCash = (amount: number) => {
+    let rem = Math.floor(Math.max(0, amount));
+    const take = (unit: number) => { const c = Math.floor(rem / unit); rem -= c * unit; return c; };
+    const denom1000 = take(1000);
+    const denom500 = take(500);
+    const denom200 = take(200);
+    const denom100 = take(100);
+    const denom50 = take(50);
+    const denom20 = take(20);
+    const coins = Math.max(0, amount) - Math.floor(Math.max(0, amount)) + rem;
+    return { denom1000, denom500, denom200, denom100, denom50, denom20, coins };
+};
+
+const pendingImportFile = ref<File | null>(null);
+const showImportPreview = ref(false);
+
+const handleImportFileSelected = (event: Event) => {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file || !storeContext.currentStoreId) return;
+    input.value = '';
+    importResult.value = null;
+    pendingImportFile.value = file;
+    showImportPreview.value = true;
+};
+
+const cancelImport = () => {
+    showImportPreview.value = false;
+    pendingImportFile.value = null;
+};
+
+const confirmImport = async () => {
+    const file = pendingImportFile.value;
+    const storeId = storeContext.currentStoreId;
+    if (!file || !storeId) return;
+
+    isImporting.value = true;
+    importProgress.value = 0;
+    importResult.value = null;
+
+    const result: ImportResult = { imported: 0, updated: 0, failed: 0, errors: [] };
+    try {
+        const text = (await file.text()).replace(/^﻿/, '');
+        const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+        if (lines.length < 2) {
+            throw new Error('File has no data rows.');
+        }
+
+        const header = parseCsvLine(lines[0]);
+        const findCol = (label: string) =>
+            header.findIndex((h) => h.toLowerCase() === label.toLowerCase());
+        const dateCol = findCol('Date');
+        const expenseCol = findCol('Expense');
+        const actualCohCol = findCol('Actual COH');
+        if (dateCol < 0) throw new Error('Missing "Date" column.');
+
+        // Map each cashier member to its COH / GCash column by header name.
+        const cashierCols = cashierMembers.value.map((m) => {
+            const name = memberName(m).toLowerCase();
+            return {
+                userId: m.userId,
+                cohCol: header.findIndex((h) => h.toLowerCase() === `coh (${name})`),
+                gcashCol: header.findIndex((h) => h.toLowerCase() === `gcash (${name})`),
+            };
+        });
+
+        // Existing entries for the currently-loaded month → update instead of create.
+        const existingByDate: Record<string, string> = {};
+        rows.value.forEach((r) => { existingByDate[isoDateKey(r.date)] = r.id; });
+
+        const dataRows = lines.slice(1);
+        for (let i = 0; i < dataRows.length; i++) {
+            const cells = parseCsvLine(dataRows[i]);
+            const rowNum = i + 2; // 1-based incl. header
+            const first = cells[dateCol] ?? '';
+            if (first.toLowerCase().startsWith('total')) continue; // trailing totals row
+
+            const date = parseCsvDate(first);
+            if (!date) {
+                result.failed++;
+                result.errors.push({ row: rowNum, message: `Unrecognized date "${first}".` });
+                importProgress.value = Math.round(((i + 1) / dataRows.length) * 100);
+                continue;
+            }
+
+            const expense = expenseCol >= 0 ? toNum(cells[expenseCol]) : 0;
+            const actualCohRaw = actualCohCol >= 0 ? cells[actualCohCol] : '';
+            const actualCoh = actualCohRaw && actualCohRaw.trim() !== '' ? toNum(actualCohRaw) : null;
+
+            try {
+                const existingId = existingByDate[date];
+                let entryId: string;
+                if (existingId) {
+                    await updateDailySalesEntry(storeId, existingId, { expense, actualCoh });
+                    entryId = existingId;
+                    result.updated++;
+                } else {
+                    const created = await createDailySalesEntry(storeId, { date, expense, actualCoh });
+                    entryId = (created as { entry: { id: string } }).entry.id;
+                    existingByDate[date] = entryId;
+                    result.imported++;
+                }
+
+                for (const c of cashierCols) {
+                    if (c.cohCol < 0 && c.gcashCol < 0) continue;
+                    const coh = c.cohCol >= 0 ? toNum(cells[c.cohCol]) : 0;
+                    const gcashAmount = c.gcashCol >= 0 ? toNum(cells[c.gcashCol]) : 0;
+                    if (coh <= 0 && gcashAmount <= 0) continue;
+                    await upsertCashierEntry(storeId, entryId, c.userId, {
+                        ...decomposeCash(coh),
+                        gcashAmount,
+                    });
+                }
+            } catch (e: any) {
+                result.failed++;
+                result.errors.push({ row: rowNum, message: e?.message ?? 'Failed to save row.' });
+            }
+            importProgress.value = Math.round(((i + 1) / dataRows.length) * 100);
+        }
+
+        importResult.value = result;
+        if (result.imported > 0 || result.updated > 0) await loadData();
+    } catch (e: any) {
+        importResult.value = {
+            imported: 0, updated: 0, failed: 1,
+            errors: [{ row: 0, message: e?.message ?? 'Import failed. Check the file and try again.' }],
+        };
+    } finally {
+        isImporting.value = false;
+        importProgress.value = 0;
+        showImportPreview.value = false;
+        pendingImportFile.value = null;
+    }
+};
+
 // ── Goal modal ───────────────────────────────────────────────
 const goalModal = reactive({ open: false, value: 0, date: todayStr(), saving: false });
 
@@ -1006,6 +1357,20 @@ const saveGoal = async () => {
 .ds-title { font-size: 1.25rem; font-weight: 700; margin: 0; }
 .ds-subtitle { font-size: 0.82rem; color: #6b7280; margin: 0.2rem 0 0; }
 .ds-header-actions { display: flex; gap: 0.5rem; align-items: center; flex-shrink: 0; white-space: nowrap; }
+
+/* CSV import progress / result */
+.ds-import-progress { margin-bottom: 0.75rem; }
+.ds-import-progress__label { font-size: 0.78rem; color: #6b7280; margin-bottom: 0.25rem; }
+.ds-import-progress__track { height: 6px; background: #e5e7eb; border-radius: 4px; overflow: hidden; }
+.ds-import-progress__fill { height: 100%; background: #0d9488; transition: width 0.2s ease; }
+
+.ds-import-result { margin-bottom: 0.75rem; border-radius: 8px; padding: 0.6rem 0.85rem; font-size: 0.82rem; }
+.ds-import-result--ok { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; }
+.ds-import-result--warn { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; }
+.ds-import-result__summary { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
+.ds-import-result__close { background: none; border: none; cursor: pointer; color: inherit; font-size: 0.9rem; line-height: 1; }
+.ds-import-result__errors { margin: 0.4rem 0 0; padding-left: 1.1rem; max-height: 140px; overflow-y: auto; }
+.ds-import-result__errors li { margin: 0.1rem 0; }
 
 .ds-controls { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; }
 .ds-month-nav { display: flex; align-items: center; gap: 0.5rem; }
