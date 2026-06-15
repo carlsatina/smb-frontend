@@ -361,7 +361,7 @@ const displaySettingsRef = ref<HTMLDetailsElement | null>(null);
 const displaySettings = reactive<DisplaySettings>({
     showSku: false,
     showType: false,
-    showCategory: true,
+    showCategory: false,
     showPrice: false,
     useCategoryColor: true,
     categoryColors: {} as Record<string, string>,

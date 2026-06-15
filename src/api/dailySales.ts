@@ -19,6 +19,8 @@ export type DailySalesRow = {
     id: string;
     date: string;
     expense: number;
+    expenseDerived: number;
+    expenseOverride: number | null;
     actualCoh: number;
     cashierEntries: CashierEntry[];
     totalCoh: number;
@@ -39,10 +41,10 @@ export type DailySalesGoal = {
 export const listDailySales = (storeId: string, year: number, month: number) =>
     apiClient.request<{ rows: DailySalesRow[]; goal: number }>(`/api/v1/stores/${storeId}/daily-sales?year=${year}&month=${month}`);
 
-export const createDailySalesEntry = (storeId: string, data: { date: string; expense: number; actualCoh?: number | null }) =>
+export const createDailySalesEntry = (storeId: string, data: { date: string; expense?: number | null; actualCoh?: number | null }) =>
     apiClient.request<{ entry: object }>(`/api/v1/stores/${storeId}/daily-sales`, { method: 'POST', body: data });
 
-export const updateDailySalesEntry = (storeId: string, entryId: string, data: { expense?: number; actualCoh?: number | null }) =>
+export const updateDailySalesEntry = (storeId: string, entryId: string, data: { expense?: number | null; actualCoh?: number | null }) =>
     apiClient.request<{ entry: object }>(`/api/v1/stores/${storeId}/daily-sales/${entryId}`, { method: 'PATCH', body: data });
 
 export const getPosForDate = (storeId: string, date: string) =>

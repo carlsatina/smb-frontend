@@ -859,6 +859,8 @@ const cancelImport = () => {
 const confirmImport = async () => {
     const file = pendingImportFile.value;
     if (!file || !storeContext.currentStoreId) return;
+    // Close the preview so the import progress is visible on the page.
+    showImportPreview.value = false;
     startImportProgress();
     try {
         const result = await importSales(storeContext.currentStoreId, file);
@@ -869,7 +871,6 @@ const confirmImport = async () => {
         await finishImportProgress();
         importResult.value = { imported: 0, failed: 1, errors: [{ saleId: '—', message: 'Upload failed. Check the file and try again.' }] };
     } finally {
-        showImportPreview.value = false;
         pendingImportFile.value = null;
     }
 };

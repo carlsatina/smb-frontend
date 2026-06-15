@@ -124,13 +124,12 @@
                             <span v-else>{{ formatMoney(addForm.seniorTotal) }}</span>
                         </td>
                         <td>
-                            <input
-                                type="number"
-                                v-model.number="addForm.expense"
-                                class="ds-input ds-input--num"
-                                min="0"
-                                step="0.01"
-                            />
+                            <div class="ds-expense-cell">
+                                <span>{{ formatMoney(addForm.expenseDerived) }}</span>
+                                <button class="btn-expense-breakdown" title="Edit expense breakdown" @click="openAddBreakdown">
+                                    <mdicon name="format-list-bulleted" size="14" />
+                                </button>
+                            </div>
                         </td>
                         <td class="ds-computed">{{ formatMoney(addTotalGcash) }}</td>
                         <td class="ds-computed">{{ formatMoney(addTotalCoh) }}</td>
@@ -214,11 +213,15 @@
                             <!-- Senior — always readonly -->
                             <td>{{ formatMoney(row.totalSenior) }}</td>
 
-                            <!-- Expense — input in edit mode (owner), plain text otherwise -->
-                            <td v-if="inlineEdit.rowId === row.id && !isCashierRole">
-                                <input type="number" v-model.number="inlineEdit.expense" class="ds-input ds-input--num" min="0" step="0.01" />
+                            <!-- Expense — read-only, driven by the itemized breakdown -->
+                            <td>
+                                <div class="ds-expense-cell">
+                                    <span>{{ formatMoney(row.expense) }}</span>
+                                    <button class="btn-expense-breakdown" title="Edit expense breakdown" @click="openBreakdown(row)">
+                                        <mdicon name="format-list-bulleted" size="14" />
+                                    </button>
+                                </div>
                             </td>
-                            <td v-else>{{ formatMoney(row.expense) }}</td>
 
                             <!-- Computed totals -->
                             <td>{{ inlineEdit.rowId === row.id ? formatMoney(inlineEditTotalGcash) : formatMoney(row.totalGcash) }}</td>
@@ -330,7 +333,12 @@
                     <div class="ds-card-field-row">
                         <label class="ds-card-field">
                             <span class="ds-card-label">Expense</span>
-                            <input type="number" v-model.number="addForm.expense" class="ds-input ds-input--num" min="0" step="0.01" />
+                            <div class="ds-expense-cell">
+                                <span>{{ formatMoney(addForm.expenseDerived) }}</span>
+                                <button class="btn-expense-breakdown" title="Edit expense breakdown" @click="openAddBreakdown">
+                                    <mdicon name="format-list-bulleted" size="14" />
+                                </button>
+                            </div>
                         </label>
                         <label v-if="!isCashierRole" class="ds-card-field">
                             <span class="ds-card-label">Actual COH</span>
@@ -388,10 +396,15 @@
                                 </div>
                             </template>
                             <div class="ds-card-field-row">
-                                <label v-if="!isCashierRole" class="ds-card-field">
+                                <div class="ds-card-field">
                                     <span class="ds-card-label">Expense</span>
-                                    <input type="number" v-model.number="inlineEdit.expense" class="ds-input ds-input--num" min="0" step="0.01" />
-                                </label>
+                                    <div class="ds-expense-cell">
+                                        <span>{{ formatMoney(inlineEditExpense) }}</span>
+                                        <button class="btn-expense-breakdown" title="Edit expense breakdown" @click="openBreakdown(row)">
+                                            <mdicon name="format-list-bulleted" size="14" />
+                                        </button>
+                                    </div>
+                                </div>
                                 <label v-if="!isCashierRole" class="ds-card-field">
                                     <span class="ds-card-label">Actual COH</span>
                                     <input type="number" v-model.number="inlineEdit.actualCoh" class="ds-input ds-input--num" min="0" step="0.01" :placeholder="formatMoney(inlineEditTotalCoh)" />
@@ -448,7 +461,12 @@
                                 </div>
                                 <div class="ds-card-field">
                                     <span class="ds-card-label">Expense</span>
-                                    <span>{{ formatMoney(row.expense) }}</span>
+                                    <div class="ds-expense-cell">
+                                        <span>{{ formatMoney(row.expense) }}</span>
+                                        <button class="btn-expense-breakdown" title="Expense breakdown" @click="openBreakdown(row)">
+                                            <mdicon name="format-list-bulleted" size="14" />
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                             <div class="ds-card-summary">
@@ -554,6 +572,64 @@
             @update:show="deleteModal.show = $event"
         />
 
+        <!-- Expense breakdown modal — editable Name + amount line items for the day -->
+        <div v-if="breakdownModal.open" class="ds-modal-backdrop" @click.self="breakdownModal.open = false">
+            <div class="ds-modal ds-modal--wide">
+                <div class="ds-bd-head">
+                    <h3>Expense Breakdown — {{ breakdownModal.dateLabel }}</h3>
+                    <button class="ds-bd-close" title="Close" @click="breakdownModal.open = false">✕</button>
+                </div>
+
+                <div v-if="breakdownModal.loading" class="ds-bd-empty">Loading…</div>
+                <template v-else>
+                    <!-- Editable lines (write roles) -->
+                    <template v-if="canWriteExpense">
+                        <div v-for="(line, i) in breakdownModal.lines" :key="i" class="ds-bd-line">
+                            <input
+                                type="text" v-model="line.name"
+                                class="ds-input ds-bd-line-name" placeholder="Name"
+                            />
+                            <input
+                                type="number" v-model.number="line.amount"
+                                class="ds-input ds-bd-line-amount" min="0" step="0.01" placeholder="0"
+                            />
+                            <button class="ds-bd-remove" title="Remove" @click="removeBreakdownLine(i)">✕</button>
+                        </div>
+                        <button class="ds-bd-addline" @click="addBreakdownLine">+ Add</button>
+                    </template>
+
+                    <!-- Read-only list (view-only roles) -->
+                    <template v-else>
+                        <template v-if="breakdownModal.lines.length">
+                            <div v-for="(line, i) in breakdownModal.lines" :key="i" class="ds-bd-line ds-bd-line--ro">
+                                <span class="ds-bd-cat">{{ line.name }}</span>
+                                <span class="ds-bd-num">{{ formatMoney(Number(line.amount) || 0) }}</span>
+                            </div>
+                        </template>
+                        <div v-else class="ds-bd-empty">No itemized expenses recorded for this day.</div>
+                    </template>
+
+                    <div class="ds-bd-total">
+                        <span>Total</span>
+                        <strong>{{ formatMoney(breakdownTotal) }}</strong>
+                    </div>
+
+                    <p v-if="breakdownModal.error" class="ds-bd-add-error">{{ breakdownModal.error }}</p>
+                </template>
+
+                <div class="ds-modal-actions">
+                    <template v-if="canWriteExpense">
+                        <button class="btn btn-secondary" :disabled="breakdownModal.saving" @click="clearBreakdownLines">Clear</button>
+                        <button class="btn btn-secondary" :disabled="breakdownModal.saving" @click="breakdownModal.open = false">Cancel</button>
+                        <button class="btn btn-primary" :disabled="breakdownModal.saving" @click="applyBreakdown">
+                            {{ breakdownModal.saving ? 'Applying…' : 'Apply' }}
+                        </button>
+                    </template>
+                    <button v-else class="btn btn-secondary" @click="breakdownModal.open = false">Close</button>
+                </div>
+            </div>
+        </div>
+
         <!-- Goal modal -->
         <div v-if="goalModal.open" class="ds-modal-backdrop" @click.self="goalModal.open = false">
             <div class="ds-modal">
@@ -592,6 +668,7 @@ import {
     updateDailySalesEntry,
     upsertCashierEntry,
 } from '@/api/dailySales';
+import { listExpenses, createExpense, updateExpense, deleteExpense, type Expense } from '@/api/expenses';
 import { listStoreMembers, type StoreMember } from '@/api/storeMembers';
 import DenominationModal from '@/components/DenominationModal.vue';
 import ConfirmModal from '@/components/ConfirmModal.vue';
@@ -620,6 +697,11 @@ const monthLabel = computed(() => {
 const cashierMembers = computed(() => allMembers.value.filter(m => m.role === 'CASHIER'));
 
 const isCashierRole = computed(() => storeContext.currentStore?.role === 'CASHIER');
+
+// Roles allowed to create expenses (mirrors the backend writeRoles for the expenses module).
+const canWriteExpense = computed(() =>
+    ['OWNER', 'ADMIN', 'INVENTORY_MANAGER', 'CASHIER'].includes(storeContext.currentStore?.role ?? '')
+);
 
 // cashier: Date + COH/GCash pairs + Senior + Expense + Total GCash + Total COH + Actions = 1 + N*2 + 5
 // owner: adds Total Sales, POS, Actual COH, Kulang Remit, Short if, Sales Needed = 1 + N*2 + 11
@@ -752,7 +834,8 @@ const defaultDraft = (): CashierDraft => ({
 const isAdding = ref(false);
 const addForm = reactive({
     date: '',
-    expense: 0 as number,
+    expense: null as number | null,   // manual override; null = derive from itemized
+    expenseDerived: 0,                 // sum of that day's itemized expenses
     seniorTotal: 0,
     actualCoh: null as number | null,
     cashiers: {} as Record<string, CashierDraft>,
@@ -760,6 +843,17 @@ const addForm = reactive({
     posLoading: false,
     saving: false,
 });
+
+// Normalize an override input: empty (cleared) ⇒ null (derive); else the number.
+// v-model.number yields '' on an emptied field, and Number('') is 0, so guard explicitly.
+const normExpense = (v: number | string | null): number | null => {
+    if (v === null || v === undefined || v === '') return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+};
+
+// Effective add-form expense: override if set, else derived.
+const addExpense = computed(() => normExpense(addForm.expense) ?? addForm.expenseDerived);
 
 const todayStr = () => {
     const tz = storeTimezone.value;
@@ -775,7 +869,8 @@ const startAdding = () => {
     const draft: Record<string, CashierDraft> = {};
     cashierMembers.value.forEach((m) => { draft[m.userId] = defaultDraft(); });
     addForm.date = todayStr();
-    addForm.expense = 0;
+    addForm.expense = null;
+    addForm.expenseDerived = 0;
     addForm.seniorTotal = 0;
     addForm.actualCoh = null;
     addForm.cashiers = draft;
@@ -783,6 +878,7 @@ const startAdding = () => {
     addForm.saving = false;
     isAdding.value = true;
     fetchPos();
+    fetchDerivedExpense();
 };
 
 const cancelAdding = () => { isAdding.value = false; };
@@ -791,7 +887,8 @@ let posTimer: ReturnType<typeof setTimeout> | null = null;
 
 const onAddDateChange = () => {
     // Reset all entered values for the new date
-    addForm.expense = 0;
+    addForm.expense = null;
+    addForm.expenseDerived = 0;
     addForm.actualCoh = null;
     addForm.posTotal = 0;
     addForm.seniorTotal = 0;
@@ -800,7 +897,7 @@ const onAddDateChange = () => {
     });
 
     if (posTimer) clearTimeout(posTimer);
-    posTimer = setTimeout(fetchPos, 600);
+    posTimer = setTimeout(() => { fetchPos(); fetchDerivedExpense(); }, 600);
 };
 
 const fetchPos = async () => {
@@ -816,6 +913,19 @@ const fetchPos = async () => {
         addForm.seniorTotal = 0;
     } finally {
         addForm.posLoading = false;
+    }
+};
+
+// Sum of that day's itemized expenses (role-filtered by the backend) — the
+// default value for the Expense column unless manually overridden.
+const fetchDerivedExpense = async () => {
+    const storeId = storeContext.currentStoreId;
+    if (!storeId || !addForm.date) return;
+    try {
+        const res = await listExpenses(storeId, { from: addForm.date, to: addForm.date });
+        addForm.expenseDerived = res.expenses.reduce((s, e) => s + Number(e.amount || 0), 0);
+    } catch {
+        addForm.expenseDerived = 0;
     }
 };
 
@@ -837,7 +947,7 @@ const addTotalGcash = computed(() =>
 );
 
 const addTotalSales = computed(() =>
-    addTotalCoh.value + addTotalGcash.value + addForm.seniorTotal + (addForm.expense || 0)
+    addTotalCoh.value + addTotalGcash.value + addForm.seniorTotal + addExpense.value
 );
 
 const addActualCohVal = computed(() =>
@@ -858,7 +968,7 @@ const saveAddRow = async () => {
     try {
         const result = await createDailySalesEntry(storeId, {
             date: addForm.date,
-            expense: addForm.expense || 0,
+            expense: null,   // always derived from the itemized breakdown
             actualCoh: addForm.actualCoh,
         });
         const entryId = (result as { entry: { id: string } }).entry.id;
@@ -896,11 +1006,14 @@ const saveAddRow = async () => {
 // ── Inline edit (existing rows) ──────────────────────────────
 const inlineEdit = reactive({
     rowId: null as string | null,
-    expense: 0 as number,
+    expense: null as number | null,   // manual override; null = derive from itemized
+    expenseDerived: 0,
     actualCoh: null as number | null,
     cashiers: {} as Record<string, CashierDraft>,
     saving: false,
 });
+
+const inlineEditExpense = computed(() => normExpense(inlineEdit.expense) ?? inlineEdit.expenseDerived);
 
 const openInlineEdit = (row: DailySalesRow) => {
     const draft: Record<string, CashierDraft> = {};
@@ -920,7 +1033,8 @@ const openInlineEdit = (row: DailySalesRow) => {
             : defaultDraft();
     });
     inlineEdit.rowId = row.id;
-    inlineEdit.expense = row.expense;
+    inlineEdit.expense = row.expenseOverride;   // null when derived
+    inlineEdit.expenseDerived = row.expenseDerived;
     inlineEdit.actualCoh = row.actualCoh;
     inlineEdit.cashiers = draft;
     inlineEdit.saving = false;
@@ -949,7 +1063,7 @@ const inlineEditKulangRemit = computed(() => inlineEditTotalCoh.value - inlineEd
 
 const inlineEditTotalSales = computed(() => {
     const row = rows.value.find(r => r.id === inlineEdit.rowId);
-    return inlineEditTotalCoh.value + inlineEditTotalGcash.value + (row?.totalSenior ?? 0) + (inlineEdit.expense || 0);
+    return inlineEditTotalCoh.value + inlineEditTotalGcash.value + (row?.totalSenior ?? 0) + inlineEditExpense.value;
 });
 
 const openInlineEditDenomModal = (m: StoreMember) => {
@@ -967,7 +1081,7 @@ const saveInlineEdit = async () => {
     const entryId = inlineEdit.rowId;
     try {
         await updateDailySalesEntry(storeId, entryId, {
-            expense: inlineEdit.expense || 0,
+            expense: null,   // always derived from the itemized breakdown
             actualCoh: inlineEdit.actualCoh,
         });
         const cashierSaves = cashierMembers.value.map((m) => {
@@ -1224,6 +1338,8 @@ const confirmImport = async () => {
     const storeId = storeContext.currentStoreId;
     if (!file || !storeId) return;
 
+    // Close the preview so the import progress is visible on the page.
+    showImportPreview.value = false;
     isImporting.value = true;
     importProgress.value = 0;
     importResult.value = null;
@@ -1273,7 +1389,9 @@ const confirmImport = async () => {
                 continue;
             }
 
-            const expense = expenseCol >= 0 ? toNum(cells[expenseCol]) : 0;
+            // Blank Expense ⇒ null (derive from itemized); a value ⇒ manual override.
+            const expenseRaw = expenseCol >= 0 ? (cells[expenseCol] ?? '').trim() : '';
+            const expense = expenseRaw === '' ? null : toNum(expenseRaw);
             const actualCohRaw = actualCohCol >= 0 ? cells[actualCohCol] : '';
             const actualCoh = actualCohRaw && actualCohRaw.trim() !== '' ? toNum(actualCohRaw) : null;
 
@@ -1318,8 +1436,188 @@ const confirmImport = async () => {
     } finally {
         isImporting.value = false;
         importProgress.value = 0;
-        showImportPreview.value = false;
         pendingImportFile.value = null;
+    }
+};
+
+// ── Expense breakdown modal ──────────────────────────────────
+// Editable Name + amount line items for a single day. Each line is backed by an
+// itemized Expense record (Name → category); the day's expense is the sum of
+// these records. Only records loaded into the modal (already role-filtered by
+// the backend) are touched on Apply, so restricted expenses are never disturbed.
+type BreakdownLine = { id: string | null; name: string; amount: number | null };
+
+type BreakdownContext = 'display' | 'add' | 'edit';
+
+// Sensitive categories (rent, payroll) are never shown or edited in the daily
+// sales breakdown — even for owners. Mirrors the backend's restricted list.
+const RESTRICTED_BREAKDOWN_CATEGORIES = ['rent', 'salaries'];
+const isRestrictedExpenseCategory = (category: string) =>
+    RESTRICTED_BREAKDOWN_CATEGORIES.includes(category.trim().toLowerCase());
+
+const breakdownModal = reactive({
+    open: false,
+    dateLabel: '',
+    dateKey: '',
+    entryId: '',
+    hadOverride: false,
+    context: 'display' as BreakdownContext,
+    loading: false,
+    saving: false,
+    error: '',
+    lines: [] as BreakdownLine[],
+    original: [] as Expense[],
+});
+
+const breakdownTotal = computed(() =>
+    breakdownModal.lines.reduce((s, l) => s + (Number(l.amount) || 0), 0)
+);
+
+const blankLine = (): BreakdownLine => ({ id: null, name: '', amount: null });
+
+const addBreakdownLine = () => breakdownModal.lines.push(blankLine());
+
+const removeBreakdownLine = (i: number) => {
+    breakdownModal.lines.splice(i, 1);
+    if (breakdownModal.lines.length === 0) breakdownModal.lines.push(blankLine());
+};
+
+const clearBreakdownLines = () => {
+    breakdownModal.lines = [blankLine()];
+};
+
+const openBreakdownCore = async (opts: {
+    dateKey: string;
+    dateLabel: string;
+    entryId: string;
+    hadOverride: boolean;
+    context: BreakdownContext;
+}) => {
+    const storeId = storeContext.currentStoreId;
+    if (!storeId || !opts.dateKey) return;
+    breakdownModal.open = true;
+    breakdownModal.loading = true;
+    breakdownModal.error = '';
+    breakdownModal.dateKey = opts.dateKey;
+    breakdownModal.dateLabel = opts.dateLabel;
+    breakdownModal.entryId = opts.entryId;
+    breakdownModal.hadOverride = opts.hadOverride;
+    breakdownModal.context = opts.context;
+    breakdownModal.lines = [];
+    breakdownModal.original = [];
+    try {
+        const res = await listExpenses(storeId, { from: opts.dateKey, to: opts.dateKey });
+        // Hide Rent/Salaries from the breakdown for every role; excluding them
+        // from `original` too means the Apply diff never touches those records.
+        const visible = res.expenses.filter((e) => !isRestrictedExpenseCategory(e.category));
+        breakdownModal.original = visible;
+        breakdownModal.lines = visible.map((e) => ({
+            id: e.id,
+            name: e.category,
+            amount: Number(e.amount),
+        }));
+        if (breakdownModal.lines.length === 0 && canWriteExpense.value) {
+            breakdownModal.lines.push(blankLine());
+        }
+    } catch {
+        breakdownModal.original = [];
+        breakdownModal.lines = canWriteExpense.value ? [blankLine()] : [];
+    } finally {
+        breakdownModal.loading = false;
+    }
+};
+
+// Saved row — read-only display, or edit context when its inline editor is open.
+const openBreakdown = (row: DailySalesRow) =>
+    openBreakdownCore({
+        dateKey: isoDateKey(row.date),
+        dateLabel: formatDate(row.date),
+        entryId: row.id,
+        hadOverride: row.expenseOverride != null,
+        context: inlineEdit.rowId === row.id ? 'edit' : 'display',
+    });
+
+// New-entry row — operate on the add form's selected date (no entry yet).
+const openAddBreakdown = () => {
+    if (!addForm.date) return;
+    openBreakdownCore({
+        dateKey: addForm.date,
+        dateLabel: formatDate(addForm.date),
+        entryId: '',
+        hadOverride: false,
+        context: 'add',
+    });
+};
+
+const applyBreakdown = async () => {
+    const storeId = storeContext.currentStoreId;
+    if (!storeId || breakdownModal.saving) return;
+
+    // A line is kept only if it has a name and a positive amount.
+    const valid = breakdownModal.lines
+        .map((l) => ({ id: l.id, name: l.name.trim(), amount: Number(l.amount) || 0 }))
+        .filter((l) => l.name !== '' && l.amount > 0);
+
+    // Rows that have a name but no amount (or vice versa) are likely mistakes.
+    const incomplete = breakdownModal.lines.some((l) => {
+        const hasName = l.name.trim() !== '';
+        const hasAmount = (Number(l.amount) || 0) > 0;
+        return hasName !== hasAmount;
+    });
+    if (incomplete) {
+        breakdownModal.error = 'Each line needs both a name and an amount greater than 0.';
+        return;
+    }
+
+    // Rent/Salaries are managed outside the daily sales breakdown.
+    if (valid.some((l) => isRestrictedExpenseCategory(l.name))) {
+        breakdownModal.error = 'Rent and Salaries can’t be added here — use the Expenses page for those.';
+        return;
+    }
+
+    breakdownModal.saving = true;
+    breakdownModal.error = '';
+    const keptIds = new Set(valid.filter((l) => l.id).map((l) => l.id as string));
+    try {
+        const ops: Promise<unknown>[] = [];
+        // Delete loaded records that are no longer present.
+        for (const orig of breakdownModal.original) {
+            if (!keptIds.has(orig.id)) ops.push(deleteExpense(storeId, orig.id));
+        }
+        // Create new lines / update changed ones.
+        for (const l of valid) {
+            if (!l.id) {
+                ops.push(createExpense(storeId, { date: breakdownModal.dateKey, amount: l.amount, category: l.name }));
+            } else {
+                const orig = breakdownModal.original.find((o) => o.id === l.id);
+                if (orig && (orig.category !== l.name || Number(orig.amount) !== l.amount)) {
+                    ops.push(updateExpense(storeId, l.id, { amount: l.amount, category: l.name }));
+                }
+            }
+        }
+        await Promise.all(ops);
+        // If the day had a manual expense override, clear it so the breakdown
+        // total (derived from the itemized records) becomes the day's expense.
+        if (breakdownModal.hadOverride && breakdownModal.entryId) {
+            await updateDailySalesEntry(storeId, breakdownModal.entryId, { expense: null });
+        }
+        // Keep whichever form is open in sync: drop any manual override and show
+        // the new itemized total as the derived placeholder.
+        const total = breakdownTotal.value;
+        if (breakdownModal.context === 'add') {
+            addForm.expense = null;
+            addForm.expenseDerived = total;
+        } else if (breakdownModal.context === 'edit') {
+            inlineEdit.expense = null;
+            inlineEdit.expenseDerived = total;
+        }
+        breakdownModal.open = false;
+        // Refresh the table so the day's derived expense reflects the changes.
+        await loadData();
+    } catch (e: any) {
+        breakdownModal.error = e?.message ?? 'Could not save the breakdown. Try again.';
+    } finally {
+        breakdownModal.saving = false;
     }
 };
 
@@ -1431,6 +1729,52 @@ const saveGoal = async () => {
 .btn-warning-soft:hover { background: #fde68a; }
 .btn-danger-soft { background: #fee2e2; color: #991b1b; }
 .btn-danger-soft:hover { background: #fecaca; }
+
+/* Expense cell + breakdown */
+.ds-expense-cell { display: inline-flex; align-items: center; gap: 0.35rem; }
+.btn-expense-breakdown {
+    display: inline-flex; align-items: center; justify-content: center;
+    border: none; background: #f0fdfa; color: #0f766e; cursor: pointer;
+    border-radius: 5px; padding: 0.15rem 0.3rem;
+}
+.btn-expense-breakdown:hover { background: #ccfbf1; }
+.ds-bd-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; margin-bottom: 0.5rem; }
+.ds-bd-table th { text-align: left; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em; color: #0f766e; border-bottom: 2px solid #99f6e4; padding: 0.4rem 0.5rem; }
+.ds-bd-table td { padding: 0.4rem 0.5rem; border-bottom: 1px solid #f3f4f6; }
+.ds-bd-table tfoot td { border-top: 2px solid #e5e7eb; border-bottom: none; }
+.ds-bd-num { text-align: right; white-space: nowrap; }
+.ds-bd-cat { display: inline-block; padding: 0.1rem 0.45rem; border-radius: 999px; background: #ecfdf5; color: #047857; font-size: 0.72rem; font-weight: 600; }
+.ds-bd-note { color: #6b7280; }
+.ds-bd-empty { color: #9ca3af; text-align: center; padding: 1.25rem 0; font-size: 0.85rem; }
+.ds-bd-note-line { font-size: 0.8rem; color: #92400e; background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 0.45rem 0.6rem; margin: 0; }
+
+/* Editable line-item breakdown editor */
+.ds-bd-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
+.ds-bd-head h3 { margin: 0; }
+.ds-bd-close { background: none; border: none; cursor: pointer; color: #9ca3af; font-size: 1.05rem; line-height: 1; padding: 0.2rem; }
+.ds-bd-close:hover { color: #111827; }
+.ds-bd-line { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; }
+.ds-bd-line-name { flex: 1; padding: 0.5rem 0.6rem; font-size: 0.85rem; }
+.ds-bd-line-amount { flex: 0 0 130px; width: auto; text-align: right; padding: 0.5rem 0.6rem; font-size: 0.85rem; }
+.ds-bd-remove {
+    flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
+    width: 36px; height: 36px; border: 1px solid #fca5a5; background: #fff; color: #b91c1c;
+    border-radius: 6px; cursor: pointer; font-size: 0.85rem;
+}
+.ds-bd-remove:hover { background: #fef2f2; }
+.ds-bd-line--ro { justify-content: space-between; }
+.ds-bd-addline {
+    border: 1px solid #d1d5db; background: #fff; color: #374151;
+    border-radius: 6px; padding: 0.45rem 0.8rem; cursor: pointer; font-size: 0.82rem; margin-top: 0.15rem;
+}
+.ds-bd-addline:hover { background: #f9fafb; }
+.ds-bd-total {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-top: 1.1rem; padding-top: 0.8rem; border-top: 1px solid #e5e7eb;
+    font-size: 0.9rem; color: #374151;
+}
+.ds-bd-total strong { font-size: 1rem; color: #111827; }
+.ds-bd-add-error { color: #991b1b; font-size: 0.78rem; margin: 0.5rem 0 0; }
 
 /* Modals */
 .ds-modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 1000; display: flex; align-items: center; justify-content: center; }
