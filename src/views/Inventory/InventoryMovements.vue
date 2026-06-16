@@ -256,6 +256,7 @@ import { useToast } from '@/composables/useToast';
 import { useStoreContextStore } from '@/stores/storeContext';
 import { canAccess } from '@/utils/roleAccess';
 import { hasPlanFeature, openPlanUpgradeModal } from '@/utils/planAccess';
+import { zonedDayStartIso, zonedDayEndIso } from '@/utils/datetime';
 
 const router = useRouter();
 const route = useRoute();
@@ -381,8 +382,9 @@ const loadMovements = async () => {
     }
     isLoading.value = true;
     try {
-        const fromValue = fromDate.value ? new Date(`${fromDate.value}T00:00:00`).toISOString() : undefined;
-        const toValue = toDate.value ? new Date(`${toDate.value}T23:59:59.999`).toISOString() : undefined;
+        const timeZone = storeContext.currentStore?.timezone || 'Asia/Manila';
+        const fromValue = fromDate.value ? zonedDayStartIso(fromDate.value, timeZone) : undefined;
+        const toValue = toDate.value ? zonedDayEndIso(toDate.value, timeZone) : undefined;
         const data = await listMovements(storeId, {
             type: filterMovementType.value === 'ALL' ? undefined : filterMovementType.value,
             from: fromValue,
@@ -498,8 +500,9 @@ const exportMovements = async () => {
     }
     isExporting.value = true;
     try {
-        const fromValue = fromDate.value ? new Date(`${fromDate.value}T00:00:00`).toISOString() : undefined;
-        const toValue = toDate.value ? new Date(`${toDate.value}T23:59:59.999`).toISOString() : undefined;
+        const timeZone = storeContext.currentStore?.timezone || 'Asia/Manila';
+        const fromValue = fromDate.value ? zonedDayStartIso(fromDate.value, timeZone) : undefined;
+        const toValue = toDate.value ? zonedDayEndIso(toDate.value, timeZone) : undefined;
         const allMovements: MovementRecord[] = [];
         const exportPageSize = 100;
         let exportPage = 1;

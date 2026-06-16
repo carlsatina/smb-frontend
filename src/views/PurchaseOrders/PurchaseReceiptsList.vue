@@ -231,6 +231,7 @@ import { listSuppliers, Supplier } from '@/api/suppliers';
 import { useToast } from '@/composables/useToast';
 import { useStoreContextStore } from '@/stores/storeContext';
 import { hasPlanFeature, openPlanUpgradeModal } from '@/utils/planAccess';
+import { zonedDayStartIso, zonedDayEndIso } from '@/utils/datetime';
 import PlanGate from '@/components/PlanGate.vue';
 
 const router = useRouter();
@@ -286,8 +287,9 @@ const loadReceipts = async () => {
     }
     isLoading.value = true;
     try {
-        const fromValue = fromDate.value ? new Date(`${fromDate.value}T00:00:00`).toISOString() : undefined;
-        const toValue = toDate.value ? new Date(`${toDate.value}T23:59:59.999`).toISOString() : undefined;
+        const timeZone = storeContext.currentStore?.timezone || 'Asia/Manila';
+        const fromValue = fromDate.value ? zonedDayStartIso(fromDate.value, timeZone) : undefined;
+        const toValue = toDate.value ? zonedDayEndIso(toDate.value, timeZone) : undefined;
         const supplierIdParam =
             supplierNameFilter.value ? undefined : supplierFilter.value || undefined;
         const supplierNameParam = supplierNameFilter.value || undefined;
@@ -322,8 +324,9 @@ const loadSummary = async () => {
     }
     isSummaryLoading.value = true;
     try {
-        const fromValue = fromDate.value ? new Date(`${fromDate.value}T00:00:00`).toISOString() : undefined;
-        const toValue = toDate.value ? new Date(`${toDate.value}T23:59:59.999`).toISOString() : undefined;
+        const timeZone = storeContext.currentStore?.timezone || 'Asia/Manila';
+        const fromValue = fromDate.value ? zonedDayStartIso(fromDate.value, timeZone) : undefined;
+        const toValue = toDate.value ? zonedDayEndIso(toDate.value, timeZone) : undefined;
         const supplierIdParam =
             supplierNameFilter.value ? undefined : supplierFilter.value || undefined;
         const supplierNameParam = supplierNameFilter.value || undefined;
@@ -484,8 +487,9 @@ const exportReceipts = async () => {
     }
     isExporting.value = true;
     try {
-        const fromValue = fromDate.value ? new Date(`${fromDate.value}T00:00:00`).toISOString() : undefined;
-        const toValue = toDate.value ? new Date(`${toDate.value}T23:59:59.999`).toISOString() : undefined;
+        const timeZone = storeContext.currentStore?.timezone || 'Asia/Manila';
+        const fromValue = fromDate.value ? zonedDayStartIso(fromDate.value, timeZone) : undefined;
+        const toValue = toDate.value ? zonedDayEndIso(toDate.value, timeZone) : undefined;
         const supplierIdParam =
             supplierNameFilter.value ? undefined : supplierFilter.value || undefined;
         const supplierNameParam = supplierNameFilter.value || undefined;

@@ -242,6 +242,7 @@ import { useToast } from '@/composables/useToast';
 import { useStoreContextStore } from '@/stores/storeContext';
 import { useUserContextStore } from '@/stores/userContext';
 import { hasPlanFeature, openPlanUpgradeModal } from '@/utils/planAccess';
+import { zonedDayStartIso, zonedDayEndIso } from '@/utils/datetime';
 
 const router = useRouter();
 const route = useRoute();
@@ -331,8 +332,9 @@ const loadAuditLogs = async () => {
     }
     auditLoading.value = true;
     try {
-        const fromValue = auditFromDate.value ? new Date(`${auditFromDate.value}T00:00:00`).toISOString() : undefined;
-        const toValue = auditToDate.value ? new Date(`${auditToDate.value}T23:59:59.999`).toISOString() : undefined;
+        const timeZone = storeContext.currentStore?.timezone || 'Asia/Manila';
+        const fromValue = auditFromDate.value ? zonedDayStartIso(auditFromDate.value, timeZone) : undefined;
+        const toValue = auditToDate.value ? zonedDayEndIso(auditToDate.value, timeZone) : undefined;
         const data = await listAuditLogs(currentStore.value.id, {
             action: auditAction.value.trim() || undefined,
             q: searchQuery.value.trim() || undefined,
@@ -418,8 +420,9 @@ const exportAuditLog = async () => {
     }
     auditExporting.value = true;
     try {
-        const fromValue = auditFromDate.value ? new Date(`${auditFromDate.value}T00:00:00`).toISOString() : undefined;
-        const toValue = auditToDate.value ? new Date(`${auditToDate.value}T23:59:59.999`).toISOString() : undefined;
+        const timeZone = storeContext.currentStore?.timezone || 'Asia/Manila';
+        const fromValue = auditFromDate.value ? zonedDayStartIso(auditFromDate.value, timeZone) : undefined;
+        const toValue = auditToDate.value ? zonedDayEndIso(auditToDate.value, timeZone) : undefined;
         const { blob, filename } = await exportAuditLogs(currentStore.value.id, {
             action: auditAction.value.trim() || undefined,
             from: fromValue,
@@ -505,7 +508,7 @@ const formatMoney = (value: number) => {
 const formatDateTime = (value: string) => {
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return value;
-    return date.toLocaleString();
+    return date.toLocaleString(undefined, { timeZone: storeContext.currentStore?.timezone || 'Asia/Manila' });
 };
 
 const formatRelativeTime = (value: string) => {

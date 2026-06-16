@@ -319,6 +319,7 @@ import { useStoreContextStore } from '@/stores/storeContext';
 import { useToast } from '@/composables/useToast';
 import { canAccess } from '@/utils/roleAccess';
 import { hasPlanFeature } from '@/utils/planAccess';
+import { zonedDayStartIso, zonedDayEndIso } from '@/utils/datetime';
 import PlanGate from '@/components/PlanGate.vue';
 
 const route = useRoute();
@@ -384,8 +385,8 @@ const lastReceiptAt = computed(() => receipts.value[0]?.receivedAt ?? null);
 
 const toIsoRange = (value: string, endOfDay: boolean) => {
     if (!value) return undefined;
-    const suffix = endOfDay ? 'T23:59:59.999' : 'T00:00:00';
-    return new Date(`${value}${suffix}`).toISOString();
+    const timeZone = storeContext.currentStore?.timezone || 'Asia/Manila';
+    return endOfDay ? zonedDayEndIso(value, timeZone) : zonedDayStartIso(value, timeZone);
 };
 
 const loadSupplier = async () => {

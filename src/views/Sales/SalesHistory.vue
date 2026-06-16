@@ -316,6 +316,7 @@ import { useStoreContextStore } from '@/stores/storeContext';
 import { useUserContextStore } from '@/stores/userContext';
 import { canAccess } from '@/utils/roleAccess';
 import { hasPlanFeature } from '@/utils/planAccess';
+import { zonedDayStartIso, zonedDayEndIso } from '@/utils/datetime';
 
 const router = useRouter();
 const route = useRoute();
@@ -599,8 +600,9 @@ const loadSales = async () => {
 
     isLoading.value = true;
     try {
-        const fromValue = new Date(`${fromDate.value}T00:00:00`).toISOString();
-        const toValue = new Date(`${toDate.value}T23:59:59.999`).toISOString();
+        const timeZone = storeContext.currentStore?.timezone || 'Asia/Manila';
+        const fromValue = zonedDayStartIso(fromDate.value, timeZone);
+        const toValue = zonedDayEndIso(toDate.value, timeZone);
         const data = await listSales(storeId, {
             status: statusFilter.value === 'ALL' ? undefined : statusFilter.value,
             from: fromValue,

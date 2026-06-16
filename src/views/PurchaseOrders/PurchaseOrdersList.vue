@@ -186,6 +186,7 @@ import { listPurchaseOrders, PurchaseOrderSummary } from '@/api/purchaseOrders';
 import { listSuppliers, Supplier } from '@/api/suppliers';
 import { useStoreContextStore } from '@/stores/storeContext';
 import { hasPlanFeature } from '@/utils/planAccess';
+import { zonedDayStartIso, zonedDayEndIso } from '@/utils/datetime';
 import PlanGate from '@/components/PlanGate.vue';
 
 const router = useRouter();
@@ -245,8 +246,9 @@ const loadOrders = async () => {
     if (!storeId) { purchaseOrders.value = []; totalCount.value = 0; openCountValue.value = 0; receivedCountValue.value = 0; return; }
     isLoading.value = true;
     try {
-        const fromValue = fromDate.value ? new Date(`${fromDate.value}T00:00:00`).toISOString() : undefined;
-        const toValue = toDate.value ? new Date(`${toDate.value}T23:59:59.999`).toISOString() : undefined;
+        const timeZone = storeContext.currentStore?.timezone || 'Asia/Manila';
+        const fromValue = fromDate.value ? zonedDayStartIso(fromDate.value, timeZone) : undefined;
+        const toValue = toDate.value ? zonedDayEndIso(toDate.value, timeZone) : undefined;
         const data = await listPurchaseOrders(storeId, {
             status: statusFilter.value === 'ALL' ? undefined : statusFilter.value,
             supplierId: supplierFilter.value || undefined,
