@@ -1814,8 +1814,13 @@ const saveGoal = async () => {
 @media (max-width: 640px) {
     .ds-page { padding: 0.75rem 0.75rem 2rem; }
     .ds-header { flex-wrap: wrap; }
-    /* Let the action buttons wrap within the viewport instead of overflowing the edge. */
-    .ds-header-actions { flex-wrap: wrap; width: 100%; }
+    /* Goal + Import/Export share the first row; Add Entry stretches full-width below. */
+    .ds-header-actions { flex-wrap: wrap; width: 100%; align-items: stretch; }
+    .ds-header-actions > .secondary-button,
+    .ds-header-actions > .csv-menu { flex: 1 1 0; min-width: 0; }
+    .ds-header-actions > .secondary-button { justify-content: center; }
+    .ds-header-actions :deep(.csv-menu__trigger) { width: 100%; justify-content: center; }
+    .ds-header-actions > .primary-button { flex: 1 0 100%; justify-content: center; }
     .ds-table-wrap { display: none; }
     .ds-cards { display: flex; flex-direction: column; gap: 0.65rem; }
 }
