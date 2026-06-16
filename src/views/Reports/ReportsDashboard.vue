@@ -777,6 +777,7 @@ const employeePaymentMethods = computed(() => {
 });
 const canViewReports = computed(() => canAccess(storeContext.currentStore?.role, 'reports'));
 const isSingleDay = computed(() => filters.from === filters.to);
+
 const canUseIngredients = computed(() => hasPlanFeature(userContext.planTier, 'ingredients'));
 const canUsePurchaseOrders = computed(() => hasPlanFeature(userContext.planTier, 'purchaseOrders'));
 const canUseExpenses = computed(() => hasPlanFeature(userContext.planTier, 'expenses'));

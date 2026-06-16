@@ -125,6 +125,15 @@
                                     <mdicon name="lock" size="14" class="lock-icon" />
                                 </button>
                                 <RouterLink
+                                    v-if="canViewAi"
+                                    :to="`/stores/${currentStoreId}/ai-insights`"
+                                    class="topnav__dropdown-item"
+                                    @click="closeMore"
+                                >
+                                    <mdicon name="robot-happy-outline" size="18" />
+                                    <span>AI Insights</span>
+                                </RouterLink>
+                                <RouterLink
                                     v-if="canViewSettings"
                                     :to="`/stores/${currentStoreId}/settings`"
                                     class="topnav__dropdown-item"
@@ -308,6 +317,9 @@
                     <RouterLink v-if="canViewExpenses && !isExpensesLocked" :to="`/stores/${currentStoreId}/expenses`" class="topnav__mobile-item" @click="closeMobileMenu">
                         <mdicon name="cash-minus" size="20" /><span>Expenses</span>
                     </RouterLink>
+                    <RouterLink v-if="canViewAi" :to="`/stores/${currentStoreId}/ai-insights`" class="topnav__mobile-item" @click="closeMobileMenu">
+                        <mdicon name="robot-happy-outline" size="20" /><span>AI Insights</span>
+                    </RouterLink>
                     <RouterLink v-if="canViewSettings" :to="`/stores/${currentStoreId}/settings`" class="topnav__mobile-item" @click="closeMobileMenu">
                         <mdicon name="cog" size="20" /><span>Settings</span>
                     </RouterLink>
@@ -405,6 +417,12 @@ const canViewPurchaseOrders = computed(() => canAccess(storeContext.currentStore
 const canViewSuppliers = computed(() => canAccess(storeContext.currentStore?.role, 'purchaseOrders'));
 const canViewPos = computed(() => !isWarehouse.value && canAccess(storeContext.currentStore?.role, 'salesPos'));
 const canViewReports = computed(() => canAccess(storeContext.currentStore?.role, 'reports'));
+// AI Insights: owner/admin (summary + chat) or inventory manager (reorder), once AI is configured.
+const canViewAi = computed(
+    () =>
+        ['OWNER', 'ADMIN', 'INVENTORY_MANAGER'].includes(storeContext.currentStore?.role ?? '') &&
+        !!storeContext.currentStore?.aiApiKeySet
+);
 const canViewSettings = computed(() => canAccess(storeContext.currentStore?.role, 'storeSettings'));
 const canViewDailySales = computed(() =>
     userContext.features.includes('DAILY_SALES') &&

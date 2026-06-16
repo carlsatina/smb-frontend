@@ -20,6 +20,7 @@ import PurchaseReceiptsList from '@/views/PurchaseOrders/PurchaseReceiptsList.vu
 import SupplierDetail from '@/views/PurchaseOrders/SupplierDetail.vue'
 import SuppliersList from '@/views/PurchaseOrders/SuppliersList.vue'
 import ReportsDashboard from '@/views/Reports/ReportsDashboard.vue'
+import AiInsights from '@/views/AI/AiInsights.vue'
 import ExpensesList from '@/views/Expenses/ExpensesList.vue'
 import DailySalesView from '@/views/Sales/DailySalesView.vue'
 import { useStoreContextStore } from '@/stores/storeContext'
@@ -172,6 +173,12 @@ const routes: Array<RouteRecordRaw> = [
     name: 'reports',
     component: ReportsDashboard,
     meta: { requiresAuth: true, feature: 'reports' }
+  },
+  {
+    path: '/stores/:storeId/ai-insights',
+    name: 'ai-insights',
+    component: AiInsights,
+    meta: { requiresAuth: true }
   },
   {
     path: '/stores/:storeId/expenses',
