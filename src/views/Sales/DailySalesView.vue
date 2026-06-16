@@ -1814,6 +1814,8 @@ const saveGoal = async () => {
 @media (max-width: 640px) {
     .ds-page { padding: 0.75rem 0.75rem 2rem; }
     .ds-header { flex-wrap: wrap; }
+    /* Let the action buttons wrap within the viewport instead of overflowing the edge. */
+    .ds-header-actions { flex-wrap: wrap; width: 100%; }
     .ds-table-wrap { display: none; }
     .ds-cards { display: flex; flex-direction: column; gap: 0.65rem; }
 }
