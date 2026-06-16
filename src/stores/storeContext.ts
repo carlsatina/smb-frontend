@@ -19,6 +19,10 @@ export type StoreSummary = {
     defaultDiscount: number;
     cashierSalesHistoryLimit: number | null;
     paymentMethods: string[];
+    aiProvider: 'OPENAI' | 'ANTHROPIC' | null;
+    aiModel: string | null;
+    aiApiKeySet: boolean;
+    aiApiKeyLast4: string | null;
     role: string;
     ownerPlanTier: PlanTier;
     ownerSubscriptionActive: boolean;

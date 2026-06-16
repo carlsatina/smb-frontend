@@ -43,6 +43,10 @@
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
                             Plan &amp; subscription
                         </button>
+                        <button class="st-sidebar-item" :class="{ 'is-active': activeSection === 'ai' }" @click="activeSection = 'ai'">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a2 2 0 0 1 2 2v1a3 3 0 0 1 3 3 3 3 0 0 1 0 6 3 3 0 0 1-3 3v1a2 2 0 0 1-4 0v-1a3 3 0 0 1-3-3 3 3 0 0 1 0-6 3 3 0 0 1 3-3V4a2 2 0 0 1 2-2z"/><path d="M9 12h6"/></svg>
+                            AI integration
+                        </button>
                     </div>
 
                     <div class="st-sidebar-group">
@@ -428,6 +432,90 @@
                             </template>
                         </section>
 
+                        <!-- ── AI integration ── -->
+                        <section v-if="activeSection === 'ai'" class="st-section">
+                            <div class="st-section-header">
+                                <h2 class="st-section-title">AI integration</h2>
+                                <p class="st-section-sub">Connect an AI provider for this store. Your API key is encrypted and never shown again after saving.</p>
+                            </div>
+                            <form class="st-form" @submit.prevent="saveAiSettings">
+                                <div class="st-form-grid">
+                                    <label class="st-field">
+                                        Provider
+                                        <select v-model="aiForm.aiProvider" :disabled="!canEdit" @change="onProviderChange">
+                                            <option :value="null">None (disabled)</option>
+                                            <option value="OPENAI">OpenAI</option>
+                                            <option value="ANTHROPIC">Anthropic (Claude)</option>
+                                        </select>
+                                    </label>
+                                    <label class="st-field">
+                                        Model
+                                        <input
+                                            v-if="customModelMode || !showModelDropdown"
+                                            v-model="aiForm.aiModel"
+                                            type="text"
+                                            :placeholder="aiModelPlaceholder"
+                                            :disabled="!canEdit || !aiForm.aiProvider"
+                                        />
+                                        <select v-else :value="aiForm.aiModel" :disabled="!canEdit || !aiForm.aiProvider" @change="onModelSelect">
+                                            <option value="">Provider default</option>
+                                            <option v-for="m in modelOptions" :key="m" :value="m">{{ m }}</option>
+                                            <option value="__custom__">Other (enter manually)…</option>
+                                        </select>
+                                        <span class="st-field-hint">
+                                            <template v-if="!aiForm.aiProvider">Select a provider first.</template>
+                                            <template v-else-if="customModelMode">
+                                                Enter a model ID.
+                                                <button v-if="canEdit" class="st-link-btn st-link-btn--muted" type="button" @click="customModelMode = false">Choose from list</button>
+                                            </template>
+                                            <template v-else-if="isLoadingModels">Loading available models…</template>
+                                            <template v-else-if="liveModelsApply">
+                                                Live list from your provider.
+                                                <button v-if="canEdit" class="st-link-btn st-link-btn--muted" type="button" @click="loadAiModels">Refresh</button>
+                                            </template>
+                                            <template v-else-if="hasCuratedModels">Common models. Save an API key to load the live list for your account.</template>
+                                            <template v-else>Optional. Save an API key to load the live model list.</template>
+                                        </span>
+                                    </label>
+                                </div>
+                                <label class="st-field">
+                                    API key
+                                    <input
+                                        v-model="aiForm.aiApiKey"
+                                        type="password"
+                                        autocomplete="new-password"
+                                        spellcheck="false"
+                                        :placeholder="currentStore?.aiApiKeySet ? 'Enter a new key to replace the saved one' : 'Paste your API key'"
+                                        :disabled="!canEdit || !aiForm.aiProvider"
+                                    />
+                                    <span v-if="currentStore?.aiApiKeySet" class="st-field-hint">
+                                        A key is saved (••••{{ currentStore.aiApiKeyLast4 }}). Leave blank to keep it.
+                                        <button v-if="canEdit" class="st-link-btn" type="button" @click="removeAiKey">Remove key</button>
+                                    </span>
+                                    <span v-else class="st-field-hint">No key saved yet.</span>
+                                </label>
+                                <div v-if="currentStore?.aiApiKeySet" class="st-ai-test">
+                                    <button class="st-btn-ghost" type="button" :disabled="isTesting || isAiSaving" @click="testAiConnection">
+                                        {{ isTesting ? 'Testing…' : 'Test connection' }}
+                                    </button>
+                                    <span v-if="aiTestResult?.ok" class="st-ai-test-result st-ai-test-result--ok">
+                                        ✓ Connected{{ aiTestResult.model ? ` to ${aiTestResult.model}` : '' }} ({{ aiTestResult.latencyMs }} ms)
+                                    </span>
+                                    <span v-else-if="aiTestResult" class="st-ai-test-result st-ai-test-result--fail">
+                                        ✕ {{ aiTestResult.message }}
+                                    </span>
+                                    <span v-else class="st-field-hint">Validates the saved key with the provider. No tokens are used.</span>
+                                </div>
+                                <p v-if="!canEdit" class="st-permission-note">Your role is {{ currentStore?.role }}. Only owners or admins can edit settings.</p>
+                                <div class="st-form-footer">
+                                    <button class="st-btn-ghost" type="button" @click="syncAiForm">Reset changes</button>
+                                    <button class="st-btn-primary" type="submit" :disabled="!canEdit || isAiSaving">
+                                        {{ isAiSaving ? 'Saving…' : 'Save changes' }}
+                                    </button>
+                                </div>
+                            </form>
+                        </section>
+
                         <!-- ── Danger zone ── -->
                         <section v-if="activeSection === 'danger'" class="st-section">
                             <div class="st-section-header">
@@ -516,7 +604,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { deleteStore, updateStore } from '@/api/stores';
+import { deleteStore, updateStore, updateStoreAiSettings, testStoreAiConnection, listStoreAiModels, type AiProvider, type AiConnectionTestResult } from '@/api/stores';
 import { useToast } from '@/composables/useToast';
 import { useStoreContextStore } from '@/stores/storeContext';
 import { useUserContextStore } from '@/stores/userContext';
@@ -587,10 +675,62 @@ const allPaymentMethods = [
     { value: 'OTHER', label: 'Other' },
 ];
 
-const activeSection = ref<'profile' | 'payment' | 'catalog' | 'team' | 'plan' | 'danger'>('profile');
+const activeSection = ref<'profile' | 'payment' | 'catalog' | 'team' | 'plan' | 'ai' | 'danger'>('profile');
 
 const isSaving = ref(false);
 const isCatalogSaving = ref(false);
+const isAiSaving = ref(false);
+
+// AI integration form. The API key is write-only: it is never populated from the
+// server (only a "key set" flag + last 4 are returned), so this field stays blank
+// unless the user is entering a new key.
+const aiForm = reactive({
+    aiProvider: null as AiProvider | null,
+    aiModel: '' as string,
+    aiApiKey: '' as string,
+});
+const isTesting = ref(false);
+const aiTestResult = ref<AiConnectionTestResult | null>(null);
+const aiModels = ref<string[]>([]);
+const isLoadingModels = ref(false);
+
+const aiModelPlaceholder = computed(() => {
+    if (aiForm.aiProvider === 'ANTHROPIC') return 'e.g. claude-opus-4-8';
+    if (aiForm.aiProvider === 'OPENAI') return 'e.g. gpt-4o';
+    return 'Select a provider first';
+});
+
+// Curated fallback so the model field is a dropdown as soon as a provider is
+// picked — before any key is saved. The live list (below) supersedes this once a
+// key exists. Only Anthropic has a curated set (current, stable IDs); OpenAI is
+// live-only — its lineup changes too often to hardcode, so it falls back to a
+// free-text input until a key is saved and the live list loads.
+const CURATED_MODELS: Partial<Record<AiProvider, string[]>> = {
+    ANTHROPIC: ['claude-opus-4-8', 'claude-sonnet-4-6', 'claude-haiku-4-5', 'claude-opus-4-7', 'claude-opus-4-6'],
+};
+
+const customModelMode = ref(false);
+
+// True when the live list (which reflects the SAVED provider/key) applies to the
+// provider currently selected in the form.
+const liveModelsApply = computed(
+    () => aiModels.value.length > 0 && aiForm.aiProvider === (currentStore.value?.aiProvider ?? null)
+);
+
+const hasCuratedModels = computed(() => !!(aiForm.aiProvider && CURATED_MODELS[aiForm.aiProvider]?.length));
+
+// Show a dropdown when we have models to offer (live or curated); otherwise fall
+// back to free-text (e.g. OpenAI before a key is saved).
+const showModelDropdown = computed(() => liveModelsApply.value || hasCuratedModels.value);
+
+const modelOptions = computed(() => {
+    if (!aiForm.aiProvider) return [];
+    const base = liveModelsApply.value ? aiModels.value : (CURATED_MODELS[aiForm.aiProvider] ?? []);
+    const options = [...base];
+    // Keep a saved/custom model selectable even if it isn't in the list.
+    if (aiForm.aiModel && !options.includes(aiForm.aiModel)) options.unshift(aiForm.aiModel);
+    return options;
+});
 const isArchiving = ref(false);
 const newUnit = ref('');
 const newCategory = ref('');
@@ -661,6 +801,113 @@ const resetForm = () => {
     newUnit.value = '';
     newCategory.value = '';
     newExpenseCategory.value = '';
+    syncAiForm();
+};
+
+// Reloads the AI form from the current store. The API key field is always cleared
+// since the server never returns the stored key.
+const syncAiForm = () => {
+    aiForm.aiProvider = currentStore.value?.aiProvider ?? null;
+    aiForm.aiModel = currentStore.value?.aiModel ?? '';
+    aiForm.aiApiKey = '';
+    aiTestResult.value = null;
+    customModelMode.value = false;
+};
+
+// User picked an option in the model dropdown. The sentinel "__custom__" switches
+// to a free-text input for entering an arbitrary model ID.
+const onModelSelect = (event: Event) => {
+    const value = (event.target as HTMLSelectElement).value;
+    if (value === '__custom__') {
+        customModelMode.value = true;
+        aiForm.aiModel = '';
+    } else {
+        aiForm.aiModel = value;
+    }
+};
+
+// Switching provider invalidates the previously selected model and any test result.
+const onProviderChange = () => {
+    aiForm.aiModel = '';
+    customModelMode.value = false;
+    aiTestResult.value = null;
+};
+
+const saveAiSettings = async () => {
+    if (!currentStore.value || !canEdit.value) return;
+    isAiSaving.value = true;
+    try {
+        const payload: { aiProvider: AiProvider | null; aiModel: string | null; aiApiKey?: string } = {
+            aiProvider: aiForm.aiProvider,
+            aiModel: aiForm.aiModel.trim() || null,
+        };
+        // Only send the key when the user actually typed one, so saving other
+        // changes never wipes the stored key.
+        if (aiForm.aiApiKey.trim()) {
+            payload.aiApiKey = aiForm.aiApiKey.trim();
+        }
+        await updateStoreAiSettings(currentStore.value.id, payload);
+        await storeContext.fetchStores();
+        aiForm.aiApiKey = '';
+        showToast('AI settings updated.', 'success');
+        await loadAiModels();
+    } catch (error: any) {
+        const message = error?.body?.error?.message || 'Unable to update AI settings.';
+        showToast(message, 'error');
+    } finally {
+        isAiSaving.value = false;
+    }
+};
+
+const removeAiKey = async () => {
+    if (!currentStore.value || !canEdit.value) return;
+    isAiSaving.value = true;
+    try {
+        await updateStoreAiSettings(currentStore.value.id, { aiApiKey: null });
+        await storeContext.fetchStores();
+        aiForm.aiApiKey = '';
+        aiTestResult.value = null;
+        aiModels.value = [];
+        showToast('API key removed.', 'success');
+    } catch (error: any) {
+        const message = error?.body?.error?.message || 'Unable to remove API key.';
+        showToast(message, 'error');
+    } finally {
+        isAiSaving.value = false;
+    }
+};
+
+const testAiConnection = async () => {
+    if (!currentStore.value) return;
+    isTesting.value = true;
+    aiTestResult.value = null;
+    try {
+        aiTestResult.value = await testStoreAiConnection(currentStore.value.id);
+    } catch (error: any) {
+        const message = error?.body?.error?.message || 'Unable to test the connection.';
+        showToast(message, 'error');
+    } finally {
+        isTesting.value = false;
+    }
+};
+
+// Fetches the live model list for the saved provider/key. Silent on failure —
+// the UI just falls back to the free-text model input.
+const loadAiModels = async () => {
+    const store = currentStore.value;
+    if (!store?.aiApiKeySet || !store.aiProvider) {
+        aiModels.value = [];
+        return;
+    }
+    isLoadingModels.value = true;
+    try {
+        const result = await listStoreAiModels(store.id);
+        aiModels.value = result.ok ? result.models : [];
+    } catch {
+        aiModels.value = [];
+    } finally {
+        isLoadingModels.value = false;
+    }
 };
 
 // Catalog defaults persist immediately on add/remove (no separate save step).
@@ -1110,13 +1357,14 @@ onMounted(async () => {
 
     // Support deep-linking via ?section=team etc.
     const qs = route.query.section as string | undefined;
-    if (qs && ['profile', 'payment', 'catalog', 'team', 'plan', 'danger'].includes(qs)) {
+    if (qs && ['profile', 'payment', 'catalog', 'team', 'plan', 'ai', 'danger'].includes(qs)) {
         activeSection.value = qs as typeof activeSection.value;
     }
 
     await Promise.all([loadCurrentUser(), userContext.fetchMe()]);
 
     if (activeSection.value === 'team') await loadTeam();
+    if (activeSection.value === 'ai') await loadAiModels();
 });
 
 watch(
@@ -1133,6 +1381,7 @@ watch(
 
 watch(activeSection, async (section) => {
     if (section === 'team' && !isTeamLoaded.value) await loadTeam();
+    if (section === 'ai' && !aiModels.value.length) await loadAiModels();
 });
 
 watch(
@@ -1562,6 +1811,51 @@ watch(
     color: #94a3b8;
     text-transform: none;
     letter-spacing: 0;
+}
+
+.st-link-btn {
+    background: none;
+    border: none;
+    padding: 0;
+    margin-left: 0.4rem;
+    font: inherit;
+    font-size: 0.72rem;
+    color: #ef4444;
+    cursor: pointer;
+    text-decoration: underline;
+}
+
+.st-link-btn:hover {
+    color: #dc2626;
+}
+
+.st-link-btn--muted {
+    color: var(--c-accent);
+}
+
+.st-link-btn--muted:hover {
+    color: var(--c-accent-dark);
+}
+
+.st-ai-test {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-top: 0.25rem;
+}
+
+.st-ai-test-result {
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+.st-ai-test-result--ok {
+    color: #16a34a;
+}
+
+.st-ai-test-result--fail {
+    color: #dc2626;
 }
 
 /* ── Toggle ── */
