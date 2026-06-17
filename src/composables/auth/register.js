@@ -10,6 +10,11 @@ const register = async(userInfo) => {
             password: userInfo.password,
             fullName: userInfo.full_name || userInfo.fullName || ''
         }
+        // When registering to accept a store invite, forward the token so the
+        // backend creates the account already email-verified (no verify email).
+        if (userInfo.inviteToken) {
+            payload.inviteToken = userInfo.inviteToken
+        }
         const reqOptions = {
             method: "POST",
             headers: {"Content-Type":"application/json"},

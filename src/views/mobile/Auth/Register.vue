@@ -135,7 +135,8 @@ export default {
             contact_number: '',
             email: '',
             password: '',
-            verifyPassword: ''
+            verifyPassword: '',
+            inviteToken: ''
         })
         const errorMsg = ref({email: '', password: ''})
         const hasError = ref(false)
@@ -144,15 +145,17 @@ export default {
         onMounted(() => {
             if (typeof route.query.email === 'string' && route.query.email) {
                 userInfo.value.email = route.query.email
-            } else {
-                try {
-                    const pending = sessionStorage.getItem('pendingInvite')
-                    if (pending) {
-                        const { email } = JSON.parse(pending)
-                        if (email) userInfo.value.email = email
-                    }
-                } catch { /* ignore */ }
             }
+            // Always pull the invite token (and email fallback) from a pending invite
+            // so the account is created already email-verified.
+            try {
+                const pending = sessionStorage.getItem('pendingInvite')
+                if (pending) {
+                    const { email, token } = JSON.parse(pending)
+                    if (!userInfo.value.email && email) userInfo.value.email = email
+                    if (token) userInfo.value.inviteToken = token
+                }
+            } catch { /* ignore */ }
         })
 
         const handleRegister = async() => {
