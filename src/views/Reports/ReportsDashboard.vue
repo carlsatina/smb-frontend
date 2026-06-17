@@ -55,6 +55,12 @@
                                                 :class="{ active: activeRange === 'LAST_30' }"
                                                 @click="applyQuickRange('LAST_30')"
                                             >Last 30 days</button>
+                                            <button
+                                                type="button"
+                                                class="date-popover-quick-btn"
+                                                :class="{ active: activeRange === 'THIS_MONTH' }"
+                                                @click="applyQuickRange('THIS_MONTH')"
+                                            >This month</button>
                                         </div>
                                     </div>
                                     <div class="date-popover-divider"></div>
@@ -100,6 +106,15 @@
                             <mdicon name="cog-outline" size="18" />
                         </button>
                         <div v-if="showCardSettings" class="card-settings-dropdown">
+                            <div class="card-settings-header">KPI cards</div>
+                            <label
+                                v-for="card in KPI_CARDS"
+                                :key="card.id"
+                                class="card-settings-row"
+                            >
+                                <input type="checkbox" v-model="visibleCards[card.id]" />
+                                <span>{{ card.label }}</span>
+                            </label>
                             <div class="card-settings-header">Visible cards</div>
                             <label
                                 v-for="card in availableCards"
@@ -131,7 +146,7 @@
                     <span class="kpi-value">{{ salesSummary.orderCount }}</span>
                     <span class="kpi-sub">Finalized sales</span>
                 </div>
-                <div class="kpi-card kpi-card--avg">
+                <div v-if="visibleCards['kpi-avg']" class="kpi-card kpi-card--avg">
                     <div class="kpi-head">
                         <span class="kpi-icon"><mdicon name="chart-line-variant" size="18" /></span>
                         <span class="kpi-label">Avg order</span>
@@ -147,7 +162,7 @@
                     <span class="kpi-value">{{ formatMoney(salesSummary.discounts) }}</span>
                     <span class="kpi-sub">Gross {{ formatMoney(salesSummary.grossSales) }}</span>
                 </div>
-                <div class="kpi-card kpi-card--voids">
+                <div v-if="visibleCards['kpi-voids']" class="kpi-card kpi-card--voids">
                     <div class="kpi-head">
                         <span class="kpi-icon"><mdicon name="close-circle-outline" size="18" /></span>
                         <span class="kpi-label">Voids</span>
@@ -737,7 +752,7 @@ const filters = reactive({
     to: defaultTo,
 });
 
-const activeRange = ref<'TODAY' | 'LAST_7' | 'LAST_30' | null>('TODAY');
+const activeRange = ref<'TODAY' | 'LAST_7' | 'LAST_30' | 'THIS_MONTH' | null>('TODAY');
 const isSettingRange = ref(false);
 
 const isLoading = ref(false);
@@ -796,6 +811,11 @@ const REPORT_CARDS: { id: string; label: string; planFeature?: PlanFeature }[] =
     { id: 'employee-sales',     label: 'Employee sales' },
 ];
 
+const KPI_CARDS: { id: string; label: string }[] = [
+    { id: 'kpi-avg',   label: 'Avg order' },
+    { id: 'kpi-voids', label: 'Voids' },
+];
+
 const STORAGE_KEY = 'reports_card_visibility';
 
 const loadVisibility = (): Record<string, boolean> => {
@@ -807,9 +827,11 @@ const loadVisibility = (): Record<string, boolean> => {
 };
 
 const savedVisibility = loadVisibility();
-const visibleCards = reactive<Record<string, boolean>>(
-    Object.fromEntries(REPORT_CARDS.map(({ id }) => [id, savedVisibility[id] ?? true]))
-);
+const visibleCards = reactive<Record<string, boolean>>({
+    ...Object.fromEntries(REPORT_CARDS.map(({ id }) => [id, savedVisibility[id] ?? true])),
+    // KPI cards default to hidden.
+    ...Object.fromEntries(KPI_CARDS.map(({ id }) => [id, savedVisibility[id] ?? false])),
+});
 
 const availableCards = computed(() =>
     REPORT_CARDS.filter(c => !c.planFeature || hasPlanFeature(userContext.planTier, c.planFeature))
@@ -838,7 +860,7 @@ const toggleDatePopover = () => {
 
 const closeDatePopover = () => { showDatePopover.value = false; };
 
-const applyQuickRange = async (range: 'TODAY' | 'LAST_7' | 'LAST_30') => {
+const applyQuickRange = async (range: 'TODAY' | 'LAST_7' | 'LAST_30' | 'THIS_MONTH') => {
     closeDatePopover();
     await setQuickRange(range);
 };
@@ -855,6 +877,25 @@ const applyCustomRange = () => {
 };
 
 const traverseRange = (direction: 1 | -1) => {
+    // In month mode, navigate whole calendar months instead of shifting by day count.
+    if (activeRange.value === 'THIS_MONTH') {
+        const fromDate = new Date(filters.from + 'T00:00:00');
+        const now = new Date();
+        const target = new Date(fromDate.getFullYear(), fromDate.getMonth() + direction, 1);
+        // Don't navigate into future months.
+        if (target.getFullYear() > now.getFullYear() ||
+            (target.getFullYear() === now.getFullYear() && target.getMonth() > now.getMonth())) {
+            return;
+        }
+        const isCurrentMonth =
+            target.getFullYear() === now.getFullYear() && target.getMonth() === now.getMonth();
+        const end = isCurrentMonth ? now : new Date(target.getFullYear(), target.getMonth() + 1, 0);
+        isSettingRange.value = true;
+        filters.from = buildDateInput(target);
+        filters.to = buildDateInput(end);
+        nextTick(() => { isSettingRange.value = false; });
+        return;
+    }
     const MS_PER_DAY = 86400000;
     const fromDate = new Date(filters.from + 'T00:00:00');
     const toDate = new Date(filters.to + 'T00:00:00');
@@ -1004,6 +1045,12 @@ const rangeLabel = computed(() => {
     if (activeRange.value === 'TODAY') return 'Today';
     if (activeRange.value === 'LAST_7') return 'Last 7 days';
     if (activeRange.value === 'LAST_30') return 'Last 30 days';
+    if (activeRange.value === 'THIS_MONTH') {
+        const d = new Date(filters.from + 'T00:00:00');
+        const now = new Date();
+        if (d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()) return 'This month';
+        return d.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+    }
     if (filters.from === filters.to) return formatDateShort(filters.from);
     return `${formatDateShort(filters.from)} – ${formatDateShort(filters.to)}`;
 });
@@ -1127,7 +1174,7 @@ const daypartSummary = computed(() => {
     });
 });
 
-const setQuickRange = async (range: 'TODAY' | 'LAST_7' | 'LAST_30') => {
+const setQuickRange = async (range: 'TODAY' | 'LAST_7' | 'LAST_30' | 'THIS_MONTH') => {
     const now = new Date();
     const to = buildDateInput(now);
     let from = to;
@@ -1136,6 +1183,9 @@ const setQuickRange = async (range: 'TODAY' | 'LAST_7' | 'LAST_30') => {
     }
     if (range === 'LAST_30') {
         from = buildDateInput(new Date(now.getTime() - 29 * 24 * 60 * 60 * 1000));
+    }
+    if (range === 'THIS_MONTH') {
+        from = buildDateInput(new Date(now.getFullYear(), now.getMonth(), 1));
     }
     isSettingRange.value = true;
     activeRange.value = range;
