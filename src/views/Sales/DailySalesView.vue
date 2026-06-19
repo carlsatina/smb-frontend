@@ -588,6 +588,7 @@
                             <input
                                 type="text" v-model="line.name"
                                 class="ds-input ds-bd-line-name" placeholder="Name"
+                                list="ds-expense-name-options"
                             />
                             <input
                                 type="number" v-model.number="line.amount"
@@ -595,6 +596,9 @@
                             />
                             <button class="ds-bd-remove" title="Remove" @click="removeBreakdownLine(i)">✕</button>
                         </div>
+                        <datalist id="ds-expense-name-options">
+                            <option v-for="name in expenseNameOptions" :key="name" :value="name" />
+                        </datalist>
                         <button class="ds-bd-addline" @click="addBreakdownLine">+ Add</button>
                     </template>
 
@@ -1454,6 +1458,14 @@ type BreakdownContext = 'display' | 'add' | 'edit';
 const RESTRICTED_BREAKDOWN_CATEGORIES = ['rent', 'salaries'];
 const isRestrictedExpenseCategory = (category: string) =>
     RESTRICTED_BREAKDOWN_CATEGORIES.includes(category.trim().toLowerCase());
+
+// Suggestions for the breakdown name field — the store's configured expense
+// categories, minus the restricted ones that can't be entered here.
+const expenseNameOptions = computed(() =>
+    (storeContext.currentStore?.expenseCategoryOptions ?? []).filter(
+        (c) => !isRestrictedExpenseCategory(c)
+    )
+);
 
 const breakdownModal = reactive({
     open: false,
