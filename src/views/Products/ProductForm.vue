@@ -220,6 +220,91 @@
                         </div>
                     </div>
 
+                    <div class="form-section">
+                        <div class="section-title-row">
+                            <div>
+                                <h2>Takeout packaging</h2>
+                                <p>Packaging deducted from inventory only when this product is sold as takeout.</p>
+                            </div>
+                        </div>
+                        <PlanGate
+                            v-if="!canEditPackaging"
+                            feature="ingredients"
+                            title="Packaging tracking needs ingredients."
+                            description="Upgrade to track packaging items as ingredients deducted on takeout."
+                        />
+                        <div v-else-if="!isEdit" class="recipe-empty">
+                            <p>Save the product first, then add its takeout packaging here.</p>
+                        </div>
+                        <div v-else class="recipe-editor">
+                            <div v-if="packagingLoading" class="panel-state">Loading packaging lines...</div>
+                            <div v-else>
+                                <div v-if="packagingError" class="form-alert form-alert--error">{{ packagingError }}</div>
+                                <div v-if="packagingSuccess" class="form-alert form-alert--success">Packaging saved.</div>
+
+                                <div v-if="packagingIngredients.length === 0" class="recipe-empty">
+                                    <p>No packaging ingredients yet. Create an ingredient in the <strong>Packaging</strong> category first.</p>
+                                </div>
+                                <template v-else>
+                                    <div v-if="packagingLines.length === 0" class="recipe-empty">
+                                        <p>No packaging yet. Click <strong>Add packaging</strong> to deduct items on takeout.</p>
+                                    </div>
+                                    <div v-else class="recipe-lines-list">
+                                        <div
+                                            v-for="(line, index) in packagingLines"
+                                            :key="line.key"
+                                            class="recipe-line-row"
+                                            :class="{ 'recipe-line-row--error': packagingLineError(line) }"
+                                        >
+                                            <SearchableSelect
+                                                :ref="setSelectRef(line.key)"
+                                                v-model="line.ingredientId"
+                                                class="recipe-line-select"
+                                                :options="packagingIngredientOptions(line)"
+                                                placeholder="Select packaging…"
+                                                search-placeholder="Search packaging…"
+                                            />
+                                            <div class="recipe-line-qty">
+                                                <input
+                                                    v-model.number="line.qtyPerUnit"
+                                                    type="number"
+                                                    step="0.01"
+                                                    min="0"
+                                                    class="recipe-line-input"
+                                                />
+                                                <span class="unit-badge">{{ ingredientMap.get(line.ingredientId)?.unit || 'unit' }} / item</span>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                class="recipe-line-remove"
+                                                @click="removePackagingLine(index)"
+                                                title="Remove"
+                                            >×</button>
+                                        </div>
+                                    </div>
+
+                                    <div class="recipe-footer">
+                                        <button
+                                            type="button"
+                                            class="add-ingredient-btn"
+                                            @click="addPackagingLine"
+                                        >
+                                            + Add packaging
+                                        </button>
+                                        <button
+                                            type="button"
+                                            class="primary-button"
+                                            :disabled="packagingSaving"
+                                            @click="savePackagingLines"
+                                        >
+                                            Save packaging
+                                        </button>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="form-actions">
                         <button type="button" class="ghost-button" @click="goBack">Cancel</button>
                         <button class="primary-button" type="submit" :disabled="saveDisabled">Save product</button>
@@ -339,6 +424,7 @@ import { listIngredients, IngredientCategory } from '@/api/ingredients';
 import { listStock, StockItem } from '@/api/inventory';
 import { createProduct, getProduct, updateProduct } from '@/api/products';
 import { listRecipeLines, updateRecipeLines } from '@/api/recipes';
+import { listPackagingLines, updatePackagingLines } from '@/api/productPackaging';
 import { useToast } from '@/composables/useToast';
 import { useStoreContextStore } from '@/stores/storeContext';
 import { useUserContextStore } from '@/stores/userContext';
@@ -360,6 +446,12 @@ type RecipeLineDraft = {
     key: string;
     ingredientId: string;
     qtyPerProductUnit: number;
+};
+
+type PackagingLineDraft = {
+    key: string;
+    ingredientId: string;
+    qtyPerUnit: number;
 };
 
 const router = useRouter();
@@ -395,6 +487,11 @@ const recipeLoading = ref(false);
 const recipeSaving = ref(false);
 const recipeError = ref('');
 const recipeSuccess = ref(false);
+const packagingLines = ref<PackagingLineDraft[]>([]);
+const packagingLoading = ref(false);
+const packagingSaving = ref(false);
+const packagingError = ref('');
+const packagingSuccess = ref(false);
 const ingredients = ref<IngredientOption[]>([]);
 const ingredientsLoading = ref(false);
 const ingredientStock = ref<StockItem[]>([]);
@@ -819,6 +916,113 @@ const saveRecipeLines = async () => {
     }
 };
 
+const packagingIngredients = computed(() =>
+    ingredients.value.filter((ingredient) => ingredient.category === 'PACKAGING')
+);
+
+const canEditPackaging = computed(() => planKnown.value && canUseIngredients.value);
+
+const packagingIngredientOptions = (line: PackagingLineDraft) => {
+    const selectedIds = new Set(packagingLines.value.map((item) => item.ingredientId).filter(Boolean));
+    return packagingIngredients.value
+        .filter((ingredient) => ingredient.id === line.ingredientId || !selectedIds.has(ingredient.id))
+        .map((ingredient) => ({
+            value: ingredient.id,
+            label: `${ingredient.name} (${ingredient.unit})`,
+        }));
+};
+
+const packagingLineError = (line: PackagingLineDraft) => {
+    if (!line.ingredientId) return 'Select a packaging item.';
+    if (!Number.isFinite(line.qtyPerUnit) || line.qtyPerUnit <= 0) {
+        return 'Quantity must be greater than zero.';
+    }
+    return '';
+};
+
+const loadPackagingLines = async () => {
+    if (!storeContext.currentStoreId || !productId.value || !canEditPackaging.value) {
+        packagingLines.value = [];
+        return;
+    }
+    packagingLoading.value = true;
+    packagingError.value = '';
+    packagingSuccess.value = false;
+    try {
+        const data = await listPackagingLines(storeContext.currentStoreId, productId.value);
+        packagingLines.value = data.lines.map((line) => ({
+            key: line.id || buildLineKey(),
+            ingredientId: line.ingredientId,
+            qtyPerUnit: Number(line.qtyPerUnit),
+        }));
+    } catch (error) {
+        packagingError.value = getErrorMessage(error) || 'Unable to load packaging lines.';
+    } finally {
+        packagingLoading.value = false;
+    }
+};
+
+const addPackagingLine = () => {
+    const key = buildLineKey();
+    packagingLines.value.push({
+        key,
+        ingredientId: '',
+        qtyPerUnit: 1,
+    });
+    nextTick(() => selectInstances.get(key)?.open());
+};
+
+const removePackagingLine = (index: number) => {
+    packagingLines.value.splice(index, 1);
+};
+
+const savePackagingLines = async () => {
+    if (!canEditPackaging.value) {
+        openPlanUpgradeModal('ingredients');
+        return;
+    }
+    if (!storeContext.currentStoreId || !productId.value) return;
+    packagingError.value = '';
+    packagingSuccess.value = false;
+
+    const trimmed = packagingLines.value.map((line) => ({
+        ingredientId: line.ingredientId,
+        qtyPerUnit: Number(line.qtyPerUnit),
+    }));
+
+    for (const line of trimmed) {
+        if (!line.ingredientId) {
+            packagingError.value = 'Each line needs a packaging item.';
+            return;
+        }
+        if (!Number.isFinite(line.qtyPerUnit) || line.qtyPerUnit <= 0) {
+            packagingError.value = 'Each line needs a positive quantity.';
+            return;
+        }
+    }
+
+    const ingredientIds = trimmed.map((line) => line.ingredientId);
+    if (new Set(ingredientIds).size !== ingredientIds.length) {
+        packagingError.value = 'Each packaging item can only appear once.';
+        return;
+    }
+
+    packagingSaving.value = true;
+    try {
+        const data = await updatePackagingLines(storeContext.currentStoreId, productId.value, trimmed);
+        packagingLines.value = data.lines.map((line) => ({
+            key: line.id || buildLineKey(),
+            ingredientId: line.ingredientId,
+            qtyPerUnit: Number(line.qtyPerUnit),
+        }));
+        packagingSuccess.value = true;
+    } catch (error) {
+        packagingError.value = getErrorMessage(error) || 'Unable to save packaging lines.';
+    } finally {
+        packagingSaving.value = false;
+    }
+};
+
 const openIngredientModal = () => {
     if (isRecipePlanLocked.value) {
         openPlanUpgradeModal('ingredients');
@@ -915,6 +1119,7 @@ onMounted(async () => {
     await loadIngredients();
     await loadIngredientStock();
     await loadRecipeLines();
+    await loadPackagingLines();
     if (!isEdit.value) {
         nextTick(() => productNameInputRef.value?.focus());
     }
@@ -974,6 +1179,7 @@ watch(
         await loadIngredients();
         await loadIngredientStock();
         await loadRecipeLines();
+        await loadPackagingLines();
     }
 );
 
@@ -982,6 +1188,7 @@ watch(
     async () => {
         await loadProduct();
         await loadRecipeLines();
+        await loadPackagingLines();
     }
 );
 </script>

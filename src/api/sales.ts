@@ -23,6 +23,7 @@ export type SaleSummary = {
     tax: number;
     total: number;
     paymentMethod: string;
+    orderType: string;
     createdAt: string;
     finalizedAt: string | null;
     voidedAt: string | null;
@@ -62,6 +63,7 @@ export type SaleDetail = {
     tax: number;
     total: number;
     paymentMethod: string;
+    orderType: string;
     createdAt: string;
     finalizedAt: string | null;
     voidedAt: string | null;
@@ -113,7 +115,7 @@ export const getSale = async (storeId: string, saleId: string) => {
 
 export const finalizeSale = async (
     storeId: string,
-    payload: { items: SaleItemInput[]; paymentMethod: string }
+    payload: { items: SaleItemInput[]; paymentMethod: string; orderType?: string }
 ) => {
     return apiClient.request<{ sale: SaleDetail }>(`/api/v1/stores/${storeId}/sales/finalize`, {
         method: 'POST',

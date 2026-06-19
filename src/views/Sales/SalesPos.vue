@@ -269,6 +269,20 @@
                     </div>
 
                     <div class="checkout-controls">
+                        <div class="order-type-toggle" role="group" aria-label="Order type">
+                            <button
+                                type="button"
+                                class="order-type-option"
+                                :class="{ 'order-type-option--active': orderType === 'DINE_IN' }"
+                                @click="orderType = 'DINE_IN'"
+                            >Dine-in</button>
+                            <button
+                                type="button"
+                                class="order-type-option"
+                                :class="{ 'order-type-option--active': orderType === 'TAKEOUT' }"
+                                @click="orderType = 'TAKEOUT'"
+                            >Takeout</button>
+                        </div>
                         <label class="select-field">
                             Payment method
                             <select v-model="paymentMethod">
@@ -353,6 +367,7 @@ watch(() => storeContext.currentStore?.paymentMethods, (methods) => {
     }
 }, { immediate: true });
 const discountEnabled = ref(false);
+const orderType = ref<'DINE_IN' | 'TAKEOUT'>('DINE_IN');
 const isLoading = ref(false);
 const isSubmitting = ref(false);
 
@@ -452,6 +467,7 @@ const removeItem = (productId: string) => {
 const clearCart = () => {
     cartItems.value = [];
     discountEnabled.value = true;
+    orderType.value = 'DINE_IN';
 };
 
 const goToSalesHistory = () => {
@@ -752,6 +768,7 @@ const finalizeTicket = async () => {
                 };
             }),
             paymentMethod: paymentMethod.value,
+            orderType: orderType.value,
         };
         const { sale } = await finalizeSale(storeId, payload);
         const receiptLabel = sale.receiptNumber ? `Receipt #${sale.receiptNumber}` : 'Sale finalized';
@@ -900,6 +917,18 @@ watch(
 .cart-panel {
     position: sticky;
     top: 1.5rem;
+    /* Cap to the viewport so the panel never grows past the screen; its inner
+       item list (.cart-list) becomes the only scrollable region. */
+    max-height: calc(100vh - 3rem);
+    overflow: hidden;
+}
+
+/* Header, summary, and checkout stay pinned; only the item list scrolls. */
+.cart-panel > .panel-header,
+.cart-panel > .cart-summary,
+.cart-panel > .checkout-controls,
+.cart-panel > .cart-empty {
+    flex-shrink: 0;
 }
 
 /* ============================================================
@@ -1321,6 +1350,14 @@ watch(
     display: flex;
     flex-direction: column;
     gap: 0.25rem;
+    /* Take the leftover vertical space and scroll within it. min-height: 0 is
+       required so this flex child is allowed to shrink below its content size. */
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    /* Breathing room so rows don't sit under the scrollbar. */
+    margin-right: -0.25rem;
+    padding-right: 0.25rem;
 }
 
 .cart-row {
@@ -1520,6 +1557,34 @@ watch(
     padding-top: 0.25rem;
 }
 
+.order-type-toggle {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.35rem;
+    padding: 0.25rem;
+    background: var(--c-border);
+    border-radius: 10px;
+}
+
+.order-type-option {
+    border: none;
+    border-radius: 8px;
+    padding: 0.55rem 0.5rem;
+    background: transparent;
+    color: var(--c-text);
+    font-size: 0.84rem;
+    font-weight: 600;
+    font-family: var(--app-font-sans);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+}
+
+.order-type-option--active {
+    background: white;
+    color: var(--c-accent);
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12);
+}
+
 .select-field {
     display: grid;
     gap: 0.4rem;
@@ -1704,6 +1769,18 @@ watch(
 
     .cart-panel {
         position: static;
+        /* Stacked layout: let the whole page scroll instead of trapping the
+           cart list in its own scroll region. */
+        max-height: none;
+        overflow: visible;
+    }
+
+    .cart-list {
+        overflow-y: visible;
+        flex: none;
+        min-height: 0;
+        margin-right: 0;
+        padding-right: 0;
     }
 }
 
