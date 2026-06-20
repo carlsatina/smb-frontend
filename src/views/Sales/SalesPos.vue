@@ -1,5 +1,5 @@
 <template>
-    <section class="pos-page">
+    <section ref="posPageRef" class="pos-page" :class="{ 'pos-page--fullscreen': isFullscreen }">
         <div class="pos-shell">
             <div class="pos-content">
                 <section class="pos-panel">
@@ -64,6 +64,15 @@
                                 {{ isRearranging ? 'Done' : 'Rearrange' }}
                             </button>
                             <button class="ghost-button" @click="goToSalesHistory">Sales history</button>
+                            <button
+                                class="ghost-button ghost-button--icon"
+                                :class="{ 'ghost-button--active': isFullscreen }"
+                                :title="isFullscreen ? 'Exit fullscreen' : 'Super fullscreen'"
+                                @click="toggleFullscreen"
+                            >
+                                <mdicon :name="isFullscreen ? 'fullscreen-exit' : 'fullscreen'" size="18" />
+                                <span>{{ isFullscreen ? 'Exit' : 'Fullscreen' }}</span>
+                            </button>
                         </div>
                     </div>
 
@@ -372,6 +381,25 @@ const isLoading = ref(false);
 const isSubmitting = ref(false);
 
 const displaySettingsRef = ref<HTMLDetailsElement | null>(null);
+
+const posPageRef = ref<HTMLElement | null>(null);
+const isFullscreen = ref(false);
+
+const toggleFullscreen = async () => {
+    try {
+        if (document.fullscreenElement) {
+            await document.exitFullscreen();
+        } else if (posPageRef.value) {
+            await posPageRef.value.requestFullscreen();
+        }
+    } catch (error) {
+        showToast('Fullscreen is not available in this browser.', 'error');
+    }
+};
+
+const handleFullscreenChange = () => {
+    isFullscreen.value = document.fullscreenElement === posPageRef.value;
+};
 
 const displaySettings = reactive<DisplaySettings>({
     showSku: false,
@@ -790,10 +818,15 @@ const handleDisplayClickOutside = (event: MouseEvent) => {
 
 onBeforeUnmount(() => {
     document.removeEventListener('click', handleDisplayClickOutside);
+    document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    if (document.fullscreenElement === posPageRef.value) {
+        document.exitFullscreen().catch(() => {});
+    }
 });
 
 onMounted(async () => {
     document.addEventListener('click', handleDisplayClickOutside);
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
     await storeContext.fetchStores();
     const routeStoreId = route.params.storeId as string | undefined;
     if (routeStoreId && routeStoreId !== storeContext.currentStoreId) {
@@ -1030,6 +1063,23 @@ watch(
     border-color: var(--c-accent);
     color: var(--c-accent-dark);
     background: var(--c-accent-soft);
+}
+
+.ghost-button--icon {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+/* ============================================================
+   FULLSCREEN
+============================================================ */
+.pos-page:fullscreen {
+    overflow-y: auto;
+}
+
+.pos-page--fullscreen {
+    overflow-y: auto;
 }
 
 /* ============================================================
