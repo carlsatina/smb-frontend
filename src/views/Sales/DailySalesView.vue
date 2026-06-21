@@ -125,9 +125,9 @@
                         </td>
                         <td>
                             <div class="ds-expense-cell">
-                                <span>{{ formatMoney(addForm.expenseDerived) }}</span>
-                                <button class="btn-expense-breakdown" title="Edit expense breakdown" @click="openAddBreakdown">
-                                    <mdicon name="format-list-bulleted" size="14" />
+                                <span>{{ formatMoney(addForm.expense) }}</span>
+                                <button class="btn-expense-breakdown" title="Manage expenses" @click="openAddBreakdown">
+                                    <mdicon name="plus" size="14" />
                                 </button>
                             </div>
                         </td>
@@ -213,12 +213,18 @@
                             <!-- Senior — always readonly -->
                             <td>{{ formatMoney(row.totalSenior) }}</td>
 
-                            <!-- Expense — read-only, driven by the itemized breakdown -->
+                            <!-- Expense — read-only; managed via the breakdown modal in row edit.
+                                 In view mode, owner/admin can click the value to see the breakdown. -->
                             <td>
                                 <div class="ds-expense-cell">
-                                    <span>{{ formatMoney(row.expense) }}</span>
-                                    <button class="btn-expense-breakdown" title="Edit expense breakdown" @click="openBreakdown(row)">
-                                        <mdicon name="format-list-bulleted" size="14" />
+                                    <button
+                                        v-if="inlineEdit.rowId !== row.id && !isCashierRole"
+                                        type="button" class="ds-expense-link" title="View expense breakdown"
+                                        @click="openBreakdown(row)"
+                                    >{{ formatMoney(row.expense) }}</button>
+                                    <span v-else>{{ formatMoney(inlineEdit.rowId === row.id ? inlineEdit.expense : row.expense) }}</span>
+                                    <button v-if="canWriteExpense && inlineEdit.rowId === row.id" class="btn-expense-breakdown" title="Manage expenses" @click="openBreakdown(row)">
+                                        <mdicon name="plus" size="14" />
                                     </button>
                                 </div>
                             </td>
@@ -258,7 +264,7 @@
                                     >{{ inlineEdit.saving ? '…' : 'Save' }}</button>
                                     <button class="btn btn-sm btn-outline-secondary" @click="cancelInlineEdit">Cancel</button>
                                 </template>
-                                <template v-else-if="!isCashierRole">
+                                <template v-else>
                                     <button
                                         class="btn btn-icon btn-warning-soft"
                                         title="Edit entry"
@@ -267,6 +273,7 @@
                                         <mdicon name="pencil" size="14" />
                                     </button>
                                     <button
+                                        v-if="!isCashierRole"
                                         class="btn btn-icon btn-danger-soft"
                                         title="Delete entry"
                                         @click="confirmDelete(row)"
@@ -334,9 +341,9 @@
                         <label class="ds-card-field">
                             <span class="ds-card-label">Expense</span>
                             <div class="ds-expense-cell">
-                                <span>{{ formatMoney(addForm.expenseDerived) }}</span>
-                                <button class="btn-expense-breakdown" title="Edit expense breakdown" @click="openAddBreakdown">
-                                    <mdicon name="format-list-bulleted" size="14" />
+                                <span>{{ formatMoney(addForm.expense) }}</span>
+                                <button class="btn-expense-breakdown" title="Manage expenses" @click="openAddBreakdown">
+                                    <mdicon name="plus" size="14" />
                                 </button>
                             </div>
                         </label>
@@ -399,9 +406,9 @@
                                 <div class="ds-card-field">
                                     <span class="ds-card-label">Expense</span>
                                     <div class="ds-expense-cell">
-                                        <span>{{ formatMoney(inlineEditExpense) }}</span>
-                                        <button class="btn-expense-breakdown" title="Edit expense breakdown" @click="openBreakdown(row)">
-                                            <mdicon name="format-list-bulleted" size="14" />
+                                        <span>{{ formatMoney(inlineEdit.expense) }}</span>
+                                        <button class="btn-expense-breakdown" title="Manage expenses" @click="openBreakdown(row)">
+                                            <mdicon name="plus" size="14" />
                                         </button>
                                     </div>
                                 </div>
@@ -435,9 +442,9 @@
                     <template v-else>
                         <div class="ds-card-header">
                             <span class="ds-card-date">{{ formatDate(row.date) }}</span>
-                            <div v-if="!isCashierRole" class="ds-card-header-actions">
+                            <div class="ds-card-header-actions">
                                 <button class="btn btn-icon btn-warning-soft" @click="openInlineEdit(row)"><mdicon name="pencil" size="14" /></button>
-                                <button class="btn btn-icon btn-danger-soft" @click="confirmDelete(row)"><mdicon name="close" size="14" /></button>
+                                <button v-if="!isCashierRole" class="btn btn-icon btn-danger-soft" @click="confirmDelete(row)"><mdicon name="close" size="14" /></button>
                             </div>
                         </div>
                         <div class="ds-card-body">
@@ -462,10 +469,12 @@
                                 <div class="ds-card-field">
                                     <span class="ds-card-label">Expense</span>
                                     <div class="ds-expense-cell">
-                                        <span>{{ formatMoney(row.expense) }}</span>
-                                        <button class="btn-expense-breakdown" title="Expense breakdown" @click="openBreakdown(row)">
-                                            <mdicon name="format-list-bulleted" size="14" />
-                                        </button>
+                                        <button
+                                            v-if="!isCashierRole"
+                                            type="button" class="ds-expense-link" title="View expense breakdown"
+                                            @click="openBreakdown(row)"
+                                        >{{ formatMoney(row.expense) }}</button>
+                                        <span v-else>{{ formatMoney(row.expense) }}</span>
                                     </div>
                                 </div>
                             </div>
@@ -572,46 +581,37 @@
             @update:show="deleteModal.show = $event"
         />
 
-        <!-- Expense breakdown modal — editable Name + amount line items for the day -->
+        <!-- Expenses modal — the day's DAILY_SALES expenses as editable lines
+             (add / edit / delete). Saving applies the changes and keeps the day's
+             stored Expense total in sync. Expenses created from the Expenses menu
+             are never shown here. -->
         <div v-if="breakdownModal.open" class="ds-modal-backdrop" @click.self="breakdownModal.open = false">
             <div class="ds-modal ds-modal--wide">
                 <div class="ds-bd-head">
-                    <h3>Expense Breakdown — {{ breakdownModal.dateLabel }}</h3>
+                    <h3>Expenses — {{ breakdownModal.dateLabel }}</h3>
                     <button class="ds-bd-close" title="Close" @click="breakdownModal.open = false">✕</button>
                 </div>
 
+                <p class="ds-bd-note">Edit an amount or name to correct it, or remove a line. Changes update this date's expense total.</p>
+
                 <div v-if="breakdownModal.loading" class="ds-bd-empty">Loading…</div>
                 <template v-else>
-                    <!-- Editable lines (write roles) -->
-                    <template v-if="canWriteExpense">
-                        <div v-for="(line, i) in breakdownModal.lines" :key="i" class="ds-bd-line">
-                            <input
-                                type="text" v-model="line.name"
-                                class="ds-input ds-bd-line-name" placeholder="Name"
-                                list="ds-expense-name-options"
-                            />
-                            <input
-                                type="number" v-model.number="line.amount"
-                                class="ds-input ds-bd-line-amount" min="0" step="0.01" placeholder="0"
-                            />
-                            <button class="ds-bd-remove" title="Remove" @click="removeBreakdownLine(i)">✕</button>
-                        </div>
-                        <datalist id="ds-expense-name-options">
-                            <option v-for="name in expenseNameOptions" :key="name" :value="name" />
-                        </datalist>
-                        <button class="ds-bd-addline" @click="addBreakdownLine">+ Add</button>
-                    </template>
-
-                    <!-- Read-only list (view-only roles) -->
-                    <template v-else>
-                        <template v-if="breakdownModal.lines.length">
-                            <div v-for="(line, i) in breakdownModal.lines" :key="i" class="ds-bd-line ds-bd-line--ro">
-                                <span class="ds-bd-cat">{{ line.name }}</span>
-                                <span class="ds-bd-num">{{ formatMoney(Number(line.amount) || 0) }}</span>
-                            </div>
-                        </template>
-                        <div v-else class="ds-bd-empty">No itemized expenses recorded for this day.</div>
-                    </template>
+                    <div v-for="(line, i) in breakdownModal.lines" :key="line.id ?? `new-${i}`" class="ds-bd-line">
+                        <input
+                            type="text" v-model="line.name"
+                            class="ds-input ds-bd-line-name" placeholder="Name"
+                            list="ds-expense-name-options"
+                        />
+                        <input
+                            type="number" v-model.number="line.amount"
+                            class="ds-input ds-bd-line-amount" min="0" step="0.01" placeholder="0"
+                        />
+                        <button class="ds-bd-remove" title="Remove" @click="removeBreakdownLine(i)">✕</button>
+                    </div>
+                    <datalist id="ds-expense-name-options">
+                        <option v-for="name in expenseNameOptions" :key="name" :value="name" />
+                    </datalist>
+                    <button class="ds-bd-addline" @click="addBreakdownLine">+ Add</button>
 
                     <div class="ds-bd-total">
                         <span>Total</span>
@@ -622,14 +622,10 @@
                 </template>
 
                 <div class="ds-modal-actions">
-                    <template v-if="canWriteExpense">
-                        <button class="btn btn-secondary" :disabled="breakdownModal.saving" @click="clearBreakdownLines">Clear</button>
-                        <button class="btn btn-secondary" :disabled="breakdownModal.saving" @click="breakdownModal.open = false">Cancel</button>
-                        <button class="btn btn-primary" :disabled="breakdownModal.saving" @click="applyBreakdown">
-                            {{ breakdownModal.saving ? 'Applying…' : 'Apply' }}
-                        </button>
-                    </template>
-                    <button v-else class="btn btn-secondary" @click="breakdownModal.open = false">Close</button>
+                    <button class="btn btn-secondary" :disabled="breakdownModal.saving" @click="breakdownModal.open = false">Close</button>
+                    <button class="btn btn-primary" :disabled="breakdownModal.saving || breakdownModal.loading" @click="applyBreakdown">
+                        {{ breakdownModal.saving ? 'Saving…' : 'Save' }}
+                    </button>
                 </div>
             </div>
         </div>
@@ -838,8 +834,7 @@ const defaultDraft = (): CashierDraft => ({
 const isAdding = ref(false);
 const addForm = reactive({
     date: '',
-    expense: null as number | null,   // manual override; null = derive from itemized
-    expenseDerived: 0,                 // sum of that day's itemized expenses
+    expense: 0,                        // running expense total, added via the breakdown modal
     seniorTotal: 0,
     actualCoh: null as number | null,
     cashiers: {} as Record<string, CashierDraft>,
@@ -847,17 +842,6 @@ const addForm = reactive({
     posLoading: false,
     saving: false,
 });
-
-// Normalize an override input: empty (cleared) ⇒ null (derive); else the number.
-// v-model.number yields '' on an emptied field, and Number('') is 0, so guard explicitly.
-const normExpense = (v: number | string | null): number | null => {
-    if (v === null || v === undefined || v === '') return null;
-    const n = Number(v);
-    return Number.isFinite(n) ? n : null;
-};
-
-// Effective add-form expense: override if set, else derived.
-const addExpense = computed(() => normExpense(addForm.expense) ?? addForm.expenseDerived);
 
 const todayStr = () => {
     const tz = storeTimezone.value;
@@ -873,8 +857,7 @@ const startAdding = () => {
     const draft: Record<string, CashierDraft> = {};
     cashierMembers.value.forEach((m) => { draft[m.userId] = defaultDraft(); });
     addForm.date = todayStr();
-    addForm.expense = null;
-    addForm.expenseDerived = 0;
+    addForm.expense = 0;
     addForm.seniorTotal = 0;
     addForm.actualCoh = null;
     addForm.cashiers = draft;
@@ -882,7 +865,6 @@ const startAdding = () => {
     addForm.saving = false;
     isAdding.value = true;
     fetchPos();
-    fetchDerivedExpense();
 };
 
 const cancelAdding = () => { isAdding.value = false; };
@@ -891,8 +873,7 @@ let posTimer: ReturnType<typeof setTimeout> | null = null;
 
 const onAddDateChange = () => {
     // Reset all entered values for the new date
-    addForm.expense = null;
-    addForm.expenseDerived = 0;
+    addForm.expense = 0;
     addForm.actualCoh = null;
     addForm.posTotal = 0;
     addForm.seniorTotal = 0;
@@ -901,7 +882,7 @@ const onAddDateChange = () => {
     });
 
     if (posTimer) clearTimeout(posTimer);
-    posTimer = setTimeout(() => { fetchPos(); fetchDerivedExpense(); }, 600);
+    posTimer = setTimeout(() => { fetchPos(); }, 600);
 };
 
 const fetchPos = async () => {
@@ -917,19 +898,6 @@ const fetchPos = async () => {
         addForm.seniorTotal = 0;
     } finally {
         addForm.posLoading = false;
-    }
-};
-
-// Sum of that day's itemized expenses (role-filtered by the backend) — the
-// default value for the Expense column unless manually overridden.
-const fetchDerivedExpense = async () => {
-    const storeId = storeContext.currentStoreId;
-    if (!storeId || !addForm.date) return;
-    try {
-        const res = await listExpenses(storeId, { from: addForm.date, to: addForm.date });
-        addForm.expenseDerived = res.expenses.reduce((s, e) => s + Number(e.amount || 0), 0);
-    } catch {
-        addForm.expenseDerived = 0;
     }
 };
 
@@ -951,7 +919,7 @@ const addTotalGcash = computed(() =>
 );
 
 const addTotalSales = computed(() =>
-    addTotalCoh.value + addTotalGcash.value + addForm.seniorTotal + addExpense.value
+    addTotalCoh.value + addTotalGcash.value + addForm.seniorTotal + addForm.expense
 );
 
 const addActualCohVal = computed(() =>
@@ -972,7 +940,7 @@ const saveAddRow = async () => {
     try {
         const result = await createDailySalesEntry(storeId, {
             date: addForm.date,
-            expense: null,   // always derived from the itemized breakdown
+            expense: addForm.expense,   // running total built from the add-expense modal
             actualCoh: addForm.actualCoh,
         });
         const entryId = (result as { entry: { id: string } }).entry.id;
@@ -1010,14 +978,11 @@ const saveAddRow = async () => {
 // ── Inline edit (existing rows) ──────────────────────────────
 const inlineEdit = reactive({
     rowId: null as string | null,
-    expense: null as number | null,   // manual override; null = derive from itemized
-    expenseDerived: 0,
+    expense: 0,                        // running expense total, added via the breakdown modal
     actualCoh: null as number | null,
     cashiers: {} as Record<string, CashierDraft>,
     saving: false,
 });
-
-const inlineEditExpense = computed(() => normExpense(inlineEdit.expense) ?? inlineEdit.expenseDerived);
 
 const openInlineEdit = (row: DailySalesRow) => {
     const draft: Record<string, CashierDraft> = {};
@@ -1037,8 +1002,7 @@ const openInlineEdit = (row: DailySalesRow) => {
             : defaultDraft();
     });
     inlineEdit.rowId = row.id;
-    inlineEdit.expense = row.expenseOverride;   // null when derived
-    inlineEdit.expenseDerived = row.expenseDerived;
+    inlineEdit.expense = row.expense;
     inlineEdit.actualCoh = row.actualCoh;
     inlineEdit.cashiers = draft;
     inlineEdit.saving = false;
@@ -1067,7 +1031,7 @@ const inlineEditKulangRemit = computed(() => inlineEditTotalCoh.value - inlineEd
 
 const inlineEditTotalSales = computed(() => {
     const row = rows.value.find(r => r.id === inlineEdit.rowId);
-    return inlineEditTotalCoh.value + inlineEditTotalGcash.value + (row?.totalSenior ?? 0) + inlineEditExpense.value;
+    return inlineEditTotalCoh.value + inlineEditTotalGcash.value + (row?.totalSenior ?? 0) + inlineEdit.expense;
 });
 
 const openInlineEditDenomModal = (m: StoreMember) => {
@@ -1085,7 +1049,7 @@ const saveInlineEdit = async () => {
     const entryId = inlineEdit.rowId;
     try {
         await updateDailySalesEntry(storeId, entryId, {
-            expense: null,   // always derived from the itemized breakdown
+            expense: inlineEdit.expense,   // running total built from the add-expense modal
             actualCoh: inlineEdit.actualCoh,
         });
         const cashierSaves = cashierMembers.value.map((m) => {
@@ -1393,7 +1357,7 @@ const confirmImport = async () => {
                 continue;
             }
 
-            // Blank Expense ⇒ null (derive from itemized); a value ⇒ manual override.
+            // Blank Expense ⇒ null (no expense / 0); a value ⇒ that exact day expense.
             const expenseRaw = expenseCol >= 0 ? (cells[expenseCol] ?? '').trim() : '';
             const expense = expenseRaw === '' ? null : toNum(expenseRaw);
             const actualCohRaw = actualCohCol >= 0 ? cells[actualCohCol] : '';
@@ -1444,11 +1408,12 @@ const confirmImport = async () => {
     }
 };
 
-// ── Expense breakdown modal ──────────────────────────────────
-// Editable Name + amount line items for a single day. Each line is backed by an
-// itemized Expense record (Name → category); the day's expense is the sum of
-// these records. Only records loaded into the modal (already role-filtered by
-// the backend) are touched on Apply, so restricted expenses are never disturbed.
+// ── Add-expense modal ────────────────────────────────────────
+// Add-only Name + amount line items for a single day. Each line creates an
+// itemized DAILY_SALES Expense record (Name → category). The modal lists the
+// day's existing DAILY_SALES expenses as editable lines (add / edit / delete) and
+// keeps the day's stored Expense total in sync with the net change on save.
+// Expenses created from the Expenses menu are never loaded here.
 type BreakdownLine = { id: string | null; name: string; amount: number | null };
 
 type BreakdownContext = 'display' | 'add' | 'edit';
@@ -1472,13 +1437,12 @@ const breakdownModal = reactive({
     dateLabel: '',
     dateKey: '',
     entryId: '',
-    hadOverride: false,
     context: 'display' as BreakdownContext,
     loading: false,
     saving: false,
     error: '',
     lines: [] as BreakdownLine[],
-    original: [] as Expense[],
+    existing: [] as Expense[],   // originals loaded for this date, used to diff on save
 });
 
 const breakdownTotal = computed(() =>
@@ -1494,58 +1458,63 @@ const removeBreakdownLine = (i: number) => {
     if (breakdownModal.lines.length === 0) breakdownModal.lines.push(blankLine());
 };
 
-const clearBreakdownLines = () => {
-    breakdownModal.lines = [blankLine()];
-};
-
-const openBreakdownCore = async (opts: {
-    dateKey: string;
-    dateLabel: string;
-    entryId: string;
-    hadOverride: boolean;
-    context: BreakdownContext;
-}) => {
+// Load the day's existing DAILY_SALES expenses into editable lines (and keep the
+// originals for diffing on save). Expenses created from the Expenses menu are
+// never surfaced here. Restricted categories are filtered defensively.
+const loadBreakdownExisting = async () => {
     const storeId = storeContext.currentStoreId;
-    if (!storeId || !opts.dateKey) return;
-    breakdownModal.open = true;
+    if (!storeId || !breakdownModal.dateKey) return;
     breakdownModal.loading = true;
-    breakdownModal.error = '';
-    breakdownModal.dateKey = opts.dateKey;
-    breakdownModal.dateLabel = opts.dateLabel;
-    breakdownModal.entryId = opts.entryId;
-    breakdownModal.hadOverride = opts.hadOverride;
-    breakdownModal.context = opts.context;
-    breakdownModal.lines = [];
-    breakdownModal.original = [];
     try {
-        const res = await listExpenses(storeId, { from: opts.dateKey, to: opts.dateKey });
-        // Hide Rent/Salaries from the breakdown for every role; excluding them
-        // from `original` too means the Apply diff never touches those records.
+        const res = await listExpenses(storeId, {
+            from: breakdownModal.dateKey,
+            to: breakdownModal.dateKey,
+            source: 'DAILY_SALES',
+        });
         const visible = res.expenses.filter((e) => !isRestrictedExpenseCategory(e.category));
-        breakdownModal.original = visible;
+        breakdownModal.existing = visible;
         breakdownModal.lines = visible.map((e) => ({
             id: e.id,
             name: e.category,
             amount: Number(e.amount),
         }));
-        if (breakdownModal.lines.length === 0 && canWriteExpense.value) {
-            breakdownModal.lines.push(blankLine());
-        }
+        if (breakdownModal.lines.length === 0) breakdownModal.lines.push(blankLine());
     } catch {
-        breakdownModal.original = [];
-        breakdownModal.lines = canWriteExpense.value ? [blankLine()] : [];
+        breakdownModal.existing = [];
+        breakdownModal.lines = [blankLine()];
     } finally {
         breakdownModal.loading = false;
     }
 };
 
-// Saved row — read-only display, or edit context when its inline editor is open.
+const openBreakdownCore = (opts: {
+    dateKey: string;
+    dateLabel: string;
+    entryId: string;
+    context: BreakdownContext;
+}) => {
+    const storeId = storeContext.currentStoreId;
+    if (!storeId || !opts.dateKey) return;
+    // Lines are populated from the day's existing DAILY_SALES expenses (loaded below)
+    // so they can be edited or removed; "+ Add" appends new blank lines.
+    breakdownModal.open = true;
+    breakdownModal.error = '';
+    breakdownModal.saving = false;
+    breakdownModal.dateKey = opts.dateKey;
+    breakdownModal.dateLabel = opts.dateLabel;
+    breakdownModal.entryId = opts.entryId;
+    breakdownModal.context = opts.context;
+    breakdownModal.lines = [];
+    breakdownModal.existing = [];
+    loadBreakdownExisting();
+};
+
+// Saved row — display context, or edit context when its inline editor is open.
 const openBreakdown = (row: DailySalesRow) =>
     openBreakdownCore({
         dateKey: isoDateKey(row.date),
         dateLabel: formatDate(row.date),
         entryId: row.id,
-        hadOverride: row.expenseOverride != null,
         context: inlineEdit.rowId === row.id ? 'edit' : 'display',
     });
 
@@ -1556,7 +1525,6 @@ const openAddBreakdown = () => {
         dateKey: addForm.date,
         dateLabel: formatDate(addForm.date),
         entryId: '',
-        hadOverride: false,
         context: 'add',
     });
 };
@@ -1592,42 +1560,50 @@ const applyBreakdown = async () => {
     const keptIds = new Set(valid.filter((l) => l.id).map((l) => l.id as string));
     try {
         const ops: Promise<unknown>[] = [];
-        // Delete loaded records that are no longer present.
-        for (const orig of breakdownModal.original) {
+        // Delete originals the user removed.
+        for (const orig of breakdownModal.existing) {
             if (!keptIds.has(orig.id)) ops.push(deleteExpense(storeId, orig.id));
         }
-        // Create new lines / update changed ones.
+        // Create new lines / update changed ones (tagged DAILY_SALES).
         for (const l of valid) {
             if (!l.id) {
-                ops.push(createExpense(storeId, { date: breakdownModal.dateKey, amount: l.amount, category: l.name }));
+                ops.push(createExpense(storeId, {
+                    date: breakdownModal.dateKey,
+                    amount: l.amount,
+                    category: l.name,
+                    source: 'DAILY_SALES',
+                }));
             } else {
-                const orig = breakdownModal.original.find((o) => o.id === l.id);
+                const orig = breakdownModal.existing.find((o) => o.id === l.id);
                 if (orig && (orig.category !== l.name || Number(orig.amount) !== l.amount)) {
                     ops.push(updateExpense(storeId, l.id, { amount: l.amount, category: l.name }));
                 }
             }
         }
         await Promise.all(ops);
-        // If the day had a manual expense override, clear it so the breakdown
-        // total (derived from the itemized records) becomes the day's expense.
-        if (breakdownModal.hadOverride && breakdownModal.entryId) {
-            await updateDailySalesEntry(storeId, breakdownModal.entryId, { expense: null });
-        }
-        // Keep whichever form is open in sync: drop any manual override and show
-        // the new itemized total as the derived placeholder.
-        const total = breakdownTotal.value;
+
+        // Keep the day's stored Expense in sync. Apply the net change (new − original)
+        // so any manual override on the entry total is preserved; a brand-new entry
+        // simply takes the itemized total.
+        const newSum = valid.reduce((s, l) => s + l.amount, 0);
+        const originalSum = breakdownModal.existing.reduce((s, e) => s + Number(e.amount || 0), 0);
+        const delta = newSum - originalSum;
         if (breakdownModal.context === 'add') {
-            addForm.expense = null;
-            addForm.expenseDerived = total;
-        } else if (breakdownModal.context === 'edit') {
-            inlineEdit.expense = null;
-            inlineEdit.expenseDerived = total;
+            addForm.expense = newSum;
+        } else if (breakdownModal.entryId) {
+            const current = breakdownModal.context === 'edit'
+                ? inlineEdit.expense
+                : (rows.value.find((r) => r.id === breakdownModal.entryId)?.expense ?? 0);
+            const newExpense = Math.max(0, (current || 0) + delta);
+            await updateDailySalesEntry(storeId, breakdownModal.entryId, { expense: newExpense });
+            if (breakdownModal.context === 'edit') inlineEdit.expense = newExpense;
+            await loadData();
         }
-        breakdownModal.open = false;
-        // Refresh the table so the day's derived expense reflects the changes.
-        await loadData();
+        // Refresh the list from the server so ids/values reflect what was saved.
+        await loadBreakdownExisting();
+        showToast('Expenses saved', 'success');
     } catch (e: any) {
-        breakdownModal.error = e?.message ?? 'Could not save the breakdown. Try again.';
+        breakdownModal.error = e?.message ?? 'Could not save the expenses. Try again.';
     } finally {
         breakdownModal.saving = false;
     }
@@ -1750,15 +1726,13 @@ const saveGoal = async () => {
     border-radius: 5px; padding: 0.15rem 0.3rem;
 }
 .btn-expense-breakdown:hover { background: #ccfbf1; }
-.ds-bd-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; margin-bottom: 0.5rem; }
-.ds-bd-table th { text-align: left; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em; color: #0f766e; border-bottom: 2px solid #99f6e4; padding: 0.4rem 0.5rem; }
-.ds-bd-table td { padding: 0.4rem 0.5rem; border-bottom: 1px solid #f3f4f6; }
-.ds-bd-table tfoot td { border-top: 2px solid #e5e7eb; border-bottom: none; }
-.ds-bd-num { text-align: right; white-space: nowrap; }
-.ds-bd-cat { display: inline-block; padding: 0.1rem 0.45rem; border-radius: 999px; background: #ecfdf5; color: #047857; font-size: 0.72rem; font-weight: 600; }
-.ds-bd-note { color: #6b7280; }
+.ds-expense-link {
+    border: none; background: none; padding: 0; cursor: pointer;
+    font: inherit; color: #0f766e; text-decoration: underline; text-underline-offset: 2px;
+}
+.ds-expense-link:hover { color: #115e59; }
+.ds-bd-note { color: #6b7280; font-size: 0.8rem; margin: 0 0 0.85rem; }
 .ds-bd-empty { color: #9ca3af; text-align: center; padding: 1.25rem 0; font-size: 0.85rem; }
-.ds-bd-note-line { font-size: 0.8rem; color: #92400e; background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 0.45rem 0.6rem; margin: 0; }
 
 /* Editable line-item breakdown editor */
 .ds-bd-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
@@ -1774,7 +1748,6 @@ const saveGoal = async () => {
     border-radius: 6px; cursor: pointer; font-size: 0.85rem;
 }
 .ds-bd-remove:hover { background: #fef2f2; }
-.ds-bd-line--ro { justify-content: space-between; }
 .ds-bd-addline {
     border: 1px solid #d1d5db; background: #fff; color: #374151;
     border-radius: 6px; padding: 0.45rem 0.8rem; cursor: pointer; font-size: 0.82rem; margin-top: 0.15rem;

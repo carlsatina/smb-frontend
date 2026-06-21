@@ -1,11 +1,14 @@
 import { apiClient } from './client';
 
+export type ExpenseSource = 'MANUAL' | 'DAILY_SALES';
+
 export type Expense = {
     id: string;
     date: string;
     amount: number;
     category: string;
     note: string | null;
+    source: ExpenseSource;
     createdAt: string;
     updatedAt: string;
     createdBy?: { id: string; fullName: string | null; email: string } | null;
@@ -15,6 +18,7 @@ export type ExpenseListFilters = {
     from?: string;
     to?: string;
     category?: string;
+    source?: ExpenseSource;
 };
 
 export type ExpenseInput = {
@@ -22,6 +26,7 @@ export type ExpenseInput = {
     amount: number;
     category: string;
     note?: string | null;
+    source?: ExpenseSource;
 };
 
 const buildQuery = (filters: ExpenseListFilters = {}) => {
@@ -29,6 +34,7 @@ const buildQuery = (filters: ExpenseListFilters = {}) => {
     if (filters.from) params.set('from', filters.from);
     if (filters.to) params.set('to', filters.to);
     if (filters.category) params.set('category', filters.category);
+    if (filters.source) params.set('source', filters.source);
     const qs = params.toString();
     return qs ? `?${qs}` : '';
 };

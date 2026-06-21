@@ -19,8 +19,6 @@ export type DailySalesRow = {
     id: string;
     date: string;
     expense: number;
-    expenseDerived: number;
-    expenseOverride: number | null;
     actualCoh: number;
     cashierEntries: CashierEntry[];
     totalCoh: number;
