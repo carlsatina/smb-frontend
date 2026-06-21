@@ -12,22 +12,22 @@
         </div>
 
         <div class="ex-controls">
-            <label class="ex-filter">
-                <span>From</span>
-                <input type="date" v-model="filters.from" class="ex-input" @change="loadExpenses" />
-            </label>
-            <label class="ex-filter">
-                <span>To</span>
-                <input type="date" v-model="filters.to" class="ex-input" @change="loadExpenses" />
-            </label>
+            <div class="ex-month-nav">
+                <button class="ghost-button ex-nav-btn" title="Previous month" @click="prevMonth">
+                    <mdicon name="chevron-left" size="18" />
+                </button>
+                <span class="ex-month-label">{{ monthLabel }}</span>
+                <button class="ghost-button ex-nav-btn" title="Next month" @click="nextMonth">
+                    <mdicon name="chevron-right" size="18" />
+                </button>
+            </div>
             <label class="ex-filter">
                 <span>Category</span>
-                <select v-model="filters.category" class="ex-input" @change="loadExpenses">
+                <select v-model="selectedCategory" class="ex-input" @change="loadExpenses">
                     <option value="">All categories</option>
                     <option v-for="c in categoryOptions" :key="c" :value="c">{{ c }}</option>
                 </select>
             </label>
-            <button v-if="hasActiveFilters" class="ghost-button" @click="clearFilters">Clear</button>
             <div class="ex-total">
                 <span class="ex-total-label">Total</span>
                 <span class="ex-total-value">{{ formatMoney(filteredTotal) }}</span>
@@ -51,7 +51,7 @@
                         <td :colspan="canWrite ? 6 : 5" class="ex-empty">Loading…</td>
                     </tr>
                     <tr v-else-if="expenses.length === 0">
-                        <td :colspan="canWrite ? 6 : 5" class="ex-empty">No expenses found for this range.</td>
+                        <td :colspan="canWrite ? 6 : 5" class="ex-empty">No expenses for {{ monthLabel }}.</td>
                     </tr>
                     <template v-else>
                         <tr v-for="ex in expenses" :key="ex.id">
@@ -148,12 +148,29 @@ const canWrite = computed(() => canAccess(storeContext.currentStore?.role, 'expe
 const categoryOptions = computed(() => storeContext.currentStore?.expenseCategoryOptions ?? []);
 const currency = computed(() => storeContext.currentStore?.currency || 'PHP');
 
-const filters = reactive<{ from: string; to: string; category: string }>({
-    from: '',
-    to: '',
-    category: '',
+const storeTimezone = computed(() => storeContext.currentStore?.timezone || 'Asia/Manila');
+
+// Month being viewed (1-based month). Defaults to the current month.
+const now = new Date();
+const year = ref(now.getFullYear());
+const month = ref(now.getMonth() + 1);
+const selectedCategory = ref('');
+
+const monthLabel = computed(() => {
+    const d = new Date(Date.UTC(year.value, month.value - 1, 1));
+    return d.toLocaleString('default', { timeZone: storeTimezone.value, month: 'long', year: 'numeric' });
 });
-const hasActiveFilters = computed(() => !!(filters.from || filters.to || filters.category));
+
+// First/last calendar day of the selected month as YYYY-MM-DD (expenses are
+// stored as date-only, so a plain month range is what the API expects).
+const pad = (n: number) => String(n).padStart(2, '0');
+const monthRange = computed(() => {
+    const lastDay = new Date(year.value, month.value, 0).getDate();
+    return {
+        from: `${year.value}-${pad(month.value)}-01`,
+        to: `${year.value}-${pad(month.value)}-${pad(lastDay)}`,
+    };
+});
 
 const filteredTotal = computed(() => expenses.value.reduce((sum, e) => sum + Number(e.amount || 0), 0));
 
@@ -181,9 +198,9 @@ const loadExpenses = async () => {
     isLoading.value = true;
     try {
         const res = await listExpenses(storeId.value, {
-            from: filters.from || undefined,
-            to: filters.to || undefined,
-            category: filters.category || undefined,
+            from: monthRange.value.from,
+            to: monthRange.value.to,
+            category: selectedCategory.value || undefined,
         });
         expenses.value = res.expenses;
     } catch (e: any) {
@@ -193,10 +210,15 @@ const loadExpenses = async () => {
     }
 };
 
-const clearFilters = () => {
-    filters.from = '';
-    filters.to = '';
-    filters.category = '';
+const prevMonth = () => {
+    if (month.value === 1) { month.value = 12; year.value--; }
+    else month.value--;
+    loadExpenses();
+};
+
+const nextMonth = () => {
+    if (month.value === 12) { month.value = 1; year.value++; }
+    else month.value++;
     loadExpenses();
 };
 
@@ -331,6 +353,9 @@ onMounted(loadExpenses);
 .ex-note { font-size: 0.8rem; color: #6b7280; }
 
 .ex-controls { display: flex; align-items: flex-end; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 1rem; }
+.ex-month-nav { display: flex; align-items: center; gap: 0.5rem; }
+.ex-nav-btn { display: inline-flex; align-items: center; justify-content: center; padding: 0.4rem 0.5rem; }
+.ex-month-label { font-weight: 600; min-width: 130px; text-align: center; font-size: 0.95rem; }
 .ex-filter { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: #6b7280; }
 .ex-input { border: 1px solid #d1d5db; border-radius: 8px; padding: 0.45rem 0.6rem; font-size: 0.875rem; background: #fff; }
 .ex-input:focus { outline: none; border-color: #0d9488; box-shadow: 0 0 0 3px rgba(13,148,136,0.12); }
