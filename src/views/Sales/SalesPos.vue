@@ -101,6 +101,7 @@
                         </button>
                     </div>
 
+                    <div class="catalog-scroll">
                     <div v-if="!storeContext.currentStoreId" class="panel-state">
                         Select or create a store to start selling.
                     </div>
@@ -207,6 +208,7 @@
                             </div>
                         </div>
                     </template>
+                    </div>
                 </section>
 
                 <aside class="cart-panel">
@@ -899,7 +901,12 @@ watch(
     --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.08);
     /* Kept for inline style compatibility (getCategoryPillStyle) */
     --ink: #0f172a;
-    min-height: 100vh;
+    /* Height of the sticky TopNav (56px + 1px border) sitting above this page.
+       Subtracted everywhere so the page fits the viewport exactly and no global
+       page scrollbar appears alongside the panels' own scrollbars. Reset to 0
+       in fullscreen, where the nav isn't rendered. */
+    --nav-h: 57px;
+    min-height: calc(100vh - var(--nav-h));
     padding: 1.5rem;
     background: #f8fafc;
     color: var(--c-text);
@@ -947,21 +954,60 @@ watch(
     gap: 1rem;
 }
 
+.pos-panel,
 .cart-panel {
     position: sticky;
-    top: 1.5rem;
-    /* Cap to the viewport so the panel never grows past the screen; its inner
-       item list (.cart-list) becomes the only scrollable region. */
-    max-height: calc(100vh - 3rem);
+    top: calc(var(--nav-h) + 1.5rem);
+    /* Cap each column to the space below the nav so neither grows past the
+       screen and the page itself never scrolls. */
+    max-height: calc(100vh - var(--nav-h) - 3rem);
+}
+
+/* Catalog: header + filters stay pinned, only the products (.catalog-scroll)
+   scroll. The panel itself is clipped so the pinned parts never move. */
+.pos-panel {
     overflow: hidden;
 }
 
-/* Header, summary, and checkout stay pinned; only the item list scrolls. */
+.pos-panel > .panel-header,
+.pos-panel > .category-filters {
+    flex-shrink: 0;
+}
+
+/* Ticket: the whole panel scrolls as one unit when it overflows the viewport
+   (header, item list, summary and checkout all move together). When it fits,
+   no scrollbar appears. */
+.cart-panel {
+    overflow-y: auto;
+    /* Stop scroll from chaining to the page when the panel hits its end, so the
+       two columns never get dragged together. */
+    overscroll-behavior: contain;
+}
+
+/* Keep every section at its natural height so the panel scrolls instead of
+   compressing the rows. */
 .cart-panel > .panel-header,
+.cart-panel > .cart-list,
 .cart-panel > .cart-summary,
 .cart-panel > .checkout-controls,
 .cart-panel > .cart-empty {
     flex-shrink: 0;
+}
+
+.catalog-scroll {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    /* Take the leftover vertical space and scroll within it. min-height: 0 lets
+       this flex child shrink below its content size so the scroll engages. */
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    /* Stop scroll from chaining to the page when the list hits its end. */
+    overscroll-behavior: contain;
+    /* Breathing room so cards don't sit under the scrollbar. */
+    margin-right: -0.25rem;
+    padding-right: 0.25rem;
 }
 
 /* ============================================================
@@ -1075,10 +1121,13 @@ watch(
    FULLSCREEN
 ============================================================ */
 .pos-page:fullscreen {
+    /* No TopNav in fullscreen — reclaim its height. */
+    --nav-h: 0px;
     overflow-y: auto;
 }
 
 .pos-page--fullscreen {
+    --nav-h: 0px;
     overflow-y: auto;
 }
 
@@ -1400,14 +1449,8 @@ watch(
     display: flex;
     flex-direction: column;
     gap: 0.25rem;
-    /* Take the leftover vertical space and scroll within it. min-height: 0 is
-       required so this flex child is allowed to shrink below its content size. */
-    flex: 1 1 auto;
-    min-height: 0;
-    overflow-y: auto;
-    /* Breathing room so rows don't sit under the scrollbar. */
-    margin-right: -0.25rem;
-    padding-right: 0.25rem;
+    /* Natural height — the whole .cart-panel scrolls, not this list on its own. */
+    flex: 0 0 auto;
 }
 
 .cart-row {
@@ -1817,14 +1860,16 @@ watch(
         grid-template-columns: 1fr;
     }
 
+    .pos-panel,
     .cart-panel {
         position: static;
-        /* Stacked layout: let the whole page scroll instead of trapping the
-           cart list in its own scroll region. */
+        /* Stacked layout: let the whole page scroll instead of trapping each
+           panel's body in its own scroll region. */
         max-height: none;
         overflow: visible;
     }
 
+    .catalog-scroll,
     .cart-list {
         overflow-y: visible;
         flex: none;

@@ -127,7 +127,7 @@
                             <div class="ds-expense-cell">
                                 <span>{{ formatMoney(addForm.expense) }}</span>
                                 <button class="btn-expense-breakdown" title="Manage expenses" @click="openAddBreakdown">
-                                    <mdicon name="plus" size="14" />
+                                    <mdicon name="format-list-bulleted" size="14" />
                                 </button>
                             </div>
                         </td>
@@ -224,7 +224,7 @@
                                     >{{ formatMoney(row.expense) }}</button>
                                     <span v-else>{{ formatMoney(inlineEdit.rowId === row.id ? inlineEdit.expense : row.expense) }}</span>
                                     <button v-if="canWriteExpense && inlineEdit.rowId === row.id" class="btn-expense-breakdown" title="Manage expenses" @click="openBreakdown(row)">
-                                        <mdicon name="plus" size="14" />
+                                        <mdicon name="format-list-bulleted" size="14" />
                                     </button>
                                 </div>
                             </td>
@@ -343,7 +343,7 @@
                             <div class="ds-expense-cell">
                                 <span>{{ formatMoney(addForm.expense) }}</span>
                                 <button class="btn-expense-breakdown" title="Manage expenses" @click="openAddBreakdown">
-                                    <mdicon name="plus" size="14" />
+                                    <mdicon name="format-list-bulleted" size="14" />
                                 </button>
                             </div>
                         </label>
@@ -408,7 +408,7 @@
                                     <div class="ds-expense-cell">
                                         <span>{{ formatMoney(inlineEdit.expense) }}</span>
                                         <button class="btn-expense-breakdown" title="Manage expenses" @click="openBreakdown(row)">
-                                            <mdicon name="plus" size="14" />
+                                            <mdicon name="format-list-bulleted" size="14" />
                                         </button>
                                     </div>
                                 </div>
@@ -1665,7 +1665,7 @@ const saveGoal = async () => {
 
 .ds-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; border: 1px solid #e5e7eb; border-radius: 8px; }
 .ds-table { width: 100%; min-width: 860px; border-collapse: collapse; font-size: 0.8rem; }
-.ds-table th { background: #f0fdfa; border-bottom: 2px solid #99f6e4; padding: 0.5rem 0.4rem; text-align: left; font-size: 0.68rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: #0f766e; word-break: break-word; line-height: 1.3; }
+.ds-table th { background: #0d9488; border-bottom: 2px solid #0f766e; padding: 0.5rem 0.4rem; text-align: left; font-size: 0.68rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: #fff; word-break: break-word; line-height: 1.3; }
 .ds-table td { padding: 0.35rem 0.4rem; border-bottom: 1px solid #f3f4f6; vertical-align: middle; white-space: nowrap; }
 .ds-table tbody tr:hover { background: #f9fafb; }
 .col-date { min-width: 90px; white-space: normal; }
