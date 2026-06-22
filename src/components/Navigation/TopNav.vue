@@ -10,49 +10,14 @@
 
                 <div v-if="isAuthenticated && currentStoreId" class="topnav__links">
                     <RouterLink
-                        v-if="canViewPos"
-                        :to="`/stores/${currentStoreId}/pos`"
-                        class="topnav__item topnav__item--pos"
-                        active-class="topnav__item--active"
-                    >
-                        <mdicon name="point-of-sale" size="16" />
-                        <span>POS</span>
-                    </RouterLink>
-                    <RouterLink
-                        v-if="canViewProducts"
-                        :to="`/stores/${currentStoreId}/products`"
-                        class="topnav__item topnav__item--products"
-                        active-class="topnav__item--active"
-                    >
-                        <mdicon name="package-variant" size="16" />
-                        <span>Products</span>
-                    </RouterLink>
-                    <RouterLink
-                        v-if="canViewInventory"
-                        :to="`/stores/${currentStoreId}/inventory`"
-                        class="topnav__item topnav__item--inventory"
-                        active-class="topnav__item--active"
-                    >
-                        <mdicon name="warehouse" size="16" />
-                        <span>Inventory</span>
-                    </RouterLink>
-                    <RouterLink
-                        v-if="canViewReports"
-                        :to="`/stores/${currentStoreId}/reports`"
-                        class="topnav__item topnav__item--reports"
-                        active-class="topnav__item--active"
-                    >
-                        <mdicon name="chart-line" size="16" />
-                        <span>Reports</span>
-                    </RouterLink>
-                    <RouterLink
-                        v-if="canViewDailySales"
-                        :to="`/stores/${currentStoreId}/daily-sales`"
+                        v-for="link in primaryLinks"
+                        :key="link.key"
+                        :to="`/stores/${currentStoreId}/${link.route}`"
                         class="topnav__item"
                         active-class="topnav__item--active"
                     >
-                        <mdicon name="cash-register" size="16" />
-                        <span>Daily Sales</span>
+                        <mdicon :name="link.icon" size="16" />
+                        <span>{{ link.label }}</span>
                     </RouterLink>
                     <div v-if="showMoreMenu" ref="moreMenuRef" class="topnav__more">
                         <button
@@ -67,90 +32,31 @@
                         </button>
                         <Transition name="dropdown">
                             <div v-if="isMoreOpen" class="topnav__dropdown">
-                                <RouterLink
-                                    v-if="canViewPurchaseOrders && !isPurchaseOrdersLocked"
-                                    :to="`/stores/${currentStoreId}/purchase-orders`"
-                                    class="topnav__dropdown-item"
-                                    @click="closeMore"
-                                >
-                                    <mdicon name="truck-delivery" size="18" />
-                                    <span>Purchase Orders</span>
-                                </RouterLink>
-                                <button
-                                    v-else-if="canViewPurchaseOrders && isPurchaseOrdersLocked"
-                                    type="button"
-                                    class="topnav__dropdown-item topnav__dropdown-item--locked"
-                                    @click="openUpgradeFromMore('purchaseOrders')"
-                                >
-                                    <mdicon name="truck-delivery" size="18" />
-                                    <span>Purchase Orders</span>
-                                    <mdicon name="lock" size="14" class="lock-icon" />
-                                </button>
-                                <RouterLink
-                                    v-if="canViewSuppliers && !isPurchaseOrdersLocked"
-                                    :to="`/stores/${currentStoreId}/suppliers`"
-                                    class="topnav__dropdown-item"
-                                    @click="closeMore"
-                                >
-                                    <mdicon name="account-group" size="18" />
-                                    <span>Suppliers</span>
-                                </RouterLink>
-                                <button
-                                    v-else-if="canViewSuppliers && isPurchaseOrdersLocked"
-                                    type="button"
-                                    class="topnav__dropdown-item topnav__dropdown-item--locked"
-                                    @click="openUpgradeFromMore('purchaseOrders')"
-                                >
-                                    <mdicon name="account-group" size="18" />
-                                    <span>Suppliers</span>
-                                    <mdicon name="lock" size="14" class="lock-icon" />
-                                </button>
-                                <RouterLink
-                                    v-if="canViewExpenses && !isExpensesLocked"
-                                    :to="`/stores/${currentStoreId}/expenses`"
-                                    class="topnav__dropdown-item"
-                                    @click="closeMore"
-                                >
-                                    <mdicon name="cash-minus" size="18" />
-                                    <span>Expenses</span>
-                                </RouterLink>
-                                <button
-                                    v-else-if="canViewExpenses && isExpensesLocked"
-                                    type="button"
-                                    class="topnav__dropdown-item topnav__dropdown-item--locked"
-                                    @click="openUpgradeFromMore('expenses')"
-                                >
-                                    <mdicon name="cash-minus" size="18" />
-                                    <span>Expenses</span>
-                                    <mdicon name="lock" size="14" class="lock-icon" />
-                                </button>
-                                <RouterLink
-                                    v-if="canViewAi"
-                                    :to="`/stores/${currentStoreId}/ai-insights`"
-                                    class="topnav__dropdown-item"
-                                    @click="closeMore"
-                                >
-                                    <mdicon name="robot-happy-outline" size="18" />
-                                    <span>AI Insights</span>
-                                </RouterLink>
-                                <RouterLink
-                                    v-if="canViewSettings"
-                                    :to="`/stores/${currentStoreId}/settings`"
-                                    class="topnav__dropdown-item"
-                                    @click="closeMore"
-                                >
-                                    <mdicon name="cog" size="18" />
-                                    <span>Settings</span>
-                                </RouterLink>
-                                <RouterLink
-                                    v-if="canViewSettings"
-                                    :to="`/stores/${currentStoreId}/audit-logs`"
-                                    class="topnav__dropdown-item"
-                                    @click="closeMore"
-                                >
-                                    <mdicon name="history" size="18" />
-                                    <span>Audit Log</span>
-                                </RouterLink>
+                                <template v-for="(grp, gi) in moreGroups" :key="grp.group">
+                                    <div v-if="gi > 0" class="topnav__dropdown-divider"></div>
+                                    <p class="topnav__dropdown-label">{{ grp.label }}</p>
+                                    <template v-for="item in grp.items" :key="item.key">
+                                        <RouterLink
+                                            v-if="!item.locked"
+                                            :to="`/stores/${currentStoreId}/${item.route}`"
+                                            class="topnav__dropdown-item"
+                                            @click="closeMore"
+                                        >
+                                            <mdicon :name="item.icon" size="18" />
+                                            <span>{{ item.label }}</span>
+                                        </RouterLink>
+                                        <button
+                                            v-else
+                                            type="button"
+                                            class="topnav__dropdown-item topnav__dropdown-item--locked"
+                                            @click="openUpgradeFromMore(item.upgradeFeature!)"
+                                        >
+                                            <mdicon :name="item.icon" size="18" />
+                                            <span>{{ item.label }}</span>
+                                            <mdicon name="lock" size="14" class="lock-icon" />
+                                        </button>
+                                    </template>
+                                </template>
                             </div>
                         </Transition>
                     </div>
@@ -293,39 +199,31 @@
         <Transition name="mobile-menu">
             <div v-if="isMobileMenuOpen && isAuthenticated && currentStoreId" class="topnav__mobile">
                 <div class="topnav__mobile-links">
-                    <RouterLink v-if="canViewPos" :to="`/stores/${currentStoreId}/pos`" class="topnav__mobile-item" @click="closeMobileMenu">
-                        <mdicon name="point-of-sale" size="20" /><span>Point of Sale</span>
+                    <RouterLink
+                        v-for="link in primaryLinks"
+                        :key="link.key"
+                        :to="`/stores/${currentStoreId}/${link.route}`"
+                        class="topnav__mobile-item"
+                        @click="closeMobileMenu"
+                    >
+                        <mdicon :name="link.icon" size="20" /><span>{{ link.label }}</span>
                     </RouterLink>
-                    <RouterLink v-if="canViewProducts" :to="`/stores/${currentStoreId}/products`" class="topnav__mobile-item" @click="closeMobileMenu">
-                        <mdicon name="package-variant" size="20" /><span>Products</span>
-                    </RouterLink>
-                    <RouterLink v-if="canViewInventory" :to="`/stores/${currentStoreId}/inventory`" class="topnav__mobile-item" @click="closeMobileMenu">
-                        <mdicon name="warehouse" size="20" /><span>Inventory</span>
-                    </RouterLink>
-                    <RouterLink v-if="canViewReports" :to="`/stores/${currentStoreId}/reports`" class="topnav__mobile-item" @click="closeMobileMenu">
-                        <mdicon name="chart-line" size="20" /><span>Reports</span>
-                    </RouterLink>
-                    <RouterLink v-if="canViewDailySales" :to="`/stores/${currentStoreId}/daily-sales`" class="topnav__mobile-item" @click="closeMobileMenu">
-                        <mdicon name="cash-register" size="20" /><span>Daily Sales</span>
-                    </RouterLink>
-                    <RouterLink v-if="canViewPurchaseOrders && !isPurchaseOrdersLocked" :to="`/stores/${currentStoreId}/purchase-orders`" class="topnav__mobile-item" @click="closeMobileMenu">
-                        <mdicon name="truck-delivery" size="20" /><span>Purchase Orders</span>
-                    </RouterLink>
-                    <RouterLink v-if="canViewSuppliers && !isPurchaseOrdersLocked" :to="`/stores/${currentStoreId}/suppliers`" class="topnav__mobile-item" @click="closeMobileMenu">
-                        <mdicon name="account-group" size="20" /><span>Suppliers</span>
-                    </RouterLink>
-                    <RouterLink v-if="canViewExpenses && !isExpensesLocked" :to="`/stores/${currentStoreId}/expenses`" class="topnav__mobile-item" @click="closeMobileMenu">
-                        <mdicon name="cash-minus" size="20" /><span>Expenses</span>
-                    </RouterLink>
-                    <RouterLink v-if="canViewAi" :to="`/stores/${currentStoreId}/ai-insights`" class="topnav__mobile-item" @click="closeMobileMenu">
-                        <mdicon name="robot-happy-outline" size="20" /><span>AI Insights</span>
-                    </RouterLink>
-                    <RouterLink v-if="canViewSettings" :to="`/stores/${currentStoreId}/settings`" class="topnav__mobile-item" @click="closeMobileMenu">
-                        <mdicon name="cog" size="20" /><span>Settings</span>
-                    </RouterLink>
-                    <RouterLink v-if="canViewSettings" :to="`/stores/${currentStoreId}/audit-logs`" class="topnav__mobile-item" @click="closeMobileMenu">
-                        <mdicon name="history" size="20" /><span>Audit Log</span>
-                    </RouterLink>
+
+                    <template v-for="grp in moreGroups" :key="grp.group">
+                        <p class="topnav__mobile-label">{{ grp.label }}</p>
+                        <template v-for="item in grp.items" :key="item.key">
+                            <RouterLink
+                                v-if="!item.locked"
+                                :to="`/stores/${currentStoreId}/${item.route}`"
+                                class="topnav__mobile-item"
+                                @click="closeMobileMenu"
+                            >
+                                <mdicon :name="item.icon" size="20" /><span>{{ item.label }}</span>
+                            </RouterLink>
+                        </template>
+                    </template>
+
+                    <p class="topnav__mobile-label">Account</p>
                     <RouterLink to="/account/profile" class="topnav__mobile-item" @click="closeMobileMenu">
                         <mdicon name="account-circle-outline" size="20" /><span>My Profile</span>
                     </RouterLink>
@@ -338,6 +236,20 @@
                 </div>
             </div>
         </Transition>
+    </nav>
+
+    <!-- Mobile bottom tab bar -->
+    <nav v-if="showBottomNav" class="bottomnav">
+        <RouterLink
+            v-for="link in bottomNavLinks"
+            :key="link.key"
+            :to="`/stores/${currentStoreId}/${link.route}`"
+            class="bottomnav__item"
+            active-class="bottomnav__item--active"
+        >
+            <mdicon :name="link.icon" size="22" />
+            <span class="bottomnav__label">{{ link.label }}</span>
+        </RouterLink>
     </nav>
 
     <!-- Store switcher modal — teleported to body to avoid z-index issues -->
@@ -386,7 +298,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { logout } from '@/api/auth';
 import { useStoreContextStore } from '@/stores/storeContext';
@@ -432,7 +344,88 @@ const canViewExpenses = computed(() => canAccess(storeContext.currentStore?.role
 const planKnown = computed(() => userContext.planTier !== null);
 const isPurchaseOrdersLocked = computed(() => planKnown.value && !hasPlanFeature(userContext.effectivePlan, 'purchaseOrders'));
 const isExpensesLocked = computed(() => planKnown.value && !hasPlanFeature(userContext.effectivePlan, 'expenses'));
-const showMoreMenu = computed(() => Boolean(currentStoreId.value) && (canViewPurchaseOrders.value || canViewSuppliers.value || canViewExpenses.value || canViewSettings.value));
+
+// ── Nav configuration ─────────────────────────────────────
+// Single source of truth for the store nav. `primaryLinks` render inline;
+// everything else collapses into the grouped "More" menu (and mobile menu).
+type NavGroupKey = 'sell' | 'procurement' | 'insights' | 'settings';
+
+interface NavLink {
+    key: string;
+    label: string;
+    icon: string;
+    route: string; // path suffix after /stores/:storeId/
+    group: NavGroupKey;
+    visible: boolean;
+    locked?: boolean;
+    upgradeFeature?: 'purchaseOrders' | 'expenses';
+}
+
+// Inline (primary) items per role. Owners/Admins get the focused set;
+// other roles fall back to their full accessible primary set.
+const primaryKeysByRole: Record<string, string[]> = {
+    OWNER: ['reports', 'inventory', 'daily-sales', 'ai-insights'],
+    ADMIN: ['reports', 'inventory', 'daily-sales', 'ai-insights'],
+};
+const defaultPrimaryKeys = ['pos', 'products', 'inventory', 'reports', 'daily-sales'];
+
+const primaryKeys = computed(() => primaryKeysByRole[storeContext.currentStore?.role ?? ''] ?? defaultPrimaryKeys);
+
+const allNavLinks = computed<NavLink[]>(() => [
+    { key: 'pos', label: 'POS', icon: 'point-of-sale', route: 'pos', group: 'sell', visible: canViewPos.value },
+    { key: 'products', label: 'Products', icon: 'package-variant', route: 'products', group: 'sell', visible: canViewProducts.value },
+    { key: 'inventory', label: 'Inventory', icon: 'warehouse', route: 'inventory', group: 'sell', visible: canViewInventory.value },
+    { key: 'reports', label: 'Reports', icon: 'chart-line', route: 'reports', group: 'insights', visible: canViewReports.value },
+    { key: 'daily-sales', label: 'Daily Sales', icon: 'cash-register', route: 'daily-sales', group: 'insights', visible: canViewDailySales.value },
+    { key: 'ai-insights', label: 'AI Insights', icon: 'robot-happy-outline', route: 'ai-insights', group: 'insights', visible: canViewAi.value },
+    { key: 'purchase-orders', label: 'Purchase Orders', icon: 'truck-delivery', route: 'purchase-orders', group: 'procurement', visible: canViewPurchaseOrders.value, locked: isPurchaseOrdersLocked.value, upgradeFeature: 'purchaseOrders' },
+    { key: 'suppliers', label: 'Suppliers', icon: 'account-group', route: 'suppliers', group: 'procurement', visible: canViewSuppliers.value, locked: isPurchaseOrdersLocked.value, upgradeFeature: 'purchaseOrders' },
+    { key: 'expenses', label: 'Expenses', icon: 'cash-minus', route: 'expenses', group: 'procurement', visible: canViewExpenses.value, locked: isExpensesLocked.value, upgradeFeature: 'expenses' },
+    { key: 'settings', label: 'Settings', icon: 'cog', route: 'settings', group: 'settings', visible: canViewSettings.value },
+    { key: 'audit-logs', label: 'Audit Log', icon: 'history', route: 'audit-logs', group: 'settings', visible: canViewSettings.value },
+]);
+
+const primaryLinks = computed(() => {
+    const keys = primaryKeys.value;
+    return allNavLinks.value
+        .filter((l) => l.visible && keys.includes(l.key))
+        .sort((a, b) => keys.indexOf(a.key) - keys.indexOf(b.key));
+});
+
+const groupOrder: NavGroupKey[] = ['sell', 'procurement', 'insights', 'settings'];
+const groupLabels: Record<NavGroupKey, string> = {
+    sell: 'Sell',
+    procurement: 'Procurement',
+    insights: 'Insights',
+    settings: 'Settings',
+};
+
+const moreGroups = computed(() =>
+    groupOrder
+        .map((group) => ({
+            group,
+            label: groupLabels[group],
+            items: allNavLinks.value.filter(
+                (l) => l.visible && !primaryKeys.value.includes(l.key) && l.group === group
+            ),
+        }))
+        .filter((g) => g.items.length > 0)
+);
+
+const showMoreMenu = computed(() => Boolean(currentStoreId.value) && moreGroups.value.length > 0);
+
+// Mobile bottom tab bar — the important (primary) links, capped to fit the bar.
+const bottomNavLinks = computed(() => primaryLinks.value.slice(0, 5));
+const showBottomNav = computed(
+    () => isAuthenticated.value && Boolean(currentStoreId.value) && bottomNavLinks.value.length > 0
+);
+
+// Reserve space at the bottom of the page so the fixed bar never covers content.
+watch(
+    showBottomNav,
+    (val) => document.body.classList.toggle('has-bottom-nav', val),
+    { immediate: true }
+);
 
 // ── Profile display ───────────────────────────────────────
 const displayName = computed(() => {
@@ -590,6 +583,7 @@ onBeforeUnmount(() => {
     window.removeEventListener('auth:logout', updateTokenState);
     document.removeEventListener('click', handleDocumentClick);
     document.removeEventListener('keydown', handleDocumentKeydown);
+    document.body.classList.remove('has-bottom-nav');
 });
 </script>
 
@@ -699,6 +693,22 @@ onBeforeUnmount(() => {
 }
 
 .topnav__dropdown-item:hover { color: #fff; background: rgba(255, 255, 255, 0.08); }
+
+.topnav__dropdown-label {
+    margin: 0;
+    padding: 0.5rem 0.75rem 0.25rem;
+    font-size: 0.62rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: rgba(255, 255, 255, 0.35);
+}
+
+.topnav__dropdown-divider {
+    height: 1px;
+    background: rgba(255, 255, 255, 0.07);
+    margin: 0.3rem 0.25rem;
+}
 .topnav__dropdown-item--locked { color: rgba(255, 255, 255, 0.35); cursor: default; }
 .topnav__dropdown-item--locked:hover { background: transparent; }
 .topnav__dropdown-item--locked .lock-icon { margin-left: auto; color: rgba(251, 191, 36, 0.7); }
@@ -1021,6 +1031,17 @@ onBeforeUnmount(() => {
     background: rgba(13, 148, 136, 0.18);
 }
 
+.topnav__mobile-label {
+    grid-column: 1 / -1;
+    margin: 0.5rem 0 0;
+    padding: 0 0.25rem;
+    font-size: 0.62rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: rgba(255, 255, 255, 0.35);
+}
+
 .topnav__mobile-item--danger { color: rgba(252, 165, 165, 0.8); }
 .topnav__mobile-item--danger:hover { color: #fca5a5; background: rgba(239, 68, 68, 0.1); }
 
@@ -1218,5 +1239,57 @@ onBeforeUnmount(() => {
     .topnav__logo { height: 28px; }
     .topnav__mobile-links { grid-template-columns: 1fr; }
     .topnav__verify span { display: none; }
+}
+
+/* ── Mobile bottom tab bar ── */
+.bottomnav { display: none; }
+
+@media (max-width: 900px) {
+    .bottomnav {
+        display: flex;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        z-index: 100;
+        background: linear-gradient(0deg, #0f172a 0%, #1e293b 100%);
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+        box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.25);
+        padding-bottom: env(safe-area-inset-bottom);
+    }
+
+    .bottomnav__item {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 3px;
+        min-height: 56px;
+        padding: 0.45rem 0.25rem;
+        color: rgba(255, 255, 255, 0.55);
+        text-decoration: none;
+        font-size: 0.62rem;
+        font-weight: 600;
+        transition: color 0.15s;
+    }
+
+    .bottomnav__item:active { color: #fff; }
+
+    .bottomnav__item--active { color: #2dd4bf; }
+
+    .bottomnav__label {
+        max-width: 100%;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+}
+</style>
+
+<style>
+/* Global: reserve space so the fixed mobile bottom bar never covers content. */
+@media (max-width: 900px) {
+    body.has-bottom-nav { padding-bottom: calc(56px + env(safe-area-inset-bottom)); }
 }
 </style>
