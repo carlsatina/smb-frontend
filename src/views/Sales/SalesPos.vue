@@ -498,6 +498,7 @@ const clearCart = () => {
     cartItems.value = [];
     discountEnabled.value = false;
     orderType.value = 'DINE_IN';
+    _paymentMethod.value = paymentMethods.value.includes('CASH') ? 'CASH' : paymentMethods.value[0];
 };
 
 const goToSalesHistory = () => {
