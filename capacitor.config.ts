@@ -3,7 +3,7 @@ import * as dotenv from 'dotenv';
 
 const config: CapacitorConfig = {
     appId: 'com.rolero.quickworks',
-    appName: 'Quickworks',
+    appName: 'SMB PoS',
     webDir: 'dist',
     // server: {
     //     url: '192.168.2.195:8080',
