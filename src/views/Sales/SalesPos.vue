@@ -496,7 +496,7 @@ const removeItem = (productId: string) => {
 
 const clearCart = () => {
     cartItems.value = [];
-    discountEnabled.value = true;
+    discountEnabled.value = false;
     orderType.value = 'DINE_IN';
 };
 
@@ -845,7 +845,7 @@ watch(
         clearCart();
         searchQuery.value = '';
         activeCategory.value = 'ALL';
-        discountEnabled.value = true;
+        discountEnabled.value = false;
         isRearranging.value = false;
         productOrder.value = [];
         loadDisplaySettings();
