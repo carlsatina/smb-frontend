@@ -24,24 +24,31 @@
                 @keydown.enter.prevent="selectHighlighted"
                 @keydown.esc.prevent="close"
             />
-            <ul class="ss-menu" role="listbox">
-                <li v-if="filtered.length === 0" class="ss-empty">No matches.</li>
-                <li
-                    v-for="(option, index) in filtered"
-                    :key="option.value"
-                    class="ss-option"
-                    :class="{
-                        'is-active': option.value === modelValue,
-                        'is-highlighted': index === highlightedIndex,
-                    }"
-                    role="option"
-                    :aria-selected="option.value === modelValue"
-                    @mouseenter="highlightedIndex = index"
-                    @mousedown.prevent="select(option.value)"
+            <Teleport to="body">
+                <ul
+                    ref="menuRef"
+                    class="ss-menu"
+                    role="listbox"
+                    :style="menuStyle"
                 >
-                    {{ option.label }}
-                </li>
-            </ul>
+                    <li v-if="filtered.length === 0" class="ss-empty">No matches.</li>
+                    <li
+                        v-for="(option, index) in filtered"
+                        :key="option.value"
+                        class="ss-option"
+                        :class="{
+                            'is-active': option.value === modelValue,
+                            'is-highlighted': index === highlightedIndex,
+                        }"
+                        role="option"
+                        :aria-selected="option.value === modelValue"
+                        @mouseenter="highlightedIndex = index"
+                        @mousedown.prevent="select(option.value)"
+                    >
+                        {{ option.label }}
+                    </li>
+                </ul>
+            </Teleport>
         </div>
     </div>
 </template>
@@ -72,9 +79,27 @@ const emit = defineEmits<{
 
 const rootRef = ref<HTMLElement | null>(null);
 const searchRef = ref<HTMLInputElement | null>(null);
+const menuRef = ref<HTMLElement | null>(null);
 const isOpen = ref(false);
 const search = ref('');
 const highlightedIndex = ref(0);
+
+// The menu is teleported to <body> so it can never be clipped by an ancestor's
+// overflow (e.g. a scrollable table). We position it manually under the control.
+const menuStyle = ref<Record<string, string>>({});
+const updateMenuPosition = () => {
+    const anchor = searchRef.value ?? rootRef.value;
+    if (!anchor) return;
+    const r = anchor.getBoundingClientRect();
+    menuStyle.value = {
+        position: 'fixed',
+        top: `${r.bottom + 4}px`,
+        left: `${r.left}px`,
+        width: `${r.width}px`,
+        right: 'auto',
+        margin: '0',
+    };
+};
 
 const selectedLabel = computed(
     () => props.options.find((option) => option.value === props.modelValue)?.label ?? ''
@@ -95,7 +120,10 @@ const open = () => {
     isOpen.value = true;
     search.value = '';
     highlightedIndex.value = 0;
-    nextTick(() => searchRef.value?.focus());
+    nextTick(() => {
+        searchRef.value?.focus();
+        updateMenuPosition();
+    });
 };
 
 const close = () => {
@@ -120,13 +148,30 @@ const move = (delta: number) => {
 };
 
 const handleClickOutside = (event: MouseEvent) => {
-    if (isOpen.value && rootRef.value && !rootRef.value.contains(event.target as Node)) {
+    if (!isOpen.value) return;
+    const target = event.target as Node;
+    const inRoot = rootRef.value?.contains(target);
+    const inMenu = menuRef.value?.contains(target);
+    if (!inRoot && !inMenu) {
         close();
     }
 };
 
-onMounted(() => document.addEventListener('mousedown', handleClickOutside));
-onBeforeUnmount(() => document.removeEventListener('mousedown', handleClickOutside));
+// Keep the teleported menu glued to the control while the page scrolls/resizes.
+const handleReposition = () => {
+    if (isOpen.value) updateMenuPosition();
+};
+
+onMounted(() => {
+    document.addEventListener('mousedown', handleClickOutside);
+    window.addEventListener('scroll', handleReposition, true);
+    window.addEventListener('resize', handleReposition);
+});
+onBeforeUnmount(() => {
+    document.removeEventListener('mousedown', handleClickOutside);
+    window.removeEventListener('scroll', handleReposition, true);
+    window.removeEventListener('resize', handleReposition);
+});
 
 defineExpose({ open });
 </script>
@@ -192,11 +237,10 @@ defineExpose({ open });
 }
 
 .ss-menu {
-    position: absolute;
-    z-index: 20;
-    left: 0;
-    right: 0;
-    margin: 0.25rem 0 0;
+    /* Positioned via inline styles (teleported to body); z-index keeps it above
+       page content, the sticky nav, and modals it may be rendered inside. */
+    position: fixed;
+    z-index: 2000;
     padding: 0.25rem;
     list-style: none;
     max-height: 220px;

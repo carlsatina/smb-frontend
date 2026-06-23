@@ -260,6 +260,7 @@
                                     <span class="cart-row-avail">{{ formatQty(row.item.currentQty) }} {{ row.item.unit }} available</span>
                                 </div>
                                 <input
+                                    :ref="(el) => setQtyInput(el, idx)"
                                     v-model.number="row.qty"
                                     type="number"
                                     class="cart-qty-input"
@@ -283,13 +284,19 @@
                                 :placeholder="transferCart.length === 0 ? 'Search items to add…' : 'Add another item…'"
                                 @focus="transferItemDropdown = true"
                                 @blur="onTransferItemBlur"
+                                @keydown.down.prevent="moveTransferHighlight(1)"
+                                @keydown.up.prevent="moveTransferHighlight(-1)"
+                                @keydown.enter.prevent="selectHighlightedTransferItem"
+                                @keydown.esc="transferItemDropdown = false"
                             />
-                            <ul v-if="transferItemDropdown && availableTransferItems.length > 0" class="dropdown-list">
+                            <ul v-if="transferItemDropdown && visibleTransferItems.length > 0" class="dropdown-list">
                                 <li
-                                    v-for="item in availableTransferItems.slice(0, 12)"
+                                    v-for="(item, i) in visibleTransferItems"
                                     :key="`${item.itemType}-${item.itemId}`"
                                     @mousedown.prevent="addToCart(item)"
+                                    @mouseenter="transferHighlight = i"
                                     class="dropdown-item"
+                                    :class="{ 'dropdown-item--active': i === transferHighlight }"
                                 >
                                     <span class="di-name">{{ item.name }}</span>
                                     <span class="di-meta">{{ formatQty(item.currentQty) }} {{ item.unit }}</span>
@@ -328,7 +335,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import SkeletonLoader from '@/components/SkeletonLoader.vue';
 import { batchTransferStock, listStock, StockItem } from '@/api/inventory';
@@ -453,6 +460,39 @@ const availableTransferItems = computed(() => {
     });
 });
 
+// The dropdown only renders the first 12 matches; keyboard navigation operates
+// over this same visible slice so the highlighted index always maps correctly.
+const visibleTransferItems = computed(() => availableTransferItems.value.slice(0, 12));
+
+// Keyboard navigation state for the add-item search dropdown.
+const transferHighlight = ref(0);
+
+// Refs to each cart row's qty input so we can focus the one just added.
+const qtyInputs = ref<HTMLInputElement[]>([]);
+const setQtyInput = (el: unknown, idx: number) => {
+    if (el) qtyInputs.value[idx] = el as HTMLInputElement;
+};
+
+// Reset/clamp the highlight whenever the visible result set changes.
+watch(visibleTransferItems, (items) => {
+    if (transferHighlight.value > items.length - 1) {
+        transferHighlight.value = Math.max(0, items.length - 1);
+    }
+});
+
+const moveTransferHighlight = (delta: number) => {
+    const count = visibleTransferItems.value.length;
+    if (count === 0) return;
+    transferItemDropdown.value = true;
+    transferHighlight.value = (transferHighlight.value + delta + count) % count;
+};
+
+const selectHighlightedTransferItem = () => {
+    if (!transferItemDropdown.value) return;
+    const item = visibleTransferItems.value[transferHighlight.value];
+    if (item) addToCart(item);
+};
+
 const cartRowError = (row: CartRow) => {
     if (row.qty === null || row.qty === undefined) return false;
     const store = storeContext.currentStore;
@@ -470,6 +510,8 @@ const canSubmitTransfer = computed(() => {
 const openTransferModal = () => {
     transferItemSearch.value = '';
     transferItemDropdown.value = false;
+    transferHighlight.value = 0;
+    qtyInputs.value = [];
     transferDestStoreId.value = '';
     transferCart.value = [];
     transferNote.value = '';
@@ -485,6 +527,10 @@ const addToCart = (item: StockItem) => {
     transferCart.value.push({ item, qty: null });
     transferItemSearch.value = '';
     transferItemDropdown.value = false;
+    transferHighlight.value = 0;
+    // Move focus to the newly added row's qty input once it has rendered.
+    const newRowIdx = transferCart.value.length - 1;
+    nextTick(() => qtyInputs.value[newRowIdx]?.focus());
 };
 
 const removeCartRow = (idx: number) => {
@@ -1519,7 +1565,8 @@ watch(
     gap: 0.5rem;
     transition: background 0.1s;
 }
-.dropdown-item:hover { background: #f1f5f9; }
+.dropdown-item:hover,
+.dropdown-item--active { background: #f1f5f9; }
 
 .di-name {
     font-weight: 600;

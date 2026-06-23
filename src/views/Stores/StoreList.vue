@@ -461,7 +461,7 @@ const handleDocumentClick = (event: MouseEvent) => {
     }
 };
 
-const setActionContainerRef = (storeId: string, el: Element | null) => {
+const setActionContainerRef = (storeId: string, el: unknown) => {
     if (el instanceof HTMLElement) {
         actionContainerRefs.set(storeId, el);
         return;
@@ -469,7 +469,7 @@ const setActionContainerRef = (storeId: string, el: Element | null) => {
     actionContainerRefs.delete(storeId);
 };
 
-const setActionMeasureRef = (storeId: string, el: Element | null) => {
+const setActionMeasureRef = (storeId: string, el: unknown) => {
     if (el instanceof HTMLElement) {
         actionMeasureRefs.set(storeId, el);
         return;

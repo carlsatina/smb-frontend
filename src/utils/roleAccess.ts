@@ -20,7 +20,7 @@ export type FeatureKey = keyof typeof accessMap;
 
 export const canAccess = (role: string | null | undefined, feature: FeatureKey) => {
     if (!role) return false;
-    return accessMap[feature].includes(role as StoreRole);
+    return (accessMap[feature] as readonly StoreRole[]).includes(role as StoreRole);
 };
 
 const featureRouteMap: Record<FeatureKey, string> = {

@@ -84,7 +84,7 @@
                 </div>
                 <div class="ex-form-group">
                     <label>Amount</label>
-                    <input type="number" v-model.number="formModal.amount" class="form-control" min="0" step="0.01" />
+                    <input ref="amountInput" type="number" v-model.number="formModal.amount" class="form-control" min="0" step="0.01" />
                 </div>
                 <div class="ex-form-group">
                     <label>Category</label>
@@ -124,7 +124,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, nextTick, onMounted, reactive, ref } from 'vue';
 import { useStoreContextStore } from '@/stores/storeContext';
 import { useToast } from '@/composables/useToast';
 import { canAccess } from '@/utils/roleAccess';
@@ -257,6 +257,9 @@ const canSave = computed(
     () => !!formModal.date && !!formModal.category && !!formModal.amount && formModal.amount > 0
 );
 
+const amountInput = ref<HTMLInputElement | null>(null);
+const focusAmount = () => nextTick(() => amountInput.value?.focus());
+
 const openCreate = () => {
     formModal.editId = null;
     formModal.date = todayStr();
@@ -265,6 +268,7 @@ const openCreate = () => {
     formModal.note = '';
     formModal.saving = false;
     formModal.show = true;
+    focusAmount();
 };
 
 const openEdit = (ex: Expense) => {
@@ -275,6 +279,7 @@ const openEdit = (ex: Expense) => {
     formModal.note = ex.note ?? '';
     formModal.saving = false;
     formModal.show = true;
+    focusAmount();
 };
 
 const closeForm = () => {

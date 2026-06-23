@@ -418,6 +418,7 @@ const isPlanLocked = computed(
 );
 const isSubmitting = ref(false);
 const isUpdatingStatus = ref(false);
+const isUpdatingDetails = ref(false);
 const isCreatingSupplier = ref(false);
 const showSupplierForm = ref(false);
 const showReceiveModal = ref(false);
@@ -653,14 +654,14 @@ const saveDetails = async () => {
     if (!routeStoreId.value || !routePurchaseOrderId.value) return;
     if (!canEditDetails.value || !purchaseOrder.value) return;
     if (!isDetailsDirty.value) return;
-    isUpdatingStatus.value = true;
+    isUpdatingDetails.value = true;
     const payload: { supplierId?: string; supplierName?: string; expectedDate?: string | null } = {};
     const supplierName = editForm.supplierName.trim();
     const expectedDate = editForm.expectedDate.trim();
     if (editSupplierSelection.value === 'CUSTOM') {
         if (!supplierName) {
             showToast('Supplier name is required for custom entry.', 'error');
-            isUpdatingStatus.value = false;
+            isUpdatingDetails.value = false;
             return;
         }
         if (supplierName !== (purchaseOrder.value.supplierName ?? '') || purchaseOrder.value.supplierId) {
@@ -677,7 +678,7 @@ const saveDetails = async () => {
     }
     if (Object.keys(payload).length === 0) {
         syncEditForm();
-        isUpdatingStatus.value = false;
+        isUpdatingDetails.value = false;
         return;
     }
     try {
@@ -689,7 +690,7 @@ const saveDetails = async () => {
         const message = error?.body?.error?.message || 'Unable to update purchase order.';
         showToast(message, 'error');
     } finally {
-        isUpdatingStatus.value = false;
+        isUpdatingDetails.value = false;
     }
 };
 

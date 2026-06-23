@@ -34,13 +34,13 @@
                             <label class="field">
                                 Supplier
                                 <div class="supplier-row">
-                                    <select v-model="supplierSelection" :disabled="!canWrite">
-                                        <option value="">No supplier</option>
-                                        <option value="CUSTOM">Custom entry</option>
-                                        <option v-for="supplier in suppliers" :key="supplier.id" :value="supplier.id">
-                                            {{ supplier.name }}
-                                        </option>
-                                    </select>
+                                    <SearchableSelect
+                                        v-model="supplierSelection"
+                                        :options="supplierOptions"
+                                        :disabled="!canWrite"
+                                        placeholder="No supplier"
+                                        search-placeholder="Search suppliers…"
+                                    />
                                     <button
                                         type="button"
                                         class="ghost-button"
@@ -149,26 +149,20 @@
                                             </select>
                                         </td>
                                         <td>
-                                            <select
-                                                v-model="line.itemId"
-                                                class="line-select line-select--wide"
+                                            <SearchableSelect
+                                                :ref="(el) => setItemRef(el, index)"
+                                                :model-value="line.itemId"
+                                                :options="lineItemOptions(line)"
                                                 :disabled="!line.itemType || !canWrite"
-                                                @change="syncLineCost(line)"
-                                            >
-                                                <option value="">{{ line.itemType ? 'Select item' : '—' }}</option>
-                                                <option
-                                                    v-for="item in availableItems(line.itemType)"
-                                                    :key="item.id"
-                                                    :value="item.id"
-                                                    :disabled="isItemSelected(line.itemType, item.id, line.key)"
-                                                >
-                                                    {{ item.name }}
-                                                </option>
-                                            </select>
+                                                :placeholder="line.itemType ? 'Select item' : '—'"
+                                                search-placeholder="Search items…"
+                                                @update:model-value="(val) => onLineItemSelected(line, index, val)"
+                                            />
                                         </td>
                                         <td class="td-qty">
                                             <div class="line-unit-wrap">
                                                 <input
+                                                    :ref="(el) => setQtyRef(el, index)"
                                                     v-model.number="line.qtyOrdered"
                                                     type="number"
                                                     min="0"
@@ -297,17 +291,18 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { listIngredients, IngredientResponse } from '@/api/ingredients';
 import { listProducts, ProductResponse } from '@/api/products';
-import { createPurchaseOrder } from '@/api/purchaseOrders';
+import { createPurchaseOrder, PurchaseOrderItemInput } from '@/api/purchaseOrders';
 import { createSupplier, listSuppliers, Supplier } from '@/api/suppliers';
 import { useToast } from '@/composables/useToast';
 import { useStoreContextStore } from '@/stores/storeContext';
 import { canAccess } from '@/utils/roleAccess';
 import { hasPlanFeature } from '@/utils/planAccess';
 import PlanGate from '@/components/PlanGate.vue';
+import SearchableSelect from '@/components/SearchableSelect.vue';
 
 const router = useRouter();
 const route = useRoute();
@@ -324,7 +319,15 @@ const supplierFormError = ref('');
 const showSupplierForm = ref(false);
 const supplierSelection = ref('');
 
-const formState = reactive({ supplierName: '', expectedDate: '' });
+// Default the expected delivery date to today (local).
+const todayStr = () => {
+    const d = new Date();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${d.getFullYear()}-${month}-${day}`;
+};
+
+const formState = reactive({ supplierName: '', expectedDate: todayStr() });
 const supplierForm = reactive({ name: '', email: '', phone: '' });
 
 const lineItems = ref<Array<{
@@ -351,6 +354,14 @@ const currentStoreLabel = computed(() => {
     return `${store.name} · ${store.currency}`;
 });
 
+// Options for the searchable supplier dropdown (keeps the "No supplier" and
+// "Custom entry" choices, then the store's suppliers).
+const supplierOptions = computed(() => [
+    { value: '', label: 'No supplier' },
+    { value: 'CUSTOM', label: 'Custom entry' },
+    ...suppliers.value.map((s) => ({ value: s.id, label: s.name })),
+]);
+
 const hasIncompleteLines = computed(() =>
     lineItems.value.some((l) => !l.itemType || !l.itemId || l.qtyOrdered <= 0)
 );
@@ -370,12 +381,46 @@ const isCreateDisabled = computed(() => {
     return hasIncompleteLines.value;
 });
 
+// Refs to each line's item dropdown so a new line can open it for searching.
+type ItemSelectInstance = { open: () => void };
+const itemSelectRefs = ref<ItemSelectInstance[]>([]);
+const setItemRef = (el: unknown, index: number) => {
+    if (el) itemSelectRefs.value[index] = el as ItemSelectInstance;
+};
+
 const addLine = () => {
     if (!canWrite.value) return;
-    lineItems.value.push({ key: `${Date.now()}-${Math.random()}`, itemType: '', itemId: '', qtyOrdered: 1, unitCost: 0, purchaseUnit: '', purchaseUnitSize: 1 });
+    lineItems.value.push({ key: `${Date.now()}-${Math.random()}`, itemType: 'INGREDIENT', itemId: '', qtyOrdered: 1, unitCost: 0, purchaseUnit: '', purchaseUnitSize: 1 });
+    // Open the new line's item dropdown so the user can search immediately.
+    const newIndex = lineItems.value.length - 1;
+    nextTick(() => itemSelectRefs.value[newIndex]?.open());
 };
 
 const removeLine = (index: number) => { lineItems.value.splice(index, 1); };
+
+// Refs to each line's qty input so we can jump focus there after item selection.
+const qtyRefs = ref<HTMLInputElement[]>([]);
+const setQtyRef = (el: unknown, index: number) => {
+    if (el) qtyRefs.value[index] = el as HTMLInputElement;
+};
+
+// Options for a line's searchable item dropdown — excludes items already chosen
+// on other lines so the same item can't be added twice.
+const lineItemOptions = (line: { itemType: '' | 'PRODUCT' | 'INGREDIENT'; itemId: string; key: string }) =>
+    availableItems(line.itemType)
+        .filter((item) => !isItemSelected(line.itemType, item.id, line.key))
+        .map((item) => ({ value: item.id, label: item.name }));
+
+const onLineItemSelected = (
+    line: { itemType: '' | 'PRODUCT' | 'INGREDIENT'; itemId: string; unitCost: number; purchaseUnit: string; purchaseUnitSize: number },
+    index: number,
+    value: string
+) => {
+    line.itemId = value;
+    syncLineCost(line);
+    // Move focus to this line's "Qty ordered" field once it has rendered.
+    nextTick(() => qtyRefs.value[index]?.focus());
+};
 
 const resetLineItem = (line: { itemId: string; unitCost: number; purchaseUnit: string; purchaseUnitSize: number }) => {
     line.itemId = '';
@@ -485,11 +530,13 @@ const createOrder = async () => {
             supplierId?: string;
             supplierName?: string;
             expectedDate?: string;
-            items: Array<{ itemType: string; itemId: string; qtyOrdered: number; unitCost: number }>;
+            items: PurchaseOrderItemInput[];
         } = {
             expectedDate: formState.expectedDate || undefined,
+            // Lines are guaranteed complete here (guarded by hasIncompleteLines),
+            // so itemType is always 'PRODUCT' | 'INGREDIENT', never ''.
             items: lineItems.value.map((l) => ({
-                itemType: l.itemType,
+                itemType: l.itemType as Exclude<typeof l.itemType, ''>,
                 itemId: l.itemId,
                 qtyOrdered: l.purchaseUnit ? l.qtyOrdered * l.purchaseUnitSize : l.qtyOrdered,
                 unitCost: l.purchaseUnit && l.purchaseUnitSize > 0 ? l.unitCost / l.purchaseUnitSize : l.unitCost,

@@ -231,7 +231,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { createStockAdjustment, listMovements, listStock, MovementRecord, StockItem } from '@/api/inventory';
 import { useToast } from '@/composables/useToast';
@@ -257,7 +257,7 @@ const highlightedIndex = ref(0);
 const itemSearchInput = ref<HTMLInputElement | null>(null);
 
 const form = reactive({
-    itemType: 'PRODUCT' as 'PRODUCT' | 'INGREDIENT',
+    itemType: 'INGREDIENT' as 'PRODUCT' | 'INGREDIENT',
     itemId: '',
     adjustmentMode: 'DELTA' as 'DELTA' | 'SET',
     qtyDelta: 0,
@@ -530,6 +530,9 @@ onMounted(async () => {
         storeContext.setCurrentStore(routeStoreId);
     }
     await loadStock();
+    // Land focus on the item search so the user can start typing immediately.
+    await nextTick();
+    if (canEdit.value) itemSearchInput.value?.focus();
     await loadMovements();
 });
 
