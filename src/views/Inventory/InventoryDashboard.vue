@@ -1,5 +1,7 @@
 <template>
     <section class="inventory-page">
+        <PullToRefresh :on-refresh="loadStock" :disabled="isLoading" />
+
         <div class="inventory-shell">
 
             <!-- HEADER -->
@@ -336,6 +338,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
+import PullToRefresh from '@/components/PullToRefresh.vue';
 import { useRoute, useRouter } from 'vue-router';
 import SkeletonLoader from '@/components/SkeletonLoader.vue';
 import { batchTransferStock, listStock, StockItem } from '@/api/inventory';

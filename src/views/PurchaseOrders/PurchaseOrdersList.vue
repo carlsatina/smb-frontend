@@ -1,5 +1,7 @@
 <template>
     <section class="po-page">
+        <PullToRefresh :on-refresh="loadOrders" :disabled="isLoading" />
+
         <div class="po-shell">
 
             <!-- HEADER -->
@@ -180,6 +182,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
+import PullToRefresh from '@/components/PullToRefresh.vue';
 import { useRoute, useRouter } from 'vue-router';
 import SkeletonLoader from '@/components/SkeletonLoader.vue';
 import { listPurchaseOrders, PurchaseOrderSummary } from '@/api/purchaseOrders';

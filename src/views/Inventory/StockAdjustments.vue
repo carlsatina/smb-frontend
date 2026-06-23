@@ -1,5 +1,7 @@
 <template>
     <section class="adjustment-page">
+        <PullToRefresh :on-refresh="loadStock" :disabled="isLoading" />
+
         <div class="adjustment-shell">
             <header class="adjustment-header">
                 <div class="adjustment-title">
@@ -232,6 +234,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
+import PullToRefresh from '@/components/PullToRefresh.vue';
 import { useRoute, useRouter } from 'vue-router';
 import { createStockAdjustment, listMovements, listStock, MovementRecord, StockItem } from '@/api/inventory';
 import { useToast } from '@/composables/useToast';

@@ -1,5 +1,7 @@
 <template>
     <section class="movements-page">
+        <PullToRefresh :on-refresh="loadMovements" :disabled="isLoading" />
+
         <div class="movements-shell">
             <header class="movements-header">
                 <div class="movements-title">
@@ -250,6 +252,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
+import PullToRefresh from '@/components/PullToRefresh.vue';
 import { useRoute, useRouter } from 'vue-router';
 import { listMovements, MovementRecord } from '@/api/inventory';
 import { useToast } from '@/composables/useToast';

@@ -1,5 +1,7 @@
 <template>
     <section class="product-page">
+        <PullToRefresh :on-refresh="loadProducts" :disabled="isLoading" />
+
         <ConfirmModal
             v-model:show="showDeleteModal"
             title="Delete Product"
@@ -281,6 +283,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
+import PullToRefresh from '@/components/PullToRefresh.vue';
 import { useRoute, useRouter } from 'vue-router';
 import { deleteProduct, exportProducts, importProducts, ImportResult, listProducts } from '@/api/products';
 import { useStoreContextStore } from '@/stores/storeContext';

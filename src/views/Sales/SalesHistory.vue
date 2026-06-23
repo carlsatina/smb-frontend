@@ -1,5 +1,7 @@
 <template>
     <section class="sales-page">
+        <PullToRefresh :on-refresh="loadSales" :disabled="isLoading" />
+
         <CsvImportPreviewModal
             :show="showImportPreview"
             :file="pendingImportFile"
@@ -305,6 +307,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
+import PullToRefresh from '@/components/PullToRefresh.vue';
 import { useRoute, useRouter } from 'vue-router';
 import SkeletonLoader from '@/components/SkeletonLoader.vue';
 import CsvImportPreviewModal from '@/components/CsvImportPreviewModal.vue';

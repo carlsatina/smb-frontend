@@ -1,5 +1,7 @@
 <template>
     <section class="ingredients-page">
+        <PullToRefresh :on-refresh="loadIngredients" :disabled="isLoading" />
+
         <ConfirmModal
             v-model:show="showDeleteModal"
             title="Delete ingredient"
@@ -287,6 +289,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
+import PullToRefresh from '@/components/PullToRefresh.vue';
 import { useRoute, useRouter } from 'vue-router';
 import {
     deleteIngredient,

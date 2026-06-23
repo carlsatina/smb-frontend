@@ -1,5 +1,7 @@
 <template>
     <section class="reports-page">
+        <PullToRefresh :on-refresh="loadReports" :disabled="isLoading" />
+
         <div class="reports-shell">
             <header class="reports-header">
                 <div class="reports-title">
@@ -728,6 +730,7 @@ import {
 } from '@/api/reports';
 import { getExpenseSummary } from '@/api/expenses';
 import { suppressLoading, resumeLoading } from '@/composables/useLoading';
+import PullToRefresh from '@/components/PullToRefresh.vue';
 import { useStoreContextStore } from '@/stores/storeContext';
 import { useUserContextStore } from '@/stores/userContext';
 import { canAccess } from '@/utils/roleAccess';

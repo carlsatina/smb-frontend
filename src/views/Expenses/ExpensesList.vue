@@ -1,5 +1,7 @@
 <template>
     <div class="ex-page">
+        <PullToRefresh :on-refresh="loadExpenses" :disabled="isLoading" />
+
         <div class="ex-header">
             <div>
                 <h1 class="ex-title">Expenses</h1>
@@ -125,6 +127,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onMounted, reactive, ref } from 'vue';
+import PullToRefresh from '@/components/PullToRefresh.vue';
 import { useStoreContextStore } from '@/stores/storeContext';
 import { useToast } from '@/composables/useToast';
 import { canAccess } from '@/utils/roleAccess';
