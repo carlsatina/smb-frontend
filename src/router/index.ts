@@ -178,7 +178,7 @@ const routes: Array<RouteRecordRaw> = [
     path: '/stores/:storeId/ai-insights',
     name: 'ai-insights',
     component: AiInsights,
-    meta: { requiresAuth: true }
+    meta: { requiresAuth: true, feature: 'aiInsights' }
   },
   {
     path: '/stores/:storeId/expenses',
@@ -190,7 +190,7 @@ const routes: Array<RouteRecordRaw> = [
     path: '/stores/:storeId/daily-sales',
     name: 'daily-sales',
     component: DailySalesView,
-    meta: { requiresAuth: true }
+    meta: { requiresAuth: true, feature: 'dailySales' }
   },
   {
     path: '/stores/:storeId/team',
@@ -317,9 +317,12 @@ router.beforeEach(async (to) => {
     return { name: 'home', query: { redirect: to.fullPath } }
   }
 
-  // Redirect to stores if already logged in and trying to access auth routes
-  if (isAuthRoute && token) {
-    return { name: 'stores' }
+  // Redirect into the app if already logged in and landing on an auth route or
+  // the marketing/landing page. This is what lets the mobile app skip the login
+  // screen on relaunch when a valid session is still stored.
+  if ((isAuthRoute || to.name === 'home') && token) {
+    const redirectTo = to.query.redirect as string | undefined
+    return redirectTo ? { path: redirectTo } : { name: 'stores' }
   }
 
   // For any authenticated store-scoped route, ensure stores are loaded and current store is synced
