@@ -2,7 +2,7 @@ import { CapacitorConfig } from '@capacitor/cli';
 import * as dotenv from 'dotenv';
 
 const config: CapacitorConfig = {
-    appId: 'com.rolero.quickworks',
+    appId: 'com.pos.smb',
     appName: 'SMB PoS',
     webDir: 'dist',
     // server: {

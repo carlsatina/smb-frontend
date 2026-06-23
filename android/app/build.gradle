@@ -1,10 +1,10 @@
 apply plugin: 'com.android.application'
 
 android {
-    namespace "com.rolero.quickworks"
+    namespace "com.pos.smb"
     compileSdkVersion rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.rolero.quickworks"
+        applicationId "com.pos.smb"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 2

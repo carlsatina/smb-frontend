@@ -1,4 +1,4 @@
-package com.rolero.quickworks;
+package com.pos.smb;
 
 import android.os.Bundle;
 import com.getcapacitor.BridgeActivity;
