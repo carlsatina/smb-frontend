@@ -200,7 +200,7 @@
             <div v-if="isMobileMenuOpen && isAuthenticated && currentStoreId" class="topnav__mobile">
                 <div class="topnav__mobile-links">
                     <RouterLink
-                        v-for="link in primaryLinks"
+                        v-for="link in mobilePrimaryLinks"
                         :key="link.key"
                         :to="`/stores/${currentStoreId}/${link.route}`"
                         class="topnav__mobile-item"
@@ -419,6 +419,14 @@ const bottomNavLinks = computed(() => primaryLinks.value.slice(0, 5));
 const showBottomNav = computed(
     () => isAuthenticated.value && Boolean(currentStoreId.value) && bottomNavLinks.value.length > 0
 );
+
+// Hamburger menu: skip primary links already shown in the bottom tab bar to
+// avoid duplication. Any primary links beyond the bar's cap still surface here.
+const mobilePrimaryLinks = computed(() => {
+    if (!showBottomNav.value) return primaryLinks.value;
+    const bottomKeys = new Set(bottomNavLinks.value.map((l) => l.key));
+    return primaryLinks.value.filter((l) => !bottomKeys.has(l.key));
+});
 
 // Reserve space at the bottom of the page so the fixed bar never covers content.
 watch(

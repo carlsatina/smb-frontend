@@ -1,64 +1,144 @@
 <template>
-    <div class="root">
-            <teleport to="body">
-                <transition name="fade" appear>
-                <div class="modal" @keyup.esc="close" tabindex="0">
-                    <div class="modal-container text-center" ref="modal" >
-                        <img src="@/assets/loading.gif" width="80"/>
+    <teleport to="body">
+        <transition name="loading-fade" appear>
+            <div class="loading-overlay" role="status" aria-live="polite" aria-busy="true">
+                <div class="loading-card">
+                    <div class="loading-spinner">
+                        <span class="loading-spinner__ring"></span>
+                        <span class="loading-spinner__core"></span>
                     </div>
+                    <p class="loading-text">{{ label }}</p>
+                    <span class="sr-only">Loading, please wait…</span>
                 </div>
-                </transition>
-            </teleport>
-    </div>
+            </div>
+        </transition>
+    </teleport>
 </template>
 
-<script>
-import { onClickOutside } from '@vueuse/core'
-import { ref, defineProps } from 'vue'
-
-export default {
-    name: 'Loading',
-    setup(props, { emit }) {
-        const modal = ref(null)
-
-        return {
-            modal
-        }
-
-
-    },
-};
+<script setup lang="ts">
+withDefaults(defineProps<{ label?: string }>(), { label: 'Loading…' });
 </script>
 
-<style lang="scss" scoped>
-.modal {
+<script lang="ts">
+export default { name: 'Loading' };
+</script>
+
+<style scoped>
+.loading-overlay {
     position: fixed;
-    top: 0;
-    left: 0;
-    background-color: rgba(0,0,0,0.2);
-    width: 100%;
-    height: 100%;
+    inset: 0;
+    z-index: 1000;
     display: flex;
-    justify-content: center;
     align-items: center;
-    z-index: 999;
+    justify-content: center;
+    background: radial-gradient(
+        120% 120% at 50% 40%,
+        rgba(15, 23, 42, 0.55) 0%,
+        rgba(15, 23, 42, 0.78) 100%
+    );
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    font-family: var(--app-font-sans);
 }
 
-.modal-container {
-    background-color: transparent;
-    padding: 25px 30px 30px;
-    border-radius: 10px;
-    width: 550px;
+.loading-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.1rem;
+    padding: 2rem 2.5rem;
+    border-radius: 20px;
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.5);
+    animation: loading-pop 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.fade-enter-active,
-.fade-leave-active {
-    transition: all 0.5s ease;
+/* ── Spinner ── */
+.loading-spinner {
+    position: relative;
+    width: 58px;
+    height: 58px;
 }
 
-.fade-enter-from,
-.fade-leave-to {
+.loading-spinner__ring {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: conic-gradient(
+        from 0deg,
+        rgba(45, 212, 191, 0) 0%,
+        rgba(45, 212, 191, 0.15) 35%,
+        #2dd4bf 100%
+    );
+    -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 5px));
+    mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 5px));
+    animation: loading-spin 0.9s linear infinite;
+}
+
+.loading-spinner__core {
+    position: absolute;
+    inset: 50%;
+    width: 8px;
+    height: 8px;
+    margin: -4px 0 0 -4px;
+    border-radius: 50%;
+    background: #2dd4bf;
+    box-shadow: 0 0 12px rgba(45, 212, 191, 0.7);
+    animation: loading-pulse 1.4s ease-in-out infinite;
+}
+
+.loading-text {
+    margin: 0;
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: rgba(241, 245, 249, 0.85);
+    animation: loading-pulse 1.6s ease-in-out infinite;
+}
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* ── Animations ── */
+@keyframes loading-spin {
+    to { transform: rotate(360deg); }
+}
+
+@keyframes loading-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.45; }
+}
+
+@keyframes loading-pop {
+    from { opacity: 0; transform: scale(0.92) translateY(6px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* ── Enter/leave transition ── */
+.loading-fade-enter-active,
+.loading-fade-leave-active {
+    transition: opacity 0.25s ease;
+}
+
+.loading-fade-enter-from,
+.loading-fade-leave-to {
     opacity: 0;
 }
 
+@media (prefers-reduced-motion: reduce) {
+    .loading-spinner__ring { animation-duration: 1.6s; }
+    .loading-spinner__core,
+    .loading-text { animation: none; }
+    .loading-card { animation: none; }
+}
 </style>

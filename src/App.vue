@@ -2,6 +2,7 @@
     <TopNav v-if="showTopNav" />
     <ToastHost />
     <PlanUpgradeModal :open="planModalOpen" :feature="planModalFeature" :message="planModalMessage" @close="closePlanModal" />
+    <Loading v-if="isLoading" />
     <router-view />
 </template>
 
@@ -11,7 +12,9 @@ import { useRoute, useRouter } from 'vue-router';
 import TopNav from '@/components/Navigation/TopNav.vue';
 import ToastHost from '@/components/ToastHost.vue';
 import PlanUpgradeModal from '@/components/PlanUpgradeModal.vue';
+import Loading from '@/components/Loading.vue';
 import { useUserContextStore } from '@/stores/userContext';
+import { isLoading } from '@/composables/useLoading';
 import type { PlanFeature } from '@/utils/planAccess';
 
 const route = useRoute();

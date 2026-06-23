@@ -129,7 +129,7 @@
                 </div>
             </header>
 
-            <div v-if="storeContext.currentStoreId && canViewReports" class="reports-kpis">
+            <div v-if="storeContext.currentStoreId && canViewReports" :key="`kpis-${revealKey}`" class="reports-kpis reports-reveal">
                 <div class="kpi-card kpi-card--sales">
                     <div class="kpi-head">
                         <span class="kpi-icon"><mdicon name="cash-multiple" size="18" /></span>
@@ -223,7 +223,7 @@
                 {{ errorMessage }}
             </div>
 
-            <div v-else class="reports-grid">
+            <div v-else :key="`grid-${revealKey}`" class="reports-grid reports-reveal">
                 <section v-if="visibleCards['sales-charts']" class="report-card report-card--wide charts-row" :class="{ 'charts-row--single': isSingleDay }">
                     <div v-if="!isSingleDay" class="chart-panel">
                         <div class="chart-panel-header">
@@ -727,6 +727,7 @@ import {
     TopProductRecord,
 } from '@/api/reports';
 import { getExpenseSummary } from '@/api/expenses';
+import { suppressLoading, resumeLoading } from '@/composables/useLoading';
 import { useStoreContextStore } from '@/stores/storeContext';
 import { useUserContextStore } from '@/stores/userContext';
 import { canAccess } from '@/utils/roleAccess';
@@ -756,6 +757,9 @@ const activeRange = ref<'TODAY' | 'LAST_7' | 'LAST_30' | 'THIS_MONTH' | null>('T
 const isSettingRange = ref(false);
 
 const isLoading = ref(false);
+// Bumped after every load so the KPI/report cards re-trigger their staggered
+// entrance animation each time fresh data arrives.
+const revealKey = ref(0);
 const errorMessage = ref('');
 const salesDays = ref<SalesByDayRecord[]>([]);
 const salesSummary = ref<SalesSummaryTotals>({
@@ -967,28 +971,33 @@ const loadReports = async () => {
     isLoading.value = true;
     errorMessage.value = '';
     try {
+        // Build all requests under suppression so the page's own skeletons +
+        // staggered reveal handle the loading UI instead of the global overlay.
+        suppressLoading();
+        const reportRequests = [
+            getSalesSummary(storeId, { from: filters.from, to: filters.to }),
+            getSalesByDay(storeId, { from: filters.from, to: filters.to }),
+            getSalesByHour(storeId, { from: filters.from, to: filters.to }),
+            getTopProducts(storeId, { from: filters.from, to: filters.to, limit: 3 }),
+            getProductsSold(storeId, { from: filters.from, to: filters.to, limit: 100 }),
+            getProfitSummary(storeId, { from: filters.from, to: filters.to }),
+            getLowStock(storeId, { limit: 8 }),
+            canUseIngredients.value
+                ? getIngredientUsage(storeId, { from: filters.from, to: filters.to, limit: 8 })
+                : Promise.resolve({ ingredients: [] as IngredientUsageRecord[] }),
+            canUsePurchaseOrders.value
+                ? getPurchaseSpend(storeId, { from: filters.from, to: filters.to, limit: 8 })
+                : Promise.resolve({ suppliers: [] as PurchaseSpendRecord[], summary: { totalSpend: 0, totalReceipts: 0, avgReceipt: 0 } as PurchaseSpendSummary }),
+            getProductMargins(storeId, { from: filters.from, to: filters.to, limit: 8 }),
+            getPaymentMethodBreakdown(storeId, { from: filters.from, to: filters.to }),
+            getEmployeeSales(storeId, { from: filters.from, to: filters.to }),
+            canUseExpenses.value
+                ? getExpenseSummary(storeId, filters.from, filters.to)
+                : Promise.resolve({ range: { from: filters.from, to: filters.to }, total: 0, byCategory: [] }),
+        ] as const;
+        resumeLoading();
         const [summary, sales, hourly, top, soldPerProduct, profit, lowStock, usage, spend, margins, paymentBreakdown, empSales, expense] =
-            await Promise.allSettled([
-                getSalesSummary(storeId, { from: filters.from, to: filters.to }),
-                getSalesByDay(storeId, { from: filters.from, to: filters.to }),
-                getSalesByHour(storeId, { from: filters.from, to: filters.to }),
-                getTopProducts(storeId, { from: filters.from, to: filters.to, limit: 3 }),
-                getProductsSold(storeId, { from: filters.from, to: filters.to, limit: 100 }),
-                getProfitSummary(storeId, { from: filters.from, to: filters.to }),
-                getLowStock(storeId, { limit: 8 }),
-                canUseIngredients.value
-                    ? getIngredientUsage(storeId, { from: filters.from, to: filters.to, limit: 8 })
-                    : Promise.resolve({ ingredients: [] as IngredientUsageRecord[] }),
-                canUsePurchaseOrders.value
-                    ? getPurchaseSpend(storeId, { from: filters.from, to: filters.to, limit: 8 })
-                    : Promise.resolve({ suppliers: [] as PurchaseSpendRecord[], summary: { totalSpend: 0, totalReceipts: 0, avgReceipt: 0 } as PurchaseSpendSummary }),
-                getProductMargins(storeId, { from: filters.from, to: filters.to, limit: 8 }),
-                getPaymentMethodBreakdown(storeId, { from: filters.from, to: filters.to }),
-                getEmployeeSales(storeId, { from: filters.from, to: filters.to }),
-                canUseExpenses.value
-                    ? getExpenseSummary(storeId, filters.from, filters.to)
-                    : Promise.resolve({ range: { from: filters.from, to: filters.to }, total: 0, byCategory: [] }),
-            ]);
+            await Promise.allSettled(reportRequests);
         if (summary.status === 'fulfilled') salesSummary.value = summary.value.totals;
         if (sales.status === 'fulfilled') salesDays.value = sales.value.days;
         if (hourly.status === 'fulfilled') hourlySales.value = hourly.value.hours;
@@ -1018,6 +1027,7 @@ const loadReports = async () => {
         errorMessage.value = error?.body?.error?.message || 'Unable to load reports.';
     } finally {
         isLoading.value = false;
+        revealKey.value += 1;
     }
 };
 
@@ -1604,6 +1614,32 @@ watch(
     display: flex;
     flex-wrap: wrap;
     gap: 0.75rem;
+}
+
+/* ── Staggered entrance: cards rise in each time fresh data loads ── */
+@keyframes report-rise {
+    from { opacity: 0; transform: translateY(12px) scale(0.99); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* `backwards` holds the hidden state during the stagger delay, then hands
+   styling back so hover transitions on the cards keep working. */
+.reports-reveal > * {
+    animation: report-rise 0.5s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+.reports-reveal > *:nth-child(1) { animation-delay: 0.03s; }
+.reports-reveal > *:nth-child(2) { animation-delay: 0.07s; }
+.reports-reveal > *:nth-child(3) { animation-delay: 0.11s; }
+.reports-reveal > *:nth-child(4) { animation-delay: 0.15s; }
+.reports-reveal > *:nth-child(5) { animation-delay: 0.19s; }
+.reports-reveal > *:nth-child(6) { animation-delay: 0.23s; }
+.reports-reveal > *:nth-child(7) { animation-delay: 0.27s; }
+.reports-reveal > *:nth-child(8) { animation-delay: 0.31s; }
+.reports-reveal > *:nth-child(9) { animation-delay: 0.35s; }
+.reports-reveal > *:nth-child(n+10) { animation-delay: 0.39s; }
+
+@media (prefers-reduced-motion: reduce) {
+    .reports-reveal > * { animation: none; }
 }
 
 .kpi-card {

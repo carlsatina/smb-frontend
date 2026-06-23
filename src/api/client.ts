@@ -1,3 +1,5 @@
+import { startLoading, stopLoading, isLoadingSuppressed } from '@/composables/useLoading';
+
 const baseUrl = import.meta.env.VITE_BACKEND_API || '';
 const csrfCookieName = import.meta.env.VITE_CSRF_COOKIE_NAME || 'csrfToken';
 const adminCsrfCookieName = `${csrfCookieName}.admin`;
@@ -11,6 +13,8 @@ const ADMIN_CSRF_KEY = 'adminCsrfToken';
 type RequestOptions = {
     method?: string;
     body?: unknown;
+    // Set true to suppress the global loading overlay (e.g. background polling).
+    silent?: boolean;
 };
 
 const getCookieValue = (name: string) => {
@@ -112,102 +116,120 @@ const maybeDispatchPlanUpgrade = (errorBody: any) => {
 
 export const apiClient = {
     async request<T>(path: string, options: RequestOptions = {}) {
-        const admin = isAdminPath(path);
-        const makeRequest = async () =>
-            fetch(`${baseUrl}${path}`, {
-                method: options.method ?? 'GET',
-                headers: buildHeaders(admin),
-                body: options.body ? JSON.stringify(options.body) : undefined,
-                credentials: 'include',
-            });
+        const showOverlay = !options.silent && !isLoadingSuppressed();
+        if (showOverlay) startLoading();
+        try {
+            const admin = isAdminPath(path);
+            const makeRequest = async () =>
+                fetch(`${baseUrl}${path}`, {
+                    method: options.method ?? 'GET',
+                    headers: buildHeaders(admin),
+                    body: options.body ? JSON.stringify(options.body) : undefined,
+                    credentials: 'include',
+                });
 
-        let response = await makeRequest();
+            let response = await makeRequest();
 
-        const isRefreshRequest = path.includes('/auth/refresh');
-        if (response.status === 401 && !isRefreshRequest) {
-            const refreshed = await refreshSession(admin);
-            if (refreshed) {
-                response = await makeRequest();
+            const isRefreshRequest = path.includes('/auth/refresh');
+            if (response.status === 401 && !isRefreshRequest) {
+                const refreshed = await refreshSession(admin);
+                if (refreshed) {
+                    response = await makeRequest();
+                }
             }
-        }
 
-        if (!response.ok) {
-            let errorBody: any = null;
-            try {
-                errorBody = await response.json();
-            } catch (error) {
-                errorBody = null;
+            if (!response.ok) {
+                let errorBody: any = null;
+                try {
+                    errorBody = await response.json();
+                } catch (error) {
+                    errorBody = null;
+                }
+                maybeDispatchPlanUpgrade(errorBody);
+                throw { status: response.status, body: errorBody };
             }
-            maybeDispatchPlanUpgrade(errorBody);
-            throw { status: response.status, body: errorBody };
-        }
 
-        if (response.status === 204) {
-            return {} as T;
-        }
+            if (response.status === 204) {
+                return {} as T;
+            }
 
-        return response.json() as Promise<T>;
+            return response.json() as Promise<T>;
+        } finally {
+            if (showOverlay) stopLoading();
+        }
     },
     async download(path: string, options: RequestOptions = {}) {
-        const admin = isAdminPath(path);
-        const makeRequest = async () =>
-            fetch(`${baseUrl}${path}`, {
-                method: options.method ?? 'GET',
-                headers: buildHeaders(admin),
-                body: options.body ? JSON.stringify(options.body) : undefined,
+        const showOverlay = !options.silent && !isLoadingSuppressed();
+        if (showOverlay) startLoading();
+        try {
+            const admin = isAdminPath(path);
+            const makeRequest = async () =>
+                fetch(`${baseUrl}${path}`, {
+                    method: options.method ?? 'GET',
+                    headers: buildHeaders(admin),
+                    body: options.body ? JSON.stringify(options.body) : undefined,
+                    credentials: 'include',
+                });
+
+            let response = await makeRequest();
+
+            const isRefreshRequest = path.includes('/auth/refresh');
+            if (response.status === 401 && !isRefreshRequest) {
+                const refreshed = await refreshSession(admin);
+                if (refreshed) {
+                    response = await makeRequest();
+                }
+            }
+
+            if (!response.ok) {
+                let errorBody: any = null;
+                try {
+                    errorBody = await response.json();
+                } catch (error) {
+                    errorBody = null;
+                }
+                maybeDispatchPlanUpgrade(errorBody);
+                throw { status: response.status, body: errorBody };
+            }
+
+            const blob = await response.blob();
+            const contentDisposition = response.headers.get('content-disposition') ?? '';
+            const filenameMatch =
+                contentDisposition.match(/filename\*=UTF-8''([^;]+)/i) ||
+                contentDisposition.match(/filename=\"?([^\";]+)\"?/i);
+            const filename = filenameMatch ? decodeURIComponent(filenameMatch[1]) : 'export.csv';
+
+            return { blob, filename };
+        } finally {
+            if (showOverlay) stopLoading();
+        }
+    },
+    async upload<T>(path: string, body: FormData, options: { silent?: boolean } = {}): Promise<T> {
+        const showOverlay = !options.silent && !isLoadingSuppressed();
+        if (showOverlay) startLoading();
+        try {
+            const admin = isAdminPath(path);
+            const headers = buildHeaders(admin);
+            delete headers['Content-Type'];
+
+            const response = await fetch(`${baseUrl}${path}`, {
+                method: 'POST',
+                headers,
+                body,
                 credentials: 'include',
             });
 
-        let response = await makeRequest();
-
-        const isRefreshRequest = path.includes('/auth/refresh');
-        if (response.status === 401 && !isRefreshRequest) {
-            const refreshed = await refreshSession(admin);
-            if (refreshed) {
-                response = await makeRequest();
+            if (!response.ok) {
+                let errorBody: any = null;
+                try { errorBody = await response.json(); } catch { errorBody = null; }
+                maybeDispatchPlanUpgrade(errorBody);
+                throw { status: response.status, body: errorBody };
             }
+
+            return response.json() as Promise<T>;
+        } finally {
+            if (showOverlay) stopLoading();
         }
-
-        if (!response.ok) {
-            let errorBody: any = null;
-            try {
-                errorBody = await response.json();
-            } catch (error) {
-                errorBody = null;
-            }
-            maybeDispatchPlanUpgrade(errorBody);
-            throw { status: response.status, body: errorBody };
-        }
-
-        const blob = await response.blob();
-        const contentDisposition = response.headers.get('content-disposition') ?? '';
-        const filenameMatch =
-            contentDisposition.match(/filename\*=UTF-8''([^;]+)/i) ||
-            contentDisposition.match(/filename=\"?([^\";]+)\"?/i);
-        const filename = filenameMatch ? decodeURIComponent(filenameMatch[1]) : 'export.csv';
-
-        return { blob, filename };
-    },
-    async upload<T>(path: string, body: FormData): Promise<T> {
-        const admin = isAdminPath(path);
-        const headers = buildHeaders(admin);
-        delete headers['Content-Type'];
-
-        const response = await fetch(`${baseUrl}${path}`, {
-            method: 'POST',
-            headers,
-            body,
-            credentials: 'include',
-        });
-
-        if (!response.ok) {
-            let errorBody: any = null;
-            try { errorBody = await response.json(); } catch { errorBody = null; }
-            maybeDispatchPlanUpgrade(errorBody);
-            throw { status: response.status, body: errorBody };
-        }
-
-        return response.json() as Promise<T>;
     },
 };
 

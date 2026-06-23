@@ -46,7 +46,9 @@ export const updateDailySalesEntry = (storeId: string, entryId: string, data: { 
     apiClient.request<{ entry: object }>(`/api/v1/stores/${storeId}/daily-sales/${entryId}`, { method: 'PATCH', body: data });
 
 export const getPosForDate = (storeId: string, date: string) =>
-    apiClient.request<{ pos: number; seniorDiscount: number }>(`/api/v1/stores/${storeId}/daily-sales/pos?date=${date}`);
+    // silent: this is a debounced auto-calc with its own inline indicator —
+    // it shouldn't trigger the global loading overlay.
+    apiClient.request<{ pos: number; seniorDiscount: number }>(`/api/v1/stores/${storeId}/daily-sales/pos?date=${date}`, { silent: true });
 
 export const deleteDailySalesEntry = (storeId: string, entryId: string) =>
     apiClient.request<void>(`/api/v1/stores/${storeId}/daily-sales/${entryId}`, { method: 'DELETE' });
