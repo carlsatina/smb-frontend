@@ -37,6 +37,24 @@ export function usePullToRefresh(onRefresh: () => Promise<void> | void, options:
         lastScrollAt = Date.now();
     };
 
+    // The window isn't the only scroller: lists/tables live inside nested
+    // `overflow-y: auto` containers (e.g. `.table-scroll`). When the touch begins
+    // inside one of those and it isn't at its own top, the gesture is an inner
+    // scroll-up, not a page pull — even though `window.scrollY` still reads 0.
+    const startsInsideScrolledContainer = (target: EventTarget | null) => {
+        let el = target instanceof Element ? target : null;
+        while (el && el !== document.body && el !== document.documentElement) {
+            if (el.scrollTop > 0) {
+                const overflowY = getComputedStyle(el).overflowY;
+                if ((overflowY === 'auto' || overflowY === 'scroll') && el.scrollHeight > el.clientHeight) {
+                    return true;
+                }
+            }
+            el = el.parentElement;
+        }
+        return false;
+    };
+
     const reset = () => {
         tracking = false;
         pullDistance.value = 0;
@@ -49,7 +67,9 @@ export function usePullToRefresh(onRefresh: () => Promise<void> | void, options:
             e.touches.length !== 1 ||
             scrollTop() > 0 ||
             // Page is still coasting/settling (e.g. just scrolled back up) — not a deliberate pull.
-            Date.now() - lastScrollAt < settleDelay
+            Date.now() - lastScrollAt < settleDelay ||
+            // Touch began inside a nested scroll container that isn't at its top.
+            startsInsideScrolledContainer(e.target)
         ) {
             tracking = false;
             return;
@@ -90,7 +110,8 @@ export function usePullToRefresh(onRefresh: () => Promise<void> | void, options:
     };
 
     onMounted(() => {
-        window.addEventListener('scroll', onScroll, { passive: true });
+        // Capture phase so scrolls inside nested containers (which don't bubble) count too.
+        window.addEventListener('scroll', onScroll, { passive: true, capture: true });
         window.addEventListener('touchstart', onTouchStart, { passive: true });
         window.addEventListener('touchmove', onTouchMove, { passive: false });
         window.addEventListener('touchend', onTouchEnd, { passive: true });
@@ -98,7 +119,7 @@ export function usePullToRefresh(onRefresh: () => Promise<void> | void, options:
     });
 
     onBeforeUnmount(() => {
-        window.removeEventListener('scroll', onScroll);
+        window.removeEventListener('scroll', onScroll, { capture: true });
         window.removeEventListener('touchstart', onTouchStart);
         window.removeEventListener('touchmove', onTouchMove);
         window.removeEventListener('touchend', onTouchEnd);
