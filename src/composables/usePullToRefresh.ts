@@ -18,14 +18,24 @@ export function usePullToRefresh(onRefresh: () => Promise<void> | void, options:
     const maxPull = options.maxPull ?? 120;
     const isEnabled = options.isEnabled ?? (() => true);
 
+    const settleDelay = 250; // ms the page must be still at the top before a pull can arm
+
     const pullDistance = ref(0);
     const isRefreshing = ref(false);
 
     let startY = 0;
     let tracking = false;
+    let lastScrollAt = 0; // timestamp of the most recent scroll event
 
     const scrollTop = () =>
         window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0;
+
+    // Momentum/inertial scrolling keeps firing scroll events as it settles. Pulling
+    // back up to the top leaves the page coasting with scrollTop briefly reading 0,
+    // which would otherwise arm a pull. Require the page to be still first.
+    const onScroll = () => {
+        lastScrollAt = Date.now();
+    };
 
     const reset = () => {
         tracking = false;
@@ -33,7 +43,14 @@ export function usePullToRefresh(onRefresh: () => Promise<void> | void, options:
     };
 
     const onTouchStart = (e: TouchEvent) => {
-        if (!isEnabled() || isRefreshing.value || e.touches.length !== 1 || scrollTop() > 0) {
+        if (
+            !isEnabled() ||
+            isRefreshing.value ||
+            e.touches.length !== 1 ||
+            scrollTop() > 0 ||
+            // Page is still coasting/settling (e.g. just scrolled back up) — not a deliberate pull.
+            Date.now() - lastScrollAt < settleDelay
+        ) {
             tracking = false;
             return;
         }
@@ -73,6 +90,7 @@ export function usePullToRefresh(onRefresh: () => Promise<void> | void, options:
     };
 
     onMounted(() => {
+        window.addEventListener('scroll', onScroll, { passive: true });
         window.addEventListener('touchstart', onTouchStart, { passive: true });
         window.addEventListener('touchmove', onTouchMove, { passive: false });
         window.addEventListener('touchend', onTouchEnd, { passive: true });
@@ -80,6 +98,7 @@ export function usePullToRefresh(onRefresh: () => Promise<void> | void, options:
     });
 
     onBeforeUnmount(() => {
+        window.removeEventListener('scroll', onScroll);
         window.removeEventListener('touchstart', onTouchStart);
         window.removeEventListener('touchmove', onTouchMove);
         window.removeEventListener('touchend', onTouchEnd);
