@@ -603,6 +603,9 @@ const goToMovements = () => {
 };
 
 onMounted(async () => {
+    // Show the skeleton from the first frame so the store fetch doesn't briefly
+    // flash the empty-state table before the first load kicks in.
+    isLoading.value = true;
     await storeContext.fetchStores();
     const routeStoreId = route.params.storeId as string | undefined;
     if (routeStoreId && routeStoreId !== storeContext.currentStoreId) {
@@ -731,10 +734,12 @@ watch(
    KPI CARDS
 ============================================================ */
 .inventory-kpis {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
     gap: 0.75rem;
-    align-items: flex-start;
+    align-items: stretch;
+    flex: 1 1 340px;
+    min-width: 0;
 }
 
 .kpi-card {
@@ -745,7 +750,7 @@ watch(
     background: var(--c-surface);
     border: 1px solid var(--c-border);
     border-radius: 12px;
-    min-width: 120px;
+    min-width: 0;
     transition: border-color 0.15s;
 }
 

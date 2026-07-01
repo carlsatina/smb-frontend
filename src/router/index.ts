@@ -322,7 +322,16 @@ router.beforeEach(async (to) => {
   // screen on relaunch when a valid session is still stored.
   if ((isAuthRoute || to.name === 'home') && token) {
     const redirectTo = to.query.redirect as string | undefined
-    return redirectTo ? { path: redirectTo } : { name: 'stores' }
+    if (redirectTo) {
+      return { path: redirectTo }
+    }
+    // Land on the reports page for the last-used store when relaunching with a
+    // valid session. If no store is remembered (or it turns out to be invalid),
+    // fall back to the store picker — the feature guard below handles the rest.
+    const lastStoreId = localStorage.getItem('currentStoreId')
+    return lastStoreId
+      ? { name: 'reports', params: { storeId: lastStoreId } }
+      : { name: 'stores' }
   }
 
   // For any authenticated store-scoped route, ensure stores are loaded and current store is synced

@@ -131,7 +131,17 @@
                 </div>
             </header>
 
-            <div v-if="storeContext.currentStoreId && canViewReports" :key="`kpis-${revealKey}`" class="reports-kpis reports-reveal">
+            <div
+                v-if="storeContext.currentStoreId && canViewReports && !hasLoaded"
+                class="reports-kpis reports-kpis--loading"
+                aria-hidden="true"
+            >
+                <div v-for="n in 6" :key="`kpi-skel-${n}`" class="kpi-card kpi-card--skeleton">
+                    <SkeletonLoader :rows="2" />
+                </div>
+            </div>
+
+            <div v-if="storeContext.currentStoreId && canViewReports && hasLoaded" :key="`kpis-${revealKey}`" class="reports-kpis reports-reveal">
                 <div class="kpi-card kpi-card--sales">
                     <div class="kpi-head">
                         <span class="kpi-icon"><mdicon name="cash-multiple" size="18" /></span>
@@ -223,6 +233,12 @@
 
             <div v-else-if="errorMessage" class="panel-state panel-state--error">
                 {{ errorMessage }}
+            </div>
+
+            <div v-else-if="!hasLoaded" class="reports-grid" aria-hidden="true">
+                <section v-for="n in 4" :key="`grid-skel-${n}`" class="report-card">
+                    <SkeletonLoader :rows="4" label="Loading reports…" />
+                </section>
             </div>
 
             <div v-else :key="`grid-${revealKey}`" class="reports-grid reports-reveal">
@@ -763,6 +779,10 @@ const isLoading = ref(false);
 // Bumped after every load so the KPI/report cards re-trigger their staggered
 // entrance animation each time fresh data arrives.
 const revealKey = ref(0);
+// False until the first load settles. Gates the reveal sections so they mount
+// (and animate) exactly once — with real data — instead of animating first on
+// the empty initial render and then again after data arrives.
+const hasLoaded = ref(false);
 const errorMessage = ref('');
 const salesDays = ref<SalesByDayRecord[]>([]);
 const salesSummary = ref<SalesSummaryTotals>({
@@ -969,6 +989,7 @@ const loadReports = async () => {
         purchaseSpendSummary.value = { totalSpend: 0, totalReceipts: 0, avgReceipt: 0 };
         paymentMethods.value = [];
         employeeSales.value = [];
+        hasLoaded.value = true;
         return;
     }
     isLoading.value = true;
@@ -1030,6 +1051,7 @@ const loadReports = async () => {
         errorMessage.value = error?.body?.error?.message || 'Unable to load reports.';
     } finally {
         isLoading.value = false;
+        hasLoaded.value = true;
         revealKey.value += 1;
     }
 };
@@ -1617,6 +1639,15 @@ watch(
     display: flex;
     flex-wrap: wrap;
     gap: 0.75rem;
+}
+
+/* Neutral placeholder cards shown only during the very first load, before any
+   data (and the staggered reveal animation) arrives. */
+.kpi-card--skeleton {
+    background: var(--c-surface);
+    border-color: var(--c-border);
+    min-height: 88px;
+    justify-content: center;
 }
 
 /* ── Staggered entrance: cards rise in each time fresh data loads ── */

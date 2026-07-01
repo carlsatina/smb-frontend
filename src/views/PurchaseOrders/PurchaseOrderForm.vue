@@ -707,6 +707,7 @@ watch(() => supplierSelection.value, (v) => { if (v !== 'CUSTOM') formState.supp
     display: flex;
     flex-direction: column;
     gap: 1rem;
+    min-width: 0;
 }
 
 .form-section:last-of-type {
@@ -828,6 +829,7 @@ watch(() => supplierSelection.value, (v) => { if (v !== 'CUSTOM') formState.supp
     border: 1px solid var(--c-border);
     overflow: hidden;
     overflow-x: auto;
+    min-width: 0;
 }
 
 .line-items-table {
@@ -1232,7 +1234,8 @@ watch(() => supplierSelection.value, (v) => { if (v !== 'CUSTOM') formState.supp
 
 /* RESPONSIVE */
 @media (max-width: 960px) {
-    .po-form-content { grid-template-columns: 1fr; }
+    .po-form-content { grid-template-columns: minmax(0, 1fr); }
+    .po-form { min-width: 0; }
     .form-actions { flex-direction: column-reverse; }
     .form-actions .primary-button,
     .form-actions .ghost-button { width: 100%; justify-content: center; }

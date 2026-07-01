@@ -905,7 +905,9 @@ watch(() => totalCount.value, async () => {
 /* RESPONSIVE */
 @media (max-width: 768px) {
     .po-toolbar { flex-direction: column; align-items: flex-start; }
-    .toolbar-right { width: 100%; justify-content: flex-end; }
+    .toolbar-right { width: 100%; flex-wrap: wrap; }
+    .toolbar-right .ghost-button { flex: 1 1 auto; justify-content: center; }
+    .toolbar-right .primary-button { flex: 1 1 100%; justify-content: center; }
     .search-input { min-width: 0; width: 100%; }
     .progress-cell { min-width: 100px; }
 }
