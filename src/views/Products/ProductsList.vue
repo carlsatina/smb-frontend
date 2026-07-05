@@ -29,133 +29,148 @@
                 <div class="product-title">
                     <span class="product-eyebrow">Catalog</span>
                     <h1>Products</h1>
-                    <p>Keep pricing, stock rules, and recipes consistent across {{ currentStoreLabel }}.</p>
+                    <p>Pricing, stock rules, and recipes for {{ currentStoreLabel }}.</p>
                 </div>
-                <div class="product-kpis">
-                    <div class="kpi-card">
-                        <span class="kpi-label">Total</span>
-                        <span class="kpi-value">{{ totalProducts }}</span>
-                    </div>
-                    <div class="kpi-card">
-                        <span class="kpi-label">Active</span>
-                        <span class="kpi-value">{{ activeProducts }}</span>
-                        <span class="kpi-sub">Live in POS</span>
-                    </div>
-                    <div class="kpi-card">
-                        <span class="kpi-label">Recipes</span>
-                        <span class="kpi-value">{{ recipeProducts }}</span>
-                        <span class="kpi-sub">Ingredient-based</span>
-                    </div>
-                    <div v-if="recipeMissingCount > 0" class="kpi-card kpi-card--warn">
-                        <span class="kpi-label">
-                            <span class="kpi-dot kpi-dot--warn"></span>
-                            Incomplete
-                        </span>
-                        <span class="kpi-value">{{ recipeMissingCount }}</span>
-                        <span class="kpi-sub">Recipe missing</span>
-                    </div>
+                <div class="header-actions">
+                    <template v-if="canImportExport && storeContext.currentStoreId">
+                        <CsvActionsMenu
+                            :can-import="canWrite"
+                            :is-importing="isImporting"
+                            :is-exporting="isExporting"
+                            @export="handleExport"
+                            @import="triggerImport"
+                            @template="downloadTemplate"
+                        />
+                        <input
+                            ref="importFileInput"
+                            type="file"
+                            accept=".csv,text/csv"
+                            style="display:none"
+                            @change="handleImportFileSelected"
+                        />
+                    </template>
+                    <button
+                        v-if="canWrite"
+                        class="primary-button"
+                        :disabled="!storeContext.currentStoreId"
+                        @click="createProduct"
+                    >
+                        <mdicon name="plus" size="16" />
+                        New product
+                    </button>
+                    <span v-else-if="storeContext.currentStoreId" class="readonly-chip">View-only access</span>
                 </div>
             </header>
 
-            <div class="product-content">
+            <div v-if="!storeContext.currentStoreId && !isLoading" class="panel-state">
+                Select or create a store to view products.
+            </div>
 
-                <!-- MAIN COLUMN -->
-                <div class="product-main">
+            <template v-else>
+                <!-- STAT STRIP (doubles as catalog filter) -->
+                <div class="stat-strip" role="group" aria-label="Filter by product type">
+                    <button
+                        type="button"
+                        class="stat"
+                        :class="{ 'stat--active': catalogFilter === 'ALL' }"
+                        :aria-pressed="catalogFilter === 'ALL'"
+                        @click="catalogFilter = 'ALL'"
+                    >
+                        <span class="stat-value">{{ totalProducts }}</span>
+                        <span class="stat-label">Products</span>
+                    </button>
+                    <button
+                        type="button"
+                        class="stat"
+                        :class="{ 'stat--active': catalogFilter === 'READY_MADE' }"
+                        :aria-pressed="catalogFilter === 'READY_MADE'"
+                        @click="toggleCatalog('READY_MADE')"
+                    >
+                        <span class="stat-value">{{ readyMadeProducts }}</span>
+                        <span class="stat-label">Ready-made</span>
+                    </button>
+                    <button
+                        v-if="showRecipeStats"
+                        type="button"
+                        class="stat"
+                        :class="{ 'stat--active': catalogFilter === 'RECIPE' }"
+                        :aria-pressed="catalogFilter === 'RECIPE'"
+                        @click="toggleCatalog('RECIPE')"
+                    >
+                        <span class="stat-value">{{ recipeProducts }}</span>
+                        <span class="stat-label">Recipes</span>
+                    </button>
+                    <button
+                        v-if="recipeMissingCount > 0"
+                        type="button"
+                        class="stat stat--warn stat--flagged"
+                        :class="{ 'stat--active': catalogFilter === 'MISSING_RECIPE' }"
+                        :aria-pressed="catalogFilter === 'MISSING_RECIPE'"
+                        @click="toggleCatalog('MISSING_RECIPE')"
+                    >
+                        <span class="stat-value">{{ recipeMissingCount }}</span>
+                        <span class="stat-label">No recipe</span>
+                    </button>
+                </div>
 
-                    <!-- TOOLBAR -->
-                    <div class="prod-toolbar">
-                        <div class="toolbar-row">
-                            <div class="toolbar-left">
-                                <div class="filter-group">
-                                    <span class="filter-group__label">Type</span>
-                                    <div class="filter-pills">
-                                        <button class="pill" :class="{ active: filterType === 'ALL' }" @click="filterType = 'ALL'">All</button>
-                                        <button class="pill" :class="{ active: filterType === 'READY_MADE' }" @click="filterType = 'READY_MADE'">Ready-made</button>
-                                        <button class="pill" :class="{ active: filterType === 'RECIPE' }" @click="filterType = 'RECIPE'">Recipe</button>
-                                    </div>
-                                </div>
-                                <label class="active-toggle">
-                                    <input v-model="activeOnly" type="checkbox" />
-                                    <span>Active only</span>
-                                </label>
-                            </div>
-                            <div class="toolbar-right">
-                            <template v-if="canImportExport && storeContext.currentStoreId">
-                                <CsvActionsMenu
-                                    :can-import="canWrite"
-                                    :is-importing="isImporting"
-                                    :is-exporting="isExporting"
-                                    @export="handleExport"
-                                    @import="triggerImport"
-                                    @template="downloadTemplate"
-                                />
-                                <input
-                                    ref="importFileInput"
-                                    type="file"
-                                    accept=".csv,text/csv"
-                                    style="display:none"
-                                    @change="handleImportFileSelected"
-                                />
-                            </template>
-                            <button
-                                v-if="canWrite"
-                                class="primary-button"
-                                :disabled="!storeContext.currentStoreId"
-                                @click="createProduct"
-                            >
-                                + New product
-                            </button>
-                            <span v-else-if="storeContext.currentStoreId && !canImportExport" class="panel-note">View-only access</span>
-                            </div>
+                <!-- IMPORT PROGRESS -->
+                <div v-if="isImporting" class="import-progress">
+                    <div class="import-progress__label">Importing… {{ Math.round(importProgress) }}%</div>
+                    <div class="import-progress__track">
+                        <div class="import-progress__fill" :style="{ width: importProgress + '%' }"></div>
+                    </div>
+                </div>
+
+                <!-- IMPORT RESULT -->
+                <div v-if="importResult" class="import-result" :class="importResult.failed > 0 ? 'import-result--warn' : 'import-result--ok'">
+                    <div class="import-result__summary">
+                        <span>Import complete: <strong>{{ importResult.imported }}</strong> added, <strong>{{ importResult.updated }}</strong> updated{{ importResult.failed > 0 ? `, ${importResult.failed} failed` : '' }}.</span>
+                        <button class="import-result__close" @click="importResult = null">✕</button>
+                    </div>
+                    <ul v-if="importResult.errors.length > 0" class="import-result__errors">
+                        <li v-for="err in importResult.errors" :key="err.row">Row {{ err.row }}: {{ err.message }}</li>
+                    </ul>
+                </div>
+
+                <!-- TABLE PANEL -->
+                <section class="product-panel">
+                    <div class="panel-toolbar">
+                        <div class="search-wrap">
+                            <mdicon name="magnify" size="17" class="search-icon" />
+                            <input
+                                v-model="searchQuery"
+                                type="text"
+                                class="search-input"
+                                placeholder="Search by name, SKU, barcode, or category…"
+                            />
                         </div>
-                        <input
-                            v-model="searchQuery"
-                            type="text"
-                            class="search-input"
-                            placeholder="Search name, SKU, barcode..."
-                        />
+                        <label class="active-toggle">
+                            <input v-model="activeOnly" type="checkbox" />
+                            <span>Active only</span>
+                        </label>
                     </div>
 
-                    <!-- IMPORT PROGRESS -->
-                    <div v-if="isImporting" class="import-progress">
-                        <div class="import-progress__label">Importing… {{ Math.round(importProgress) }}%</div>
-                        <div class="import-progress__track">
-                            <div class="import-progress__fill" :style="{ width: importProgress + '%' }"></div>
-                        </div>
-                    </div>
-
-                    <!-- IMPORT RESULT -->
-                    <div v-if="importResult" class="import-result" :class="importResult.failed > 0 ? 'import-result--warn' : 'import-result--ok'">
-                        <div class="import-result__summary">
-                            <span>Import complete: <strong>{{ importResult.imported }}</strong> added, <strong>{{ importResult.updated }}</strong> updated{{ importResult.failed > 0 ? `, ${importResult.failed} failed` : '' }}.</span>
-                            <button class="import-result__close" @click="importResult = null">✕</button>
-                        </div>
-                        <ul v-if="importResult.errors.length > 0" class="import-result__errors">
-                            <li v-for="err in importResult.errors" :key="err.row">Row {{ err.row }}: {{ err.message }}</li>
-                        </ul>
-                    </div>
-
-                    <!-- TABLE PANEL -->
-                    <section class="product-panel">
-                        <div v-if="!storeContext.currentStoreId" class="panel-state">
-                            Select or create a store to view products.
-                        </div>
-                        <SkeletonLoader v-else-if="isLoading" :rows="8" label="Loading products…" />
-                        <div v-else class="table-wrap">
+                    <SkeletonLoader v-if="isLoading" :rows="8" label="Loading products…" />
+                    <template v-else>
+                        <div class="table-wrap">
                             <table class="product-table">
                                 <thead>
                                     <tr>
-                                        <th>Name</th>
-                                        <th>Type</th>
+                                        <th>Product</th>
                                         <th v-if="showSkuColumn">SKU</th>
                                         <th>Price</th>
                                         <th>Cost</th>
                                         <th>Status</th>
-                                        <th class="align-right">Actions</th>
+                                        <th v-if="canWrite" class="align-right">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <tr v-for="product in paginatedProducts" :key="product.id">
+                                    <tr
+                                        v-for="product in paginatedProducts"
+                                        :key="product.id"
+                                        :class="{ 'row-clickable': canWrite }"
+                                        @click="canWrite && editProduct(product.id)"
+                                    >
                                         <td class="col-name">
                                             <div class="product-name">
                                                 {{ product.name }}
@@ -166,19 +181,19 @@
                                                     No recipe
                                                 </span>
                                             </div>
-                                            <div class="product-meta">{{ product.category || 'Uncategorized' }}</div>
+                                            <div class="product-meta">
+                                                <span
+                                                    class="type-chip"
+                                                    :class="product.type === 'RECIPE' ? 'type-chip--recipe' : 'type-chip--ready'"
+                                                >
+                                                    {{ formatProductType(product.type) }}
+                                                </span>
+                                                <span>{{ product.category || 'Uncategorized' }}</span>
+                                            </div>
                                         </td>
-                                        <td class="product-type">
-                                            <span
-                                                class="type-chip"
-                                                :class="product.type === 'RECIPE' ? 'type-chip--recipe' : 'type-chip--ready'"
-                                            >
-                                                {{ formatProductType(product.type) }}
-                                            </span>
-                                        </td>
-                                        <td v-if="showSkuColumn" class="product-sku">{{ product.sku || '—' }}</td>
-                                        <td class="product-price">{{ formatMoney(product.price) }}</td>
-                                        <td class="product-cost">
+                                        <td v-if="showSkuColumn" class="col-sku">{{ product.sku || '—' }}</td>
+                                        <td class="col-price">{{ formatMoney(product.price) }}</td>
+                                        <td class="col-cost">
                                             <template v-if="product.cost != null">
                                                 <span class="cost-value">{{ formatMoney(product.cost) }}</span>
                                                 <span v-if="marginOf(product) !== null" class="cost-margin">{{ marginOf(product) }}% margin</span>
@@ -193,17 +208,18 @@
                                                 {{ product.active ? 'Active' : 'Inactive' }}
                                             </span>
                                         </td>
-                                        <td class="table-actions">
-                                            <template v-if="canWrite">
-                                                <button class="ghost-button ghost-button--sm" @click="editProduct(product.id)">Edit</button>
-                                                <button class="ghost-button ghost-button--sm ghost-button--danger" @click="removeProduct(product.id)">Delete</button>
-                                            </template>
-                                            <span v-else class="table-note">View only</span>
+                                        <td v-if="canWrite" class="col-actions" @click.stop>
+                                            <button class="icon-btn" title="Edit" :aria-label="`Edit ${product.name}`" @click="editProduct(product.id)">
+                                                <mdicon name="pencil-outline" size="17" />
+                                            </button>
+                                            <button class="icon-btn icon-btn--danger" title="Delete" :aria-label="`Delete ${product.name}`" @click="removeProduct(product.id)">
+                                                <mdicon name="trash-can-outline" size="17" />
+                                            </button>
                                         </td>
                                     </tr>
                                     <tr v-if="filteredProducts.length === 0">
                                         <td :colspan="columnCount" class="empty-state">
-                                            No products match your filters.
+                                            {{ emptyMessage }}
                                         </td>
                                     </tr>
                                 </tbody>
@@ -233,50 +249,9 @@
                                 </button>
                             </div>
                         </div>
-                    </section>
-                </div>
-
-                <!-- ASIDE -->
-                <aside class="insight-panel">
-                    <div class="insight-card">
-                        <h3>Catalog breakdown</h3>
-                        <ul class="breakdown-list">
-                            <li class="breakdown-item">
-                                <span class="breakdown-label">Ready-made</span>
-                                <span class="breakdown-value">{{ readyMadeProducts }}</span>
-                            </li>
-                            <li class="breakdown-item">
-                                <span class="breakdown-label">Recipe</span>
-                                <span class="breakdown-value">{{ recipeProducts }}</span>
-                            </li>
-                            <li class="breakdown-item">
-                                <span class="breakdown-label">Active</span>
-                                <span class="breakdown-value breakdown-value--active">{{ activeProducts }}</span>
-                            </li>
-                            <li class="breakdown-item">
-                                <span class="breakdown-label">Inactive</span>
-                                <span class="breakdown-value breakdown-value--muted">{{ inactiveProducts }}</span>
-                            </li>
-                            <li v-if="recipeMissingCount > 0" class="breakdown-item breakdown-item--warn">
-                                <span class="breakdown-label">Recipe missing</span>
-                                <span class="breakdown-value breakdown-value--warn">{{ recipeMissingCount }}</span>
-                            </li>
-                        </ul>
-                        <button v-if="recipeMissingCount > 0" class="aside-filter-link" @click="filterType = 'RECIPE'; activeOnly = false; searchQuery = ''">
-                            View incomplete recipes →
-                        </button>
-                    </div>
-
-                    <div class="insight-card insight-card--actions">
-                        <h3>Quick actions</h3>
-                        <button v-if="canWrite" class="secondary-button" :disabled="!storeContext.currentStoreId" @click="createProduct">
-                            + New product
-                        </button>
-                        <span v-else class="panel-note">View-only access</span>
-                        <button class="secondary-button" @click="goToInventory">View inventory</button>
-                    </div>
-                </aside>
-            </div>
+                    </template>
+                </section>
+            </template>
         </div>
     </section>
 </template>
@@ -315,7 +290,7 @@ const userContext = useUserContextStore();
 const products = ref<ProductRow[]>([]);
 const isLoading = ref(false);
 const searchQuery = ref('');
-const filterType = ref<'ALL' | 'READY_MADE' | 'RECIPE'>('ALL');
+const catalogFilter = ref<'ALL' | 'READY_MADE' | 'RECIPE' | 'MISSING_RECIPE'>('ALL');
 const activeOnly = ref(false);
 const page = ref(1);
 const pageSize = ref(10);
@@ -479,20 +454,32 @@ const cancelDelete = () => {
     productToDelete.value = null;
 };
 
-const goToInventory = () => {
-    if (!storeContext.currentStoreId) return;
-    router.push(`/stores/${storeContext.currentStoreId}/inventory`);
+const toggleCatalog = (filter: 'READY_MADE' | 'RECIPE' | 'MISSING_RECIPE') => {
+    catalogFilter.value = catalogFilter.value === filter ? 'ALL' : filter;
 };
+
+const isMissingRecipe = (product: ProductRow) =>
+    product.type === 'RECIPE' && (product.recipeLineCount ?? 0) === 0;
 
 const filteredProducts = computed(() => {
     const query = searchQuery.value.trim().toLowerCase();
-    const type = filterType.value;
     return products.value.filter((product) => {
-        if (type !== 'ALL' && product.type !== type) return false;
+        if (catalogFilter.value === 'READY_MADE' && product.type !== 'READY_MADE') return false;
+        if (catalogFilter.value === 'RECIPE' && product.type !== 'RECIPE') return false;
+        if (catalogFilter.value === 'MISSING_RECIPE' && !isMissingRecipe(product)) return false;
         if (activeOnly.value && !product.active) return false;
         if (query && !product.name.toLowerCase().includes(query) && !(product.sku || '').toLowerCase().includes(query) && !(product.barcode || '').toLowerCase().includes(query) && !(product.category || '').toLowerCase().includes(query)) return false;
         return true;
     });
+});
+
+const emptyMessage = computed(() => {
+    if (searchQuery.value.trim()) return 'No products match your search.';
+    if (catalogFilter.value === 'MISSING_RECIPE') return 'Every recipe product has its recipe set up.';
+    if (catalogFilter.value === 'RECIPE') return 'No recipe products yet.';
+    if (catalogFilter.value === 'READY_MADE') return 'No ready-made products yet.';
+    if (activeOnly.value) return 'No active products match your filters.';
+    return 'No products yet. Create your first product to start selling.';
 });
 
 const totalPages = computed(() => {
@@ -518,16 +505,19 @@ const changePage = (nextPage: number) => {
 };
 
 const totalProducts = computed(() => products.value.length);
-const activeProducts = computed(() => products.value.filter((p) => p.active).length);
-const inactiveProducts = computed(() => products.value.filter((p) => !p.active).length);
 const recipeProducts = computed(() => products.value.filter((p) => p.type === 'RECIPE').length);
 const readyMadeProducts = computed(() => products.value.filter((p) => p.type === 'READY_MADE').length);
-const recipeMissingCount = computed(() => products.value.filter((p) => p.type === 'RECIPE' && (p.recipeLineCount ?? 0) === 0).length);
+const recipeMissingCount = computed(() => products.value.filter((p) => isMissingRecipe(p)).length);
+
+// Hide the Recipes stat for stores that have no recipe products and whose plan
+// doesn't include recipes — it would always read 0.
+const canUseRecipes = computed(() => hasPlanFeature(storeContext.currentStore?.ownerPlanTier ?? null, 'recipes'));
+const showRecipeStats = computed(() => recipeProducts.value > 0 || canUseRecipes.value);
 
 const currentStoreLabel = computed(() => {
     const store = storeContext.currentStore;
     if (!store) return 'your store';
-    return `${store.name} · ${store.currency}`;
+    return store.name;
 });
 
 const formatProductType = (type: string) => {
@@ -539,8 +529,8 @@ const formatProductType = (type: string) => {
 // Hide the SKU column entirely for stores that don't track SKUs.
 const showSkuColumn = computed(() => products.value.some((p) => !!p.sku));
 
-// Name, Type, Price, Cost, Status, Actions (+ SKU when shown).
-const columnCount = computed(() => 6 + (showSkuColumn.value ? 1 : 0));
+// Product, Price, Cost, Status (+ SKU and Actions when shown).
+const columnCount = computed(() => 4 + (showSkuColumn.value ? 1 : 0) + (canWrite.value ? 1 : 0));
 
 // Gross margin % when the product has a known cost (recipe costs aren't stored
 // on the product, so those show as no margin). price/cost arrive as Decimal
@@ -582,7 +572,7 @@ watch(() => route.params.storeId, (value) => {
 });
 
 watch(() => searchQuery.value, () => { page.value = 1; });
-watch(() => filterType.value, () => { page.value = 1; });
+watch(() => catalogFilter.value, () => { page.value = 1; });
 watch(() => activeOnly.value, () => { page.value = 1; });
 watch(() => pageSize.value, () => { page.value = 1; });
 
@@ -601,49 +591,6 @@ watch(() => storeContext.currentStoreId, async () => {
 </script>
 
 <style scoped>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-
-.import-progress {
-    display: flex;
-    flex-direction: column;
-    gap: 0.45rem;
-    padding: 0.75rem 1rem;
-    background: rgba(13, 148, 136, 0.06);
-    border: 1px solid rgba(13, 148, 136, 0.22);
-    border-radius: 8px;
-    margin-bottom: 0.5rem;
-}
-.import-progress__label {
-    font-size: 0.8rem;
-    font-weight: 600;
-    color: #0f766e;
-}
-.import-progress__track {
-    height: 6px;
-    background: rgba(13, 148, 136, 0.15);
-    border-radius: 999px;
-    overflow: hidden;
-}
-.import-progress__fill {
-    height: 100%;
-    background: #0d9488;
-    border-radius: 999px;
-    transition: width 0.15s ease;
-}
-
-.import-result {
-    border-radius: 8px;
-    padding: 0.75rem 1rem;
-    font-size: 0.875rem;
-    margin-bottom: 0.5rem;
-}
-.import-result--ok { background: #f0fdf4; border: 1px solid #86efac; color: #15803d; }
-.import-result--warn { background: #fffbeb; border: 1px solid #fcd34d; color: #92400e; }
-.import-result__summary { display: flex; justify-content: space-between; align-items: center; }
-.import-result__close { background: none; border: none; cursor: pointer; font-size: 1rem; opacity: 0.6; }
-.import-result__close:hover { opacity: 1; }
-.import-result__errors { margin: 0.5rem 0 0; padding-left: 1.25rem; display: flex; flex-direction: column; gap: 0.2rem; }
-
 /* ============================================================
    TOKENS
 ============================================================ */
@@ -654,7 +601,7 @@ watch(() => storeContext.currentStoreId, async () => {
     --c-accent-dark: #0f766e;
     --c-border: #e2e8f0;
     --c-surface: #ffffff;
-    --c-bg: #f8fafc;
+    --c-bg: #f6f8f9;
     min-height: 100vh;
     padding: 2rem 1.5rem 3rem;
     background: var(--c-bg);
@@ -663,19 +610,16 @@ watch(() => storeContext.currentStoreId, async () => {
 }
 
 /* ============================================================
-   SHELL
+   SHELL & HEADER
 ============================================================ */
 .product-shell {
-    max-width: 1200px;
+    max-width: 1100px;
     margin: 0 auto;
     display: flex;
     flex-direction: column;
-    gap: 1.75rem;
+    gap: 1.25rem;
 }
 
-/* ============================================================
-   HEADER
-============================================================ */
 .product-header {
     display: flex;
     flex-wrap: wrap;
@@ -713,96 +657,144 @@ watch(() => storeContext.currentStoreId, async () => {
     font-size: 0.92rem;
 }
 
-/* ============================================================
-   KPI CARDS
-============================================================ */
-.product-kpis {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 0.75rem;
-    align-items: stretch;
-    flex: 1 1 340px;
-    min-width: 0;
+.header-actions {
+    display: flex;
+    gap: 0.6rem;
+    align-items: center;
+    flex-wrap: wrap;
 }
 
-.kpi-card {
+.readonly-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.35rem 0.85rem;
+    border-radius: 999px;
+    background: #f1f5f9;
+    border: 1px solid var(--c-border);
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--c-muted);
+    white-space: nowrap;
+}
+
+/* ============================================================
+   STAT STRIP (clickable catalog filters)
+============================================================ */
+.stat-strip {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    background: var(--c-surface);
+    border: 1px solid var(--c-border);
+    border-radius: 14px;
+    overflow: hidden;
+}
+
+.stat {
     display: flex;
     flex-direction: column;
     gap: 0.2rem;
-    padding: 0.9rem 1.25rem;
-    background: var(--c-surface);
-    border: 1px solid var(--c-border);
-    border-radius: 12px;
+    padding: 1rem 1.4rem;
+    border: none;
+    border-left: 1px solid var(--c-border);
+    background: transparent;
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.15s, box-shadow 0.15s;
     min-width: 0;
-    transition: border-color 0.15s;
 }
 
-.kpi-card--warn {
-    border-color: #fbbf24;
-    background: #fffbeb;
+.stat:first-child { border-left: none; }
+
+.stat:hover { background: #f8fafc; }
+
+.stat--active {
+    background: rgba(13, 148, 136, 0.06);
+    box-shadow: inset 0 -2px 0 var(--c-accent);
 }
 
-.kpi-label {
-    display: flex;
-    align-items: center;
-    gap: 0.35rem;
+.stat--active:hover { background: rgba(13, 148, 136, 0.08); }
+
+.stat-value {
+    font-size: 1.5rem;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+    color: var(--c-text);
+    font-variant-numeric: tabular-nums;
+}
+
+.stat-label {
     font-size: 0.7rem;
-    font-weight: 600;
+    font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.08em;
     color: var(--c-muted);
+    white-space: nowrap;
 }
 
-.kpi-dot {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    flex-shrink: 0;
-}
-
-.kpi-dot--warn { background: #f59e0b; }
-
-.kpi-value {
-    font-size: 1.6rem;
-    font-weight: 800;
-    letter-spacing: -0.03em;
-    color: var(--c-text);
-    line-height: 1;
-}
-
-.kpi-card--warn .kpi-value { color: #92400e; }
-
-.kpi-sub {
-    font-size: 0.72rem;
-    color: var(--c-muted);
-}
+.stat--warn.stat--flagged .stat-value { color: #b45309; }
+.stat--warn.stat--active { box-shadow: inset 0 -2px 0 #f59e0b; background: #fffbeb; }
+.stat--warn.stat--active:hover { background: #fef3c7; }
 
 /* ============================================================
-   LAYOUT
+   IMPORT PROGRESS & RESULT
 ============================================================ */
-.product-content {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 280px;
-    gap: 1.5rem;
-    align-items: start;
+.import-progress {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    padding: 0.75rem 1rem;
+    background: rgba(13, 148, 136, 0.06);
+    border: 1px solid rgba(13, 148, 136, 0.22);
+    border-radius: 10px;
+}
+.import-progress__label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #0f766e;
+}
+.import-progress__track {
+    height: 6px;
+    background: rgba(13, 148, 136, 0.15);
+    border-radius: 999px;
+    overflow: hidden;
+}
+.import-progress__fill {
+    height: 100%;
+    background: #0d9488;
+    border-radius: 999px;
+    transition: width 0.15s ease;
 }
 
-.product-main {
+.import-result {
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+    font-size: 0.875rem;
+}
+.import-result--ok { background: #f0fdf4; border: 1px solid #86efac; color: #15803d; }
+.import-result--warn { background: #fffbeb; border: 1px solid #fcd34d; color: #92400e; }
+.import-result__summary { display: flex; justify-content: space-between; align-items: center; }
+.import-result__close { background: none; border: none; cursor: pointer; font-size: 1rem; opacity: 0.6; }
+.import-result__close:hover { opacity: 1; }
+.import-result__errors { margin: 0.5rem 0 0; padding-left: 1.25rem; display: flex; flex-direction: column; gap: 0.2rem; }
+
+/* ============================================================
+   PANEL & TOOLBAR
+============================================================ */
+.product-panel {
+    background: var(--c-surface);
+    border: 1px solid var(--c-border);
+    border-radius: 16px;
+    padding: 1.25rem 1.5rem 1.5rem;
     display: flex;
     flex-direction: column;
     gap: 1rem;
+    min-width: 0;
 }
 
-/* ============================================================
-   TOOLBAR
-============================================================ */
-.prod-toolbar {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-}
-
-.toolbar-row {
+.panel-toolbar {
     display: flex;
     gap: 0.75rem;
     align-items: center;
@@ -810,96 +802,28 @@ watch(() => storeContext.currentStoreId, async () => {
     flex-wrap: wrap;
 }
 
-.toolbar-left {
-    display: flex;
-    gap: 0.65rem;
-    align-items: center;
-    flex-wrap: wrap;
+.search-wrap {
+    position: relative;
+    flex: 1;
+    min-width: 220px;
+    max-width: 380px;
 }
 
-.toolbar-right {
-    display: flex;
-    gap: 0.65rem;
-    align-items: center;
-    flex-shrink: 0;
-}
-
-/* ============================================================
-   FILTER PILLS
-============================================================ */
-.filter-group {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.45rem;
-}
-
-.filter-group__label {
-    font-size: 0.68rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.07em;
-    color: var(--c-muted);
-}
-
-.filter-pills {
-    display: inline-flex;
-    background: #f1f5f9;
-    border-radius: 8px;
-    padding: 0.2rem;
-    gap: 0.15rem;
-    border: 1px solid var(--c-border);
-}
-
-.pill {
-    border: none;
-    background: transparent;
-    padding: 0.35rem 0.8rem;
-    border-radius: 6px;
-    font-size: 0.78rem;
-    font-weight: 600;
-    font-family: 'Inter', -apple-system, sans-serif;
-    color: var(--c-muted);
-    cursor: pointer;
-    transition: all 0.15s;
-    white-space: nowrap;
-}
-
-.pill:hover { color: var(--c-text); }
-
-.pill.active {
-    background: var(--c-surface);
-    color: var(--c-accent-dark);
-    box-shadow: 0 1px 4px rgba(15, 23, 42, 0.1);
-}
-
-/* ============================================================
-   SEARCH
-============================================================ */
-.active-toggle {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    font-size: 0.82rem;
-    font-weight: 600;
-    color: var(--c-text);
-    cursor: pointer;
-    white-space: nowrap;
-    user-select: none;
-}
-
-.active-toggle input[type="checkbox"] {
-    width: 16px;
-    height: 16px;
-    accent-color: var(--c-accent);
-    cursor: pointer;
+.search-icon {
+    position: absolute;
+    left: 0.7rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #94a3b8;
+    pointer-events: none;
 }
 
 .search-input {
-    width: 100%;
-    border-radius: 8px;
+    border-radius: 9px;
     border: 1.5px solid var(--c-border);
-    padding: 0.6rem 0.9rem;
-    min-width: 220px;
+    padding: 0.55rem 0.9rem 0.55rem 2.3rem;
+    width: 100%;
+    box-sizing: border-box;
     font-size: 0.875rem;
     font-family: 'Inter', -apple-system, sans-serif;
     color: var(--c-text);
@@ -915,18 +839,23 @@ watch(() => storeContext.currentStoreId, async () => {
     box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.12);
 }
 
-/* ============================================================
-   MAIN PANEL
-============================================================ */
-.product-panel {
-    background: var(--c-surface);
-    border: 1px solid var(--c-border);
-    border-radius: 16px;
-    padding: 1.5rem;
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-    min-width: 0;
+.active-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--c-muted);
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+}
+
+.active-toggle input {
+    accent-color: var(--c-accent);
+    width: 15px;
+    height: 15px;
+    cursor: pointer;
 }
 
 .panel-state {
@@ -936,11 +865,6 @@ watch(() => storeContext.currentStoreId, async () => {
     color: var(--c-muted);
     font-size: 0.9rem;
     text-align: center;
-}
-
-.panel-note {
-    font-size: 0.8rem;
-    color: var(--c-muted);
 }
 
 /* ============================================================
@@ -963,7 +887,6 @@ watch(() => storeContext.currentStoreId, async () => {
     letter-spacing: 0.07em;
     color: var(--c-muted);
     border-bottom: 1.5px solid var(--c-border);
-    background: #f8fafc;
     white-space: nowrap;
 }
 
@@ -976,6 +899,7 @@ watch(() => storeContext.currentStoreId, async () => {
 
 .product-table tbody tr:last-child { border-bottom: none; }
 .product-table tbody tr:hover { background: #f8fafc; }
+.product-table tbody tr.row-clickable { cursor: pointer; }
 
 .product-table tbody td {
     padding: 0.85rem 0.9rem;
@@ -994,97 +918,71 @@ watch(() => storeContext.currentStoreId, async () => {
 .recipe-missing-badge {
     display: inline-flex;
     align-items: center;
-    padding: 0.1rem 0.45rem;
-    border-radius: 4px;
-    font-size: 0.65rem;
+    padding: 0.1rem 0.5rem;
+    border-radius: 999px;
+    background: #fef3c7;
+    color: #b45309;
+    font-size: 0.66rem;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.06em;
-    background: rgba(245, 158, 11, 0.12);
-    color: #92400e;
+    letter-spacing: 0.05em;
     white-space: nowrap;
 }
 
 .product-meta {
     font-size: 0.75rem;
     color: var(--c-muted);
-    margin-top: 0.1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-top: 0.2rem;
 }
-
-.product-type { white-space: nowrap; }
 
 .type-chip {
     display: inline-flex;
     align-items: center;
-    padding: 0.18rem 0.55rem;
+    padding: 0.08rem 0.5rem;
     border-radius: 999px;
-    font-size: 0.7rem;
+    font-size: 0.68rem;
     font-weight: 600;
-    letter-spacing: 0.03em;
+    letter-spacing: 0.02em;
     white-space: nowrap;
 }
 
-.type-chip--ready {
-    background: rgba(100, 116, 139, 0.12);
-    color: #475569;
-}
+.type-chip--ready { background: #ccfbf1; color: #0f766e; }
+.type-chip--recipe { background: #ede9fe; color: #6d28d9; }
 
-.type-chip--recipe {
-    background: rgba(13, 148, 136, 0.1);
-    color: var(--c-accent-dark);
-}
-
-.product-sku {
-    font-size: 0.82rem;
+.col-sku {
     color: var(--c-muted);
-    font-variant-numeric: tabular-nums;
-}
-
-.product-price {
-    font-weight: 600;
-    font-variant-numeric: tabular-nums;
-}
-
-.product-cost {
+    font-size: 0.82rem;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
 }
 
-.cost-value {
+.col-price {
     font-weight: 600;
     color: var(--c-text);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.col-cost { white-space: nowrap; }
+
+.cost-value {
+    display: block;
+    color: var(--c-text);
+    font-variant-numeric: tabular-nums;
 }
 
 .cost-margin {
     display: block;
-    font-size: 0.7rem;
-    color: var(--c-muted);
-    margin-top: 0.1rem;
-}
-
-.cost-empty { color: var(--c-muted); }
-
-.table-note {
-    font-size: 0.78rem;
+    font-size: 0.72rem;
     color: var(--c-muted);
 }
 
-.table-actions {
-    display: flex;
-    gap: 0.4rem;
-    justify-content: flex-end;
-}
+.cost-empty { color: #cbd5e1; }
 
-.empty-state {
-    text-align: center;
-    padding: 2.5rem 1rem;
-    color: var(--c-muted);
-    font-size: 0.875rem;
-}
-
-/* ============================================================
-   STATUS PILLS
-============================================================ */
 .status-pill {
     display: inline-flex;
     align-items: center;
@@ -1094,10 +992,40 @@ watch(() => storeContext.currentStoreId, async () => {
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.07em;
+    white-space: nowrap;
 }
 
 .status-pill--active { background: rgba(13, 148, 136, 0.1); color: var(--c-accent-dark); }
-.status-pill--inactive { background: rgba(148, 163, 184, 0.15); color: #64748b; }
+.status-pill--inactive { background: #f1f5f9; color: var(--c-muted); }
+
+.col-actions {
+    text-align: right;
+    white-space: nowrap;
+}
+
+.icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: none;
+    background: transparent;
+    color: var(--c-muted);
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s;
+}
+
+.icon-btn:hover { background: rgba(13, 148, 136, 0.08); color: var(--c-accent-dark); }
+.icon-btn--danger:hover { background: #fef2f2; color: #dc2626; }
+
+.empty-state {
+    text-align: center;
+    padding: 2.5rem 1rem;
+    color: var(--c-muted);
+    font-size: 0.875rem;
+}
 
 /* ============================================================
    PAGINATION
@@ -1119,6 +1047,7 @@ watch(() => storeContext.currentStoreId, async () => {
     align-items: center;
     gap: 1rem;
     font-size: 0.82rem;
+    flex-wrap: wrap;
 }
 
 .pagination-size {
@@ -1180,7 +1109,7 @@ watch(() => storeContext.currentStoreId, async () => {
     align-items: center;
     gap: 0.4rem;
     padding: 0.6rem 1.1rem;
-    border-radius: 8px;
+    border-radius: 9px;
     border: none;
     background: var(--c-accent);
     color: #ffffff;
@@ -1201,168 +1130,31 @@ watch(() => storeContext.currentStoreId, async () => {
 
 .primary-button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 
-.ghost-button {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.3rem;
-    padding: 0.55rem 1rem;
-    border-radius: 8px;
-    border: 1.5px solid var(--c-border);
-    background: transparent;
-    color: var(--c-text);
-    font-size: 0.875rem;
-    font-weight: 600;
-    font-family: 'Inter', -apple-system, sans-serif;
-    cursor: pointer;
-    transition: all 0.15s;
-    white-space: nowrap;
-}
-
-.ghost-button:hover:not(:disabled) { border-color: var(--c-accent); color: var(--c-accent-dark); background: rgba(13, 148, 136, 0.05); }
-.ghost-button:disabled { opacity: 0.4; cursor: not-allowed; }
-
-.ghost-button--sm {
-    padding: 0.38rem 0.75rem;
-    font-size: 0.8rem;
-}
-
-
-.ghost-button--danger:hover {
-    border-color: #f87171 !important;
-    color: #dc2626 !important;
-    background: #fef2f2 !important;
-}
-
-.secondary-button {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    padding: 0.55rem 1rem;
-    border-radius: 8px;
-    border: 1.5px solid var(--c-border);
-    background: transparent;
-    color: var(--c-text);
-    font-size: 0.85rem;
-    font-weight: 600;
-    font-family: 'Inter', -apple-system, sans-serif;
-    cursor: pointer;
-    transition: all 0.15s;
-    width: 100%;
-    text-align: left;
-}
-
-.secondary-button:hover:not(:disabled) { border-color: var(--c-accent); color: var(--c-accent-dark); background: rgba(13, 148, 136, 0.05); }
-.secondary-button:disabled { opacity: 0.4; cursor: not-allowed; }
-
-/* ============================================================
-   ASIDE
-============================================================ */
-.insight-panel {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-}
-
-.insight-card {
-    background: var(--c-surface);
-    border: 1px solid var(--c-border);
-    border-radius: 16px;
-    padding: 1.25rem 1.4rem;
-}
-
-.insight-card--actions {
-    background: rgba(13, 148, 136, 0.04);
-    border-color: rgba(13, 148, 136, 0.2);
-    display: flex;
-    flex-direction: column;
-    gap: 0.6rem;
-}
-
-.insight-card h3 {
-    font-size: 0.875rem;
-    font-weight: 700;
-    color: var(--c-text);
-    margin: 0 0 0.85rem;
-}
-
-/* BREAKDOWN LIST */
-.breakdown-list {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-}
-
-.breakdown-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0.45rem 0;
-    border-bottom: 1px solid rgba(226, 232, 240, 0.6);
-    font-size: 0.83rem;
-}
-
-.breakdown-item:last-child { border-bottom: none; }
-
-.breakdown-item--warn {
-    background: rgba(251, 191, 36, 0.06);
-    border-radius: 6px;
-    padding-left: 0.4rem;
-    padding-right: 0.4rem;
-}
-
-.breakdown-label {
-    color: var(--c-muted);
-    font-weight: 500;
-}
-
-.breakdown-value {
-    font-weight: 700;
-    color: var(--c-text);
-    font-variant-numeric: tabular-nums;
-}
-
-.breakdown-value--active { color: var(--c-accent-dark); }
-.breakdown-value--muted { color: var(--c-muted); }
-.breakdown-value--warn { color: #92400e; }
-
-.aside-filter-link {
-    margin-top: 0.75rem;
-    background: none;
-    border: none;
-    padding: 0;
-    font-size: 0.8rem;
-    font-weight: 600;
-    font-family: 'Inter', -apple-system, sans-serif;
-    color: var(--c-accent-dark);
-    cursor: pointer;
-    transition: color 0.15s;
-}
-
-.aside-filter-link:hover { color: var(--c-accent); }
-
 /* ============================================================
    RESPONSIVE
 ============================================================ */
-@media (max-width: 960px) {
-    .product-content { grid-template-columns: 1fr; }
-}
-
 @media (max-width: 768px) {
-    .toolbar-row { flex-direction: column; align-items: stretch; }
-    .toolbar-left { flex-direction: column; align-items: stretch; }
-    .toolbar-right { width: 100%; }
-    .toolbar-right .primary-button { width: 100%; justify-content: center; }
-    .search-input { min-width: 0; width: 100%; }
-    .filter-group { width: 100%; }
-    .filter-pills { flex: 1; }
+    .panel-toolbar { flex-direction: column; align-items: stretch; }
+    .search-wrap { max-width: none; }
+    .active-toggle { justify-content: flex-start; }
 }
 
 @media (max-width: 640px) {
     .product-page { padding: 1rem 0.875rem 2.5rem; }
+    .product-shell { gap: 1rem; }
+    .product-header { flex-direction: column; gap: 0.875rem; }
     .product-title h1 { font-size: 1.5rem; }
-    .product-panel { padding: 0 0 1rem; border-radius: 12px; }
+
+    .header-actions { width: 100%; }
+    .header-actions .primary-button { flex: 1; justify-content: center; }
+
+    .stat { padding: 0.75rem 0.9rem; }
+    .stat-value { font-size: 1.2rem; }
+    .stat-label { font-size: 0.62rem; }
+
+    .product-panel { padding: 1rem 0 0.75rem; border-radius: 12px; }
+    .panel-toolbar { padding: 0 1rem; }
+    .pagination { padding: 1rem 1rem 0; flex-direction: column; align-items: flex-start; gap: 0.5rem; }
 
     /* ── Table → card view ── */
     .product-table thead { display: none; }
@@ -1372,13 +1164,12 @@ watch(() => storeContext.currentStoreId, async () => {
     .product-table tbody tr {
         display: grid;
         grid-template-columns: 1fr auto;
-        grid-template-rows: auto auto auto auto;
+        grid-template-rows: auto auto;
         padding: 0.875rem 1rem;
-        gap: 0.1rem 0.625rem;
+        gap: 0.15rem 0.625rem;
         border-bottom: 1px solid var(--c-border);
     }
     .product-table tbody tr:last-child { border-bottom: none; }
-    .product-table tbody tr:hover { background: #f8fafc; }
 
     .product-table tbody td {
         padding: 0;
@@ -1386,61 +1177,50 @@ watch(() => storeContext.currentStoreId, async () => {
         vertical-align: top;
     }
 
-    /* Name + category */
+    /* Name + meta */
     .product-table tbody td.col-name { grid-column: 1; grid-row: 1; }
 
-    /* Type chip — below name */
-    .product-table tbody td.product-type {
+    /* SKU — folded away on mobile */
+    .product-table tbody td.col-sku { display: none; }
+
+    /* Price · cost — one line below the name */
+    .product-table tbody td.col-price {
         grid-column: 1;
         grid-row: 2;
-        padding-top: 0.25rem;
+        padding-top: 0.5rem;
+        display: inline-flex;
+        align-items: baseline;
+        gap: 0.5rem;
     }
-
-    /* SKU — hidden on mobile (searchable, shown on desktop) */
-    .product-table tbody td.product-sku { display: none; }
-
-    /* Price — top right */
-    .product-table tbody td.product-price {
-        grid-column: 2;
-        grid-row: 1;
-        text-align: right;
-        font-weight: 700;
-        font-size: 0.95rem;
-        white-space: nowrap;
-    }
-
-    /* Cost — under price */
-    .product-table tbody td.product-cost {
+    .product-table tbody td.col-cost {
         grid-column: 2;
         grid-row: 2;
+        padding-top: 0.5rem;
         text-align: right;
-        padding-top: 0.25rem;
     }
-    .product-table tbody td.product-cost .cost-margin { text-align: right; }
+    .product-table tbody td.col-cost .cost-value { display: inline; font-size: 0.8rem; color: var(--c-muted); }
+    .product-table tbody td.col-cost .cost-margin { display: inline; margin-left: 0.35rem; }
+    .product-table tbody td.col-cost .cost-empty { display: none; }
 
-    /* Status */
+    /* Status — top right */
     .product-table tbody td.col-status {
+        grid-column: 2;
+        grid-row: 1;
+        display: flex;
+        justify-content: flex-end;
+        align-items: flex-start;
+    }
+
+    /* Actions — right-aligned row under the price line */
+    .product-table tbody td.col-actions {
         grid-column: 1 / -1;
         grid-row: 3;
         display: flex;
-        justify-content: flex-start;
-        padding-top: 0.4rem;
+        justify-content: flex-end;
+        gap: 0.25rem;
+        padding-top: 0.35rem;
     }
 
-    /* Actions row */
-    .product-table tbody td.table-actions {
-        grid-column: 1 / -1;
-        grid-row: 4;
-        justify-content: flex-start;
-        padding-top: 0.5rem;
-        margin-top: 0.35rem;
-        border-top: 1px solid rgba(226, 232, 240, 0.6);
-    }
-
-    /* Empty state */
-    .product-table tbody td.empty-state { grid-column: 1 / -1; }
-
-    /* Pagination tighter */
-    .pagination { flex-direction: column; align-items: flex-start; gap: 0.5rem; }
+    .product-table tbody td.empty-state { grid-column: 1 / -1; padding: 2.5rem 1rem; }
 }
 </style>
