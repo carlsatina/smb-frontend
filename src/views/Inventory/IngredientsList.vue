@@ -29,164 +29,180 @@
             @cancel="cancelImport"
             @update:show="showImportPreview = $event"
         />
+
         <div class="ingredients-shell">
             <header class="ingredients-header">
                 <div class="ingredients-title">
                     <span class="ingredients-eyebrow">Inventory</span>
                     <h1>Ingredients</h1>
-                    <p>Manage raw materials and packaging items for {{ currentStoreLabel }}.</p>
+                    <p>Raw materials and packaging for {{ currentStoreLabel }}.</p>
                 </div>
-                <div class="ingredients-kpis">
-                    <div class="kpi-card">
-                        <span class="kpi-label">Total</span>
-                        <span class="kpi-value">{{ totalIngredients }}</span>
-                    </div>
-                    <div class="kpi-card">
-                        <span class="kpi-label">Raw materials</span>
-                        <span class="kpi-value">{{ rawMaterialCount }}</span>
-                    </div>
-                    <div class="kpi-card">
-                        <span class="kpi-label">Packaging</span>
-                        <span class="kpi-value">{{ packagingCount }}</span>
-                    </div>
-                    <div class="kpi-card" :class="{ 'kpi-card--warn': inactiveCount > 0 }">
-                        <span class="kpi-label">Inactive</span>
-                        <span class="kpi-value">{{ inactiveCount }}</span>
-                    </div>
+                <div class="header-actions">
+                    <template v-if="canImportExport && storeContext.currentStoreId">
+                        <CsvActionsMenu
+                            :can-import="canWrite"
+                            :is-importing="isImporting"
+                            :is-exporting="isExporting"
+                            @export="handleExport"
+                            @import="triggerImport"
+                            @template="downloadTemplate"
+                        />
+                        <input
+                            ref="importFileInput"
+                            type="file"
+                            accept=".csv,text/csv"
+                            style="display:none"
+                            @change="handleImportFileSelected"
+                        />
+                    </template>
+                    <button
+                        v-if="canWrite"
+                        class="primary-button"
+                        :disabled="!storeContext.currentStoreId"
+                        @click="openCreateModal"
+                    >
+                        <mdicon name="plus" size="16" />
+                        New ingredient
+                    </button>
+                    <span v-else-if="storeContext.currentStoreId" class="readonly-chip">View-only access</span>
                 </div>
             </header>
 
-            <div class="ingredients-content">
-                <PlanGate
-                    v-if="isPlanLocked"
-                    feature="ingredients"
-                    title="Ingredients require Standard plan"
-                    description="Upgrade to Standard to manage ingredients and create recipe-based products."
-                />
-                <template v-else>
-                    <section class="ingredients-panel">
-                        <div class="toolbar">
-                            <div class="toolbar-left">
-                                <div class="filter-pills">
-                                    <button
-                                        class="pill"
-                                        :class="{ active: filterStatus === 'ALL' }"
-                                        @click="filterStatus = 'ALL'"
-                                    >All</button>
-                                    <button
-                                        class="pill"
-                                        :class="{ active: filterStatus === 'ACTIVE' }"
-                                        @click="filterStatus = 'ACTIVE'"
-                                    >Active</button>
-                                    <button
-                                        class="pill"
-                                        :class="{ active: filterStatus === 'INACTIVE' }"
-                                        @click="filterStatus = 'INACTIVE'"
-                                    >
-                                        <span v-if="inactiveCount > 0" class="pill-dot pill-dot--warn"></span>
-                                        Inactive
-                                    </button>
-                                </div>
-                                <div class="search-wrap">
-                                    <mdicon name="magnify" size="16" class="search-icon" />
-                                    <input
-                                        v-model="searchQuery"
-                                        class="search-input"
-                                        placeholder="Search ingredients..."
-                                    />
-                                </div>
-                            </div>
-                            <div class="toolbar-right">
-                                <template v-if="canImportExport && storeContext.currentStoreId">
-                                    <CsvActionsMenu
-                                        :can-import="canWrite"
-                                        :is-importing="isImporting"
-                                        :is-exporting="isExporting"
-                                        @export="handleExport"
-                                        @import="triggerImport"
-                                        @template="downloadTemplate"
-                                    />
-                                    <input
-                                        ref="importFileInput"
-                                        type="file"
-                                        accept=".csv,text/csv"
-                                        style="display:none"
-                                        @change="handleImportFileSelected"
-                                    />
-                                </template>
-                                <button
-                                    v-if="canWrite"
-                                    class="primary-button"
-                                    :disabled="!storeContext.currentStoreId"
-                                    @click="openCreateModal"
-                                >
-                                    New ingredient
-                                </button>
-                                <span v-else-if="storeContext.currentStoreId" class="panel-note">View-only access</span>
-                            </div>
+            <PlanGate
+                v-if="isPlanLocked"
+                feature="ingredients"
+                title="Ingredients require Standard plan"
+                description="Upgrade to Standard to manage ingredients and create recipe-based products."
+            />
+
+            <div v-else-if="!storeContext.currentStoreId && !isLoading" class="panel-state">
+                Select or create a store to view ingredients.
+            </div>
+
+            <template v-else>
+                <!-- STAT STRIP (doubles as filters) -->
+                <div class="stat-strip" role="group" aria-label="Filter ingredients">
+                    <button
+                        type="button"
+                        class="stat"
+                        :class="{ 'stat--active': categoryFilter === 'ALL' && statusFilter === 'ALL' }"
+                        :aria-pressed="categoryFilter === 'ALL' && statusFilter === 'ALL'"
+                        @click="clearFilters"
+                    >
+                        <span class="stat-value">{{ totalIngredients }}</span>
+                        <span class="stat-label">Ingredients</span>
+                    </button>
+                    <button
+                        type="button"
+                        class="stat"
+                        :class="{ 'stat--active': categoryFilter === 'RAW_MATERIAL' }"
+                        :aria-pressed="categoryFilter === 'RAW_MATERIAL'"
+                        @click="toggleCategory('RAW_MATERIAL')"
+                    >
+                        <span class="stat-value">{{ rawMaterialCount }}</span>
+                        <span class="stat-label">Raw materials</span>
+                    </button>
+                    <button
+                        type="button"
+                        class="stat"
+                        :class="{ 'stat--active': categoryFilter === 'PACKAGING' }"
+                        :aria-pressed="categoryFilter === 'PACKAGING'"
+                        @click="toggleCategory('PACKAGING')"
+                    >
+                        <span class="stat-value">{{ packagingCount }}</span>
+                        <span class="stat-label">Packaging</span>
+                    </button>
+                    <button
+                        type="button"
+                        class="stat stat--warn"
+                        :class="{ 'stat--active': statusFilter === 'INACTIVE', 'stat--flagged': inactiveCount > 0 }"
+                        :aria-pressed="statusFilter === 'INACTIVE'"
+                        @click="toggleInactive"
+                    >
+                        <span class="stat-value">{{ inactiveCount }}</span>
+                        <span class="stat-label">Inactive</span>
+                    </button>
+                </div>
+
+                <!-- IMPORT PROGRESS -->
+                <div v-if="isImporting" class="import-progress">
+                    <div class="import-progress__label">Importing… {{ Math.round(importProgress) }}%</div>
+                    <div class="import-progress__track">
+                        <div class="import-progress__fill" :style="{ width: importProgress + '%' }"></div>
+                    </div>
+                </div>
+
+                <!-- IMPORT RESULT -->
+                <div v-if="importResult" class="import-result" :class="importResult.failed > 0 ? 'import-result--warn' : 'import-result--ok'">
+                    <div class="import-result__summary">
+                        <span>Import complete: <strong>{{ importResult.imported }}</strong> added, <strong>{{ importResult.updated }}</strong> updated{{ importResult.failed > 0 ? `, ${importResult.failed} failed` : '' }}.</span>
+                        <button class="import-result__close" @click="importResult = null">✕</button>
+                    </div>
+                    <ul v-if="importResult.errors.length > 0" class="import-result__errors">
+                        <li v-for="err in importResult.errors" :key="err.row">Row {{ err.row }}: {{ err.message }}</li>
+                    </ul>
+                </div>
+
+                <!-- TABLE PANEL -->
+                <section class="ingredients-panel">
+                    <div class="panel-toolbar">
+                        <div class="search-wrap">
+                            <mdicon name="magnify" size="17" class="search-icon" />
+                            <input
+                                v-model="searchQuery"
+                                type="text"
+                                class="search-input"
+                                placeholder="Search by name, unit, or category…"
+                            />
                         </div>
+                    </div>
 
-                        <div v-if="isImporting" class="import-progress">
-                            <div class="import-progress__label">Importing… {{ Math.round(importProgress) }}%</div>
-                            <div class="import-progress__track">
-                                <div class="import-progress__fill" :style="{ width: importProgress + '%' }"></div>
-                            </div>
-                        </div>
-
-                        <div v-if="importResult" class="import-result" :class="importResult.failed > 0 ? 'import-result--warn' : 'import-result--ok'">
-                            <div class="import-result__summary">
-                                <span>Import complete: <strong>{{ importResult.imported }}</strong> added, <strong>{{ importResult.updated }}</strong> updated{{ importResult.failed > 0 ? `, ${importResult.failed} failed` : '' }}.</span>
-                                <button class="import-result__close" @click="importResult = null">✕</button>
-                            </div>
-                            <ul v-if="importResult.errors.length > 0" class="import-result__errors">
-                                <li v-for="err in importResult.errors" :key="err.row">Row {{ err.row }}: {{ err.message }}</li>
-                            </ul>
-                        </div>
-
-                        <div v-if="!storeContext.currentStoreId" class="panel-state">
-                            Select or create a store to view ingredients.
-                        </div>
-
-                        <div v-else-if="isLoading" class="panel-state">Loading ingredients...</div>
-
-                        <div v-else class="table-wrap">
+                    <SkeletonLoader v-if="isLoading" :rows="8" label="Loading ingredients…" />
+                    <template v-else>
+                        <div class="table-wrap">
                             <table class="ingredients-table">
                                 <thead>
                                     <tr>
-                                        <th>Name</th>
-                                        <th>Category</th>
-                                        <th>Unit</th>
-                                        <th>Cost per unit</th>
+                                        <th>Ingredient</th>
+                                        <th class="num">Cost per unit</th>
                                         <th>Purchase unit</th>
                                         <th>Status</th>
-                                        <th class="align-center">Actions</th>
+                                        <th v-if="canWrite" class="align-right">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <tr v-for="ingredient in paginatedIngredients" :key="ingredient.id">
-                                        <td>
+                                    <tr
+                                        v-for="ingredient in paginatedIngredients"
+                                        :key="ingredient.id"
+                                        :class="{ 'row-clickable': canWrite }"
+                                        @click="canWrite && openEditModal(ingredient)"
+                                    >
+                                        <td class="col-name">
                                             <div class="ingredient-name">{{ ingredient.name }}</div>
+                                            <div class="ingredient-meta">
+                                                <span
+                                                    class="category-chip"
+                                                    :class="ingredient.category === 'PACKAGING' ? 'category-chip--packaging' : 'category-chip--raw'"
+                                                >
+                                                    {{ formatCategory(ingredient.category) }}
+                                                </span>
+                                                <span>{{ ingredient.unit }}</span>
+                                            </div>
                                         </td>
-                                        <td>
-                                            <span class="category-chip" :class="'category-chip--' + ingredient.category.toLowerCase()">
-                                                {{ formatCategory(ingredient.category) }}
-                                            </span>
-                                        </td>
-                                        <td class="cell-muted">{{ ingredient.unit }}</td>
-                                        <td class="cell-num">
+                                        <td class="col-cost num">
                                             {{ formatMoney(ingredient.costPerUnit) }}
                                             <span class="cost-unit">/ {{ ingredient.unit }}</span>
                                         </td>
-                                        <td>
+                                        <td class="col-purchase">
                                             <template v-if="ingredient.purchaseUnit">
                                                 <span class="purchase-unit-badge">{{ ingredient.purchaseUnit }}</span>
                                                 <span v-if="ingredient.purchaseUnitSize" class="purchase-unit-size">
                                                     {{ formatQty(ingredient.purchaseUnitSize) }} {{ ingredient.unit }} each
                                                 </span>
                                             </template>
-                                            <span v-else class="cell-muted">—</span>
+                                            <span v-else class="cell-empty">—</span>
                                         </td>
-                                        <td>
+                                        <td class="col-status">
                                             <span
                                                 class="status-pill"
                                                 :class="ingredient.active ? 'status-pill--active' : 'status-pill--inactive'"
@@ -194,22 +210,21 @@
                                                 {{ ingredient.active ? 'Active' : 'Inactive' }}
                                             </span>
                                         </td>
-                                        <td class="table-actions">
-                                            <div v-if="canWrite" class="action-group">
-                                                <button class="action-btn" @click="openEditModal(ingredient)">Edit</button>
-                                                <button class="action-btn action-btn--danger" @click="openDeleteModal(ingredient)">Delete</button>
-                                            </div>
-                                            <span v-else class="cell-muted">View only</span>
+                                        <td v-if="canWrite" class="col-actions" @click.stop>
+                                            <button class="icon-btn" title="Edit" :aria-label="`Edit ${ingredient.name}`" @click="openEditModal(ingredient)">
+                                                <mdicon name="pencil-outline" size="17" />
+                                            </button>
+                                            <button class="icon-btn icon-btn--danger" title="Delete" :aria-label="`Delete ${ingredient.name}`" @click="openDeleteModal(ingredient)">
+                                                <mdicon name="trash-can-outline" size="17" />
+                                            </button>
                                         </td>
                                     </tr>
                                     <tr v-if="filteredIngredients.length === 0">
-                                        <td colspan="7">
+                                        <td :colspan="canWrite ? 5 : 4" class="empty-cell">
                                             <div class="empty-state">
                                                 <mdicon name="flask-outline" size="32" class="empty-icon" />
                                                 <p class="empty-heading">No ingredients found</p>
-                                                <p class="empty-sub">
-                                                    {{ searchQuery || filterStatus !== 'ALL' ? 'Try adjusting your search or filter.' : 'Add your first ingredient to get started.' }}
-                                                </p>
+                                                <p class="empty-sub">{{ emptyMessage }}</p>
                                             </div>
                                         </td>
                                     </tr>
@@ -217,72 +232,29 @@
                             </table>
                         </div>
 
-                        <div v-if="!isLoading && filteredIngredients.length > 0" class="pagination">
-                            <div class="pagination-left">
+                        <div v-if="filteredIngredients.length > 0" class="pagination">
+                            <div class="pagination-info">
+                                <span>{{ filteredIngredients.length }} ingredient{{ filteredIngredients.length !== 1 ? 's' : '' }}</span>
                                 <label class="pagination-size">
-                                    <span>Rows</span>
+                                    <span>Show</span>
                                     <select v-model.number="pageSize">
-                                        <option v-for="size in pageSizeOptions" :key="size" :value="size">
-                                            {{ size }}
-                                        </option>
+                                        <option v-for="size in pageSizeOptions" :key="size" :value="size">{{ size }}</option>
                                     </select>
                                 </label>
-                                <span class="pagination-info">{{ filteredIngredients.length }} ingredient{{ filteredIngredients.length !== 1 ? 's' : '' }}</span>
                             </div>
-                            <div class="pagination-controls">
-                                <button class="page-btn" :disabled="page === 1" @click="changePage(page - 1)">
+                            <div v-if="totalPages > 1" class="pagination-controls">
+                                <button class="page-btn" :disabled="page === 1" @click="changePage(page - 1)" aria-label="Previous page">
                                     <mdicon name="chevron-left" size="18" />
                                 </button>
-                                <span class="pagination-info">{{ page }} / {{ Math.max(1, totalPages) }}</span>
-                                <button class="page-btn" :disabled="page >= totalPages" @click="changePage(page + 1)">
+                                <span class="page-indicator">{{ page }} / {{ totalPages }}</span>
+                                <button class="page-btn" :disabled="page >= totalPages" @click="changePage(page + 1)" aria-label="Next page">
                                     <mdicon name="chevron-right" size="18" />
                                 </button>
                             </div>
                         </div>
-                    </section>
-
-                    <aside class="insight-panel">
-                        <div class="insight-card">
-                            <h3>Breakdown</h3>
-                            <div class="breakdown-list">
-                                <div class="breakdown-item">
-                                    <span class="breakdown-dot breakdown-dot--raw"></span>
-                                    <span class="breakdown-label">Raw materials</span>
-                                    <span class="breakdown-count">{{ rawMaterialCount }}</span>
-                                </div>
-                                <div class="breakdown-item">
-                                    <span class="breakdown-dot breakdown-dot--packaging"></span>
-                                    <span class="breakdown-label">Packaging</span>
-                                    <span class="breakdown-count">{{ packagingCount }}</span>
-                                </div>
-                                <div class="breakdown-item">
-                                    <span class="breakdown-dot breakdown-dot--active"></span>
-                                    <span class="breakdown-label">Active</span>
-                                    <span class="breakdown-count">{{ activeCount }}</span>
-                                </div>
-                                <div class="breakdown-item" :class="{ 'breakdown-item--warn': inactiveCount > 0 }">
-                                    <span class="breakdown-dot breakdown-dot--inactive"></span>
-                                    <span class="breakdown-label">Inactive</span>
-                                    <span class="breakdown-count">{{ inactiveCount }}</span>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="insight-card">
-                            <h3>Navigate</h3>
-                            <div class="action-list">
-                                <button class="secondary-button" @click="goToInventory">
-                                    <mdicon name="arrow-left" size="15" />
-                                    Back to inventory
-                                </button>
-                                <button class="secondary-button" @click="goToMovements">
-                                    <mdicon name="swap-horizontal" size="15" />
-                                    Movement history
-                                </button>
-                            </div>
-                        </div>
-                    </aside>
-                </template>
-            </div>
+                    </template>
+                </section>
+            </template>
         </div>
     </section>
 </template>
@@ -290,7 +262,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import PullToRefresh from '@/components/PullToRefresh.vue';
-import { useRoute, useRouter } from 'vue-router';
+import { useRoute } from 'vue-router';
 import {
     deleteIngredient,
     exportIngredients,
@@ -308,8 +280,8 @@ import IngredientModal from '@/components/IngredientModal.vue';
 import PlanGate from '@/components/PlanGate.vue';
 import CsvActionsMenu from '@/components/CsvActionsMenu.vue';
 import CsvImportPreviewModal from '@/components/CsvImportPreviewModal.vue';
+import SkeletonLoader from '@/components/SkeletonLoader.vue';
 
-const router = useRouter();
 const route = useRoute();
 const storeContext = useStoreContextStore();
 const { showToast } = useToast();
@@ -317,7 +289,8 @@ const { showToast } = useToast();
 const ingredients = ref<IngredientResponse[]>([]);
 const isLoading = ref(false);
 const searchQuery = ref('');
-const filterStatus = ref<'ALL' | 'ACTIVE' | 'INACTIVE'>('ALL');
+const statusFilter = ref<'ALL' | 'INACTIVE'>('ALL');
+const categoryFilter = ref<'ALL' | 'RAW_MATERIAL' | 'PACKAGING'>('ALL');
 const page = ref(1);
 const pageSize = ref(10);
 const pageSizeOptions = [10, 20, 50];
@@ -522,20 +495,23 @@ const cancelDelete = () => {
     ingredientToDelete.value = null;
 };
 
-const goToInventory = () => {
-    if (!storeContext.currentStoreId) return;
-    router.push(`/stores/${storeContext.currentStoreId}/inventory`);
+const toggleCategory = (category: 'RAW_MATERIAL' | 'PACKAGING') => {
+    categoryFilter.value = categoryFilter.value === category ? 'ALL' : category;
 };
 
-const goToMovements = () => {
-    if (!storeContext.currentStoreId) return;
-    router.push(`/stores/${storeContext.currentStoreId}/inventory/movements`);
+const toggleInactive = () => {
+    statusFilter.value = statusFilter.value === 'INACTIVE' ? 'ALL' : 'INACTIVE';
+};
+
+const clearFilters = () => {
+    categoryFilter.value = 'ALL';
+    statusFilter.value = 'ALL';
 };
 
 const filteredIngredients = computed(() => {
     let result = ingredients.value;
-    if (filterStatus.value === 'ACTIVE') result = result.filter((i) => i.active);
-    if (filterStatus.value === 'INACTIVE') result = result.filter((i) => !i.active);
+    if (categoryFilter.value !== 'ALL') result = result.filter((i) => i.category === categoryFilter.value);
+    if (statusFilter.value === 'INACTIVE') result = result.filter((i) => !i.active);
     const query = searchQuery.value.trim().toLowerCase();
     if (!query) return result;
     return result.filter((ingredient) =>
@@ -543,6 +519,14 @@ const filteredIngredients = computed(() => {
         ingredient.unit.toLowerCase().includes(query) ||
         ingredient.category.toLowerCase().includes(query)
     );
+});
+
+const emptyMessage = computed(() => {
+    if (searchQuery.value.trim()) return 'No ingredients match your search.';
+    if (statusFilter.value === 'INACTIVE') return 'No inactive ingredients.';
+    if (categoryFilter.value === 'PACKAGING') return 'No packaging items yet.';
+    if (categoryFilter.value === 'RAW_MATERIAL') return 'No raw materials yet.';
+    return 'Add your first ingredient to start building recipes.';
 });
 
 const totalPages = computed(() => {
@@ -563,17 +547,16 @@ const changePage = (nextPage: number) => {
 const totalIngredients = computed(() => ingredients.value.length);
 const rawMaterialCount = computed(() => ingredients.value.filter((i) => i.category === 'RAW_MATERIAL').length);
 const packagingCount = computed(() => ingredients.value.filter((i) => i.category === 'PACKAGING').length);
-const activeCount = computed(() => ingredients.value.filter((i) => i.active).length);
 const inactiveCount = computed(() => ingredients.value.filter((i) => !i.active).length);
 
 const currentStoreLabel = computed(() => {
     const store = storeContext.currentStore;
-    if (!store) return 'Select a store to get started.';
-    return `${store.name} · ${store.currency}`;
+    if (!store) return 'your store';
+    return store.name;
 });
 
 const formatCategory = (category: string) => {
-    if (category === 'RAW_MATERIAL') return 'Raw Material';
+    if (category === 'RAW_MATERIAL') return 'Raw material';
     if (category === 'PACKAGING') return 'Packaging';
     return category;
 };
@@ -614,26 +597,10 @@ watch(
     }
 );
 
-watch(
-    () => searchQuery.value,
-    () => {
-        page.value = 1;
-    }
-);
-
-watch(
-    () => pageSize.value,
-    () => {
-        page.value = 1;
-    }
-);
-
-watch(
-    () => filterStatus.value,
-    () => {
-        page.value = 1;
-    }
-);
+watch(() => searchQuery.value, () => { page.value = 1; });
+watch(() => pageSize.value, () => { page.value = 1; });
+watch(() => statusFilter.value, () => { page.value = 1; });
+watch(() => categoryFilter.value, () => { page.value = 1; });
 
 watch(
     () => filteredIngredients.value.length,
@@ -650,16 +617,13 @@ watch(
     () => storeContext.currentStoreId,
     async () => {
         page.value = 1;
-        if (!isPlanLocked.value) {
-            await loadIngredients();
-        }
+        if (isPlanLocked.value) return;
+        await loadIngredients();
     }
 );
 </script>
 
 <style scoped>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-
 /* ============================================================
    TOKENS
 ============================================================ */
@@ -670,7 +634,7 @@ watch(
     --c-accent-dark: #0f766e;
     --c-border: #e2e8f0;
     --c-surface: #ffffff;
-    --c-bg: #f8fafc;
+    --c-bg: #f6f8f9;
     min-height: 100vh;
     padding: 2rem 1.5rem 3rem;
     background: var(--c-bg);
@@ -682,11 +646,11 @@ watch(
    SHELL & HEADER
 ============================================================ */
 .ingredients-shell {
-    max-width: 1200px;
+    max-width: 1000px;
     margin: 0 auto;
     display: flex;
     flex-direction: column;
-    gap: 1.75rem;
+    gap: 1.25rem;
 }
 
 .ingredients-header {
@@ -720,169 +684,185 @@ watch(
 
 .ingredients-title p {
     color: var(--c-muted);
-    max-width: 520px;
+    max-width: 480px;
     line-height: 1.55;
     margin: 0;
     font-size: 0.92rem;
 }
 
-/* ============================================================
-   KPI CARDS (header row)
-============================================================ */
-.ingredients-kpis {
+.header-actions {
     display: flex;
+    gap: 0.6rem;
+    align-items: center;
     flex-wrap: wrap;
-    gap: 0.65rem;
-    align-items: flex-start;
 }
 
-.kpi-card {
+.readonly-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.35rem 0.85rem;
+    border-radius: 999px;
+    background: #f1f5f9;
+    border: 1px solid var(--c-border);
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--c-muted);
+    white-space: nowrap;
+}
+
+/* ============================================================
+   STAT STRIP (clickable filters)
+============================================================ */
+.stat-strip {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     background: var(--c-surface);
     border: 1px solid var(--c-border);
-    border-radius: 12px;
-    padding: 0.6rem 1rem;
+    border-radius: 14px;
+    overflow: hidden;
+}
+
+.stat {
     display: flex;
     flex-direction: column;
-    gap: 0.15rem;
-    min-width: 100px;
+    gap: 0.2rem;
+    padding: 1rem 1.4rem;
+    border: none;
+    border-left: 1px solid var(--c-border);
+    background: transparent;
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.15s, box-shadow 0.15s;
+    min-width: 0;
 }
 
-.kpi-card--warn {
-    background: #fffbeb;
-    border-color: #fde68a;
+.stat:first-child { border-left: none; }
+
+.stat:hover { background: #f8fafc; }
+
+.stat--active {
+    background: rgba(13, 148, 136, 0.06);
+    box-shadow: inset 0 -2px 0 var(--c-accent);
 }
 
-.kpi-label {
-    font-size: 0.65rem;
+.stat--active:hover { background: rgba(13, 148, 136, 0.08); }
+
+.stat-value {
+    font-size: 1.5rem;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+    color: var(--c-text);
+    font-variant-numeric: tabular-nums;
+}
+
+.stat-label {
+    font-size: 0.7rem;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.09em;
+    letter-spacing: 0.08em;
     color: var(--c-muted);
+    white-space: nowrap;
 }
 
-.kpi-value {
-    font-size: 1.3rem;
-    font-weight: 800;
-    color: var(--c-text);
-    letter-spacing: -0.02em;
-    line-height: 1;
-}
-
-.kpi-card--warn .kpi-value { color: #b45309; }
+.stat--warn.stat--flagged .stat-value { color: #b45309; }
+.stat--warn.stat--active { box-shadow: inset 0 -2px 0 #f59e0b; background: #fffbeb; }
+.stat--warn.stat--active:hover { background: #fef3c7; }
 
 /* ============================================================
-   LAYOUT
+   IMPORT PROGRESS & RESULT
 ============================================================ */
-.ingredients-content {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 260px;
-    gap: 1.5rem;
-    align-items: start;
+.import-progress {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    padding: 0.75rem 1rem;
+    background: rgba(13, 148, 136, 0.06);
+    border: 1px solid rgba(13, 148, 136, 0.22);
+    border-radius: 10px;
 }
 
+.import-progress__label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #0f766e;
+}
+
+.import-progress__track {
+    height: 6px;
+    background: rgba(13, 148, 136, 0.15);
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.import-progress__fill {
+    height: 100%;
+    background: #0d9488;
+    border-radius: 999px;
+    transition: width 0.15s ease;
+}
+
+.import-result {
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+    font-size: 0.875rem;
+}
+.import-result--ok { background: #f0fdf4; border: 1px solid #86efac; color: #15803d; }
+.import-result--warn { background: #fffbeb; border: 1px solid #fcd34d; color: #92400e; }
+.import-result__summary { display: flex; justify-content: space-between; align-items: center; }
+.import-result__close { background: none; border: none; cursor: pointer; font-size: 1rem; opacity: 0.6; }
+.import-result__close:hover { opacity: 1; }
+.import-result__errors { margin: 0.5rem 0 0; padding-left: 1.25rem; display: flex; flex-direction: column; gap: 0.2rem; }
+
 /* ============================================================
-   PANEL
+   PANEL & TOOLBAR
 ============================================================ */
 .ingredients-panel {
     background: var(--c-surface);
     border: 1px solid var(--c-border);
     border-radius: 16px;
-    padding: 1.75rem;
+    padding: 1.25rem 1.5rem 1.5rem;
     display: flex;
     flex-direction: column;
     gap: 1rem;
+    min-width: 0;
 }
 
-/* ============================================================
-   TOOLBAR
-============================================================ */
-.toolbar {
+.panel-toolbar {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 1rem;
-    flex-wrap: wrap;
-}
-
-.toolbar-left {
-    display: flex;
-    align-items: center;
     gap: 0.75rem;
+    align-items: center;
     flex-wrap: wrap;
 }
-
-.toolbar-right {
-    display: flex;
-    align-items: center;
-    gap: 0.65rem;
-    flex-shrink: 0;
-}
-
-.filter-pills {
-    display: flex;
-    gap: 0.25rem;
-    padding: 0.2rem;
-    background: #f1f5f9;
-    border-radius: 10px;
-}
-
-.pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    padding: 0.4rem 0.75rem;
-    border: none;
-    border-radius: 7px;
-    background: transparent;
-    color: var(--c-muted);
-    font-size: 0.8rem;
-    font-weight: 600;
-    cursor: pointer;
-    font-family: 'Inter', -apple-system, sans-serif;
-    transition: all 0.15s;
-    white-space: nowrap;
-}
-
-.pill:hover { color: var(--c-text); }
-
-.pill.active {
-    background: #ffffff;
-    color: var(--c-text);
-    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.1);
-}
-
-.pill-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    flex-shrink: 0;
-}
-
-.pill-dot--warn { background: #f59e0b; }
 
 .search-wrap {
     position: relative;
-    display: flex;
-    align-items: center;
+    flex: 1;
+    min-width: 220px;
+    max-width: 380px;
 }
 
 .search-icon {
     position: absolute;
-    left: 0.75rem;
-    color: var(--c-muted);
+    left: 0.7rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #94a3b8;
     pointer-events: none;
 }
 
 .search-input {
-    border-radius: 8px;
+    border-radius: 9px;
     border: 1.5px solid var(--c-border);
-    padding: 0.5rem 0.9rem 0.5rem 2.25rem;
-    min-width: 180px;
-    font-size: 0.84rem;
+    padding: 0.55rem 0.9rem 0.55rem 2.3rem;
+    width: 100%;
+    box-sizing: border-box;
+    font-size: 0.875rem;
     font-family: 'Inter', -apple-system, sans-serif;
-    background: var(--c-surface);
     color: var(--c-text);
-    transition: border-color 0.15s;
+    background: var(--c-surface);
+    transition: border-color 0.15s, box-shadow 0.15s;
 }
 
 .search-input::placeholder { color: #94a3b8; }
@@ -893,14 +873,19 @@ watch(
     box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.12);
 }
 
+.panel-state {
+    padding: 2rem;
+    border-radius: 10px;
+    background: #f1f5f9;
+    color: var(--c-muted);
+    font-size: 0.9rem;
+    text-align: center;
+}
+
 /* ============================================================
    TABLE
 ============================================================ */
-.table-wrap {
-    border: 1px solid var(--c-border);
-    border-radius: 12px;
-    overflow: hidden;
-}
+.table-wrap { overflow-x: auto; min-width: 0; }
 
 .ingredients-table {
     width: 100%;
@@ -916,183 +901,154 @@ watch(
     text-transform: uppercase;
     letter-spacing: 0.07em;
     color: var(--c-muted);
-    background: #f8fafc;
     border-bottom: 1.5px solid var(--c-border);
+    white-space: nowrap;
 }
 
+.ingredients-table thead th.num { text-align: right; }
 .ingredients-table thead th.align-right { text-align: right; }
-.ingredients-table thead th.align-center { text-align: center; }
+
+.ingredients-table tbody tr {
+    border-bottom: 1px solid var(--c-border);
+    transition: background 0.12s;
+}
+
+.ingredients-table tbody tr:last-child { border-bottom: none; }
+.ingredients-table tbody tr:hover { background: #f8fafc; }
+.ingredients-table tbody tr.row-clickable { cursor: pointer; }
 
 .ingredients-table tbody td {
-    padding: 0.65rem 0.9rem;
-    border-bottom: 1px solid var(--c-border);
+    padding: 0.85rem 0.9rem;
     vertical-align: middle;
 }
-
-.ingredients-table tbody tr:last-child td { border-bottom: none; }
-.ingredients-table tbody tr:hover { background: #f8fafc; }
 
 .ingredient-name {
     font-weight: 600;
     color: var(--c-text);
 }
 
+.ingredient-meta {
+    font-size: 0.75rem;
+    color: var(--c-muted);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-top: 0.2rem;
+}
+
 .category-chip {
     display: inline-flex;
-    padding: 0.18rem 0.55rem;
+    align-items: center;
+    padding: 0.08rem 0.5rem;
     border-radius: 999px;
-    font-size: 0.7rem;
+    font-size: 0.68rem;
     font-weight: 600;
-    letter-spacing: 0.03em;
+    letter-spacing: 0.02em;
     white-space: nowrap;
 }
 
-.category-chip--raw_material {
-    background: rgba(13, 148, 136, 0.08);
-    color: #0f766e;
-}
+.category-chip--raw { background: #ede9fe; color: #6d28d9; }
+.category-chip--packaging { background: #e0f2fe; color: #0369a1; }
 
-.category-chip--packaging {
-    background: rgba(139, 92, 246, 0.08);
-    color: #6d28d9;
-}
-
-.status-pill {
-    display: inline-flex;
-    padding: 0.2rem 0.6rem;
-    border-radius: 999px;
-    font-size: 0.7rem;
-    font-weight: 700;
-    letter-spacing: 0.04em;
+.col-cost {
     white-space: nowrap;
-}
-
-.status-pill--active {
-    background: rgba(5, 150, 105, 0.1);
-    color: #047857;
-}
-
-.status-pill--inactive {
-    background: rgba(148, 163, 184, 0.15);
-    color: #64748b;
-}
-
-.cell-muted {
-    font-size: 0.84rem;
-    color: var(--c-muted);
-}
-
-.cell-num {
     font-weight: 600;
     color: var(--c-text);
-    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
 }
+
+.ingredients-table td.num { text-align: right; }
 
 .cost-unit {
     font-size: 0.72rem;
     font-weight: 500;
     color: var(--c-muted);
-    margin-left: 0.2rem;
 }
 
 .purchase-unit-badge {
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    padding: 0.1rem 0.5rem;
+    border-radius: 999px;
+    background: rgba(13, 148, 136, 0.08);
+    color: var(--c-accent-dark);
     font-size: 0.72rem;
     font-weight: 600;
-    color: #0f766e;
-    background: rgba(13, 148, 136, 0.08);
-    border: 1px solid rgba(13, 148, 136, 0.2);
-    border-radius: 4px;
-    padding: 0.15rem 0.45rem;
+    white-space: nowrap;
 }
 
 .purchase-unit-size {
     display: block;
-    font-size: 0.7rem;
+    font-size: 0.72rem;
     color: var(--c-muted);
-    margin-top: 0.15rem;
-}
-
-.table-actions {
-    text-align: center;
+    margin-top: 0.2rem;
     white-space: nowrap;
 }
 
-.action-group {
-    display: inline-flex;
-    flex-wrap: nowrap;
-    justify-content: center;
-    gap: 0.35rem;
-}
+.cell-empty { color: #cbd5e1; }
 
-.action-btn {
+.status-pill {
     display: inline-flex;
     align-items: center;
-    padding: 0.3rem 0.65rem;
-    border-radius: 6px;
-    border: 1.5px solid var(--c-border);
-    background: transparent;
-    color: var(--c-text);
-    font-size: 0.78rem;
+    padding: 0.2rem 0.65rem;
+    border-radius: 999px;
+    font-size: 0.68rem;
     font-weight: 600;
-    font-family: 'Inter', -apple-system, sans-serif;
-    cursor: pointer;
-    transition: all 0.15s;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
     white-space: nowrap;
 }
 
-.action-btn:hover {
-    border-color: var(--c-accent);
-    color: var(--c-accent-dark);
+.status-pill--active { background: rgba(13, 148, 136, 0.1); color: var(--c-accent-dark); }
+.status-pill--inactive { background: #f1f5f9; color: var(--c-muted); }
+
+.col-actions {
+    text-align: right;
+    white-space: nowrap;
 }
 
-.action-btn--danger:hover {
-    border-color: #fca5a5;
-    color: #dc2626;
-    background: #fef2f2;
-}
-
-.panel-note {
-    font-size: 0.8rem;
+.icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: none;
+    background: transparent;
     color: var(--c-muted);
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s;
 }
 
-/* ============================================================
-   EMPTY STATE
-============================================================ */
+.icon-btn:hover:not(:disabled) { background: rgba(13, 148, 136, 0.08); color: var(--c-accent-dark); }
+.icon-btn--danger:hover:not(:disabled) { background: #fef2f2; color: #dc2626; }
+
+.empty-cell { padding: 0; }
+
 .empty-state {
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 3rem 1.5rem;
+    gap: 0.35rem;
+    padding: 2.5rem 1rem;
     text-align: center;
 }
 
-.empty-icon { color: #cbd5e1; margin-bottom: 0.75rem; }
+.empty-icon { color: #cbd5e1; margin-bottom: 0.35rem; }
 
 .empty-heading {
+    margin: 0;
     font-size: 0.95rem;
     font-weight: 700;
     color: var(--c-text);
-    margin: 0 0 0.3rem;
 }
 
 .empty-sub {
+    margin: 0;
     font-size: 0.82rem;
     color: var(--c-muted);
-    margin: 0;
-}
-
-/* ============================================================
-   PANEL STATE
-============================================================ */
-.panel-state {
-    padding: 1.5rem;
-    border-radius: 10px;
-    background: #f1f5f9;
-    color: var(--c-muted);
-    font-size: 0.875rem;
-    text-align: center;
 }
 
 /* ============================================================
@@ -1102,163 +1058,71 @@ watch(
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 1rem;
     flex-wrap: wrap;
-    padding-top: 0.75rem;
-    border-top: 1px solid var(--c-border);
-}
-
-.pagination-left {
-    display: flex;
-    align-items: center;
     gap: 0.75rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--c-border);
+    font-size: 0.85rem;
+    color: var(--c-muted);
 }
 
 .pagination-info {
-    font-size: 0.8rem;
-    color: var(--c-muted);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    font-size: 0.82rem;
+}
+
+.pagination-size {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.pagination-size select {
+    border: 1.5px solid var(--c-border);
+    border-radius: 6px;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.82rem;
+    font-family: 'Inter', -apple-system, sans-serif;
+    color: var(--c-text);
+    background: var(--c-surface);
+    cursor: pointer;
+}
+
+.pagination-size select:focus {
+    outline: none;
+    border-color: var(--c-accent);
 }
 
 .pagination-controls {
     display: flex;
     align-items: center;
-    gap: 0.35rem;
+    gap: 0.5rem;
+}
+
+.page-indicator {
+    font-size: 0.82rem;
+    min-width: 50px;
+    text-align: center;
 }
 
 .page-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
-    border: 1.5px solid var(--c-border);
-    border-radius: 8px;
-    background: var(--c-surface);
-    color: var(--c-text);
-    cursor: pointer;
-    transition: all 0.15s;
-}
-
-.page-btn:hover:not(:disabled) {
-    border-color: var(--c-accent);
-    color: var(--c-accent);
-}
-
-.page-btn:disabled { opacity: 0.35; cursor: not-allowed; }
-
-.pagination-size {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    font-size: 0.78rem;
-    color: var(--c-muted);
-    font-weight: 500;
-}
-
-.pagination-size select {
-    padding: 0.25rem 0.5rem;
-    border: 1.5px solid var(--c-border);
+    width: 30px;
+    height: 30px;
     border-radius: 6px;
-    font-size: 0.78rem;
-    font-family: 'Inter', -apple-system, sans-serif;
-    color: var(--c-text);
-    background: var(--c-surface);
-}
-
-/* ============================================================
-   ASIDE
-============================================================ */
-.insight-panel {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-}
-
-.insight-card {
-    background: var(--c-surface);
-    border: 1px solid var(--c-border);
-    border-radius: 16px;
-    padding: 1.25rem 1.4rem;
-}
-
-.insight-card h3 {
-    font-size: 0.875rem;
-    font-weight: 700;
-    color: var(--c-text);
-    margin: 0 0 0.75rem;
-}
-
-.breakdown-list {
-    display: flex;
-    flex-direction: column;
-}
-
-.breakdown-item {
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-    padding: 0.5rem 0;
-    border-bottom: 1px solid var(--c-border);
-    font-size: 0.82rem;
-}
-
-.breakdown-item:last-child { border-bottom: none; }
-
-.breakdown-item--warn .breakdown-label { color: #b45309; }
-.breakdown-item--warn .breakdown-count { color: #b45309; }
-
-.breakdown-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    flex-shrink: 0;
-}
-
-.breakdown-dot--raw       { background: #0d9488; }
-.breakdown-dot--packaging { background: #8b5cf6; }
-.breakdown-dot--active    { background: #059669; }
-.breakdown-dot--inactive  { background: #f59e0b; }
-
-.breakdown-label {
-    flex: 1;
-    color: var(--c-text);
-    font-weight: 500;
-}
-
-.breakdown-count {
-    font-weight: 700;
-    color: var(--c-text);
-    font-size: 0.875rem;
-}
-
-.action-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-}
-
-.secondary-button {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    padding: 0.55rem 0.9rem;
-    border-radius: 8px;
     border: 1.5px solid var(--c-border);
     background: transparent;
     color: var(--c-text);
-    font-size: 0.84rem;
-    font-weight: 600;
-    font-family: 'Inter', -apple-system, sans-serif;
     cursor: pointer;
     transition: all 0.15s;
-    text-align: left;
-    width: 100%;
 }
 
-.secondary-button:hover {
-    border-color: var(--c-accent);
-    color: var(--c-accent-dark);
-}
+.page-btn:hover:not(:disabled) { border-color: var(--c-accent); color: var(--c-accent-dark); background: rgba(13, 148, 136, 0.05); }
+.page-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 
 /* ============================================================
    BUTTONS
@@ -1267,102 +1131,94 @@ watch(
     display: inline-flex;
     align-items: center;
     gap: 0.4rem;
-    padding: 0.65rem 1.25rem;
-    border-radius: 8px;
+    padding: 0.6rem 1.1rem;
+    border-radius: 9px;
     border: none;
     background: var(--c-accent);
-    color: #ffffff;
+    color: #fff;
     font-size: 0.875rem;
     font-weight: 600;
     font-family: 'Inter', -apple-system, sans-serif;
     cursor: pointer;
-    transition: background 0.15s;
+    transition: background 0.15s, box-shadow 0.15s, transform 0.15s;
+    box-shadow: 0 2px 8px rgba(13, 148, 136, 0.25);
     white-space: nowrap;
 }
 
-.primary-button:hover:not(:disabled) { background: var(--c-accent-dark); }
-
-.primary-button:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
-/* ============================================================
-   IMPORT / EXPORT
-============================================================ */
-.import-progress {
-    display: flex;
-    flex-direction: column;
-    gap: 0.45rem;
-    padding: 0.75rem 1rem;
-    background: rgba(13, 148, 136, 0.06);
-    border: 1px solid rgba(13, 148, 136, 0.22);
-    border-radius: 8px;
-}
-.import-progress__label {
-    font-size: 0.8rem;
-    font-weight: 600;
-    color: #0f766e;
-}
-.import-progress__track {
-    height: 6px;
-    background: rgba(13, 148, 136, 0.15);
-    border-radius: 999px;
-    overflow: hidden;
-}
-.import-progress__fill {
-    height: 100%;
-    background: #0d9488;
-    border-radius: 999px;
-    transition: width 0.15s ease;
-}
-
-.import-result {
-    border-radius: 8px;
-    padding: 0.75rem 1rem;
-    font-size: 0.875rem;
-}
-.import-result--ok { background: #f0fdf4; border: 1px solid #86efac; color: #15803d; }
-.import-result--warn { background: #fffbeb; border: 1px solid #fcd34d; color: #92400e; }
-.import-result__summary { display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; }
-.import-result__close { background: none; border: none; cursor: pointer; font-size: 1rem; opacity: 0.6; }
-.import-result__close:hover { opacity: 1; }
-.import-result__errors { margin: 0.5rem 0 0; padding-left: 1.25rem; display: flex; flex-direction: column; gap: 0.2rem; }
+.primary-button:hover:not(:disabled) { background: var(--c-accent-dark); transform: translateY(-1px); box-shadow: 0 4px 14px rgba(13, 148, 136, 0.35); }
+.primary-button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 
 /* ============================================================
    RESPONSIVE
 ============================================================ */
-@media (max-width: 960px) {
-    .ingredients-content {
-        grid-template-columns: 1fr;
-    }
-
-    .toolbar {
-        flex-direction: column;
-        align-items: stretch;
-    }
-
-    .toolbar-left { flex-wrap: wrap; }
-
-    .filter-pills { overflow-x: auto; }
-}
-
 @media (max-width: 640px) {
-    .ingredients-page {
-        padding: 1.25rem 1rem 2.5rem;
+    .ingredients-page { padding: 1rem 0.875rem 2.5rem; }
+    .ingredients-shell { gap: 1rem; }
+    .ingredients-header { flex-direction: column; gap: 0.875rem; }
+    .ingredients-title h1 { font-size: 1.5rem; }
+
+    .header-actions { width: 100%; }
+    .header-actions .primary-button { flex: 1; justify-content: center; }
+
+    .stat { padding: 0.75rem 0.7rem; }
+    .stat-value { font-size: 1.2rem; }
+    .stat-label { font-size: 0.6rem; }
+
+    .ingredients-panel { padding: 1rem 0 0.75rem; border-radius: 12px; }
+    .panel-toolbar { padding: 0 1rem; }
+    .search-wrap { max-width: none; }
+    .pagination { padding: 1rem 1rem 0; flex-direction: column; align-items: flex-start; gap: 0.5rem; }
+
+    /* ── Table → card view ── */
+    .ingredients-table thead { display: none; }
+    .ingredients-table,
+    .ingredients-table tbody { display: block; }
+
+    .ingredients-table tbody tr {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        grid-template-rows: auto auto auto;
+        padding: 0.875rem 1rem;
+        gap: 0.2rem 0.625rem;
+        border-bottom: 1px solid var(--c-border);
+    }
+    .ingredients-table tbody tr:last-child { border-bottom: none; }
+
+    .ingredients-table tbody td {
+        padding: 0;
+        border: none;
+        vertical-align: top;
     }
 
-    .ingredients-title h1 {
-        font-size: 1.5rem;
+    .ingredients-table tbody td.col-name { grid-column: 1; grid-row: 1; }
+    .ingredients-table tbody td.col-status {
+        grid-column: 2;
+        grid-row: 1;
+        display: flex;
+        justify-content: flex-end;
+        align-items: flex-start;
+    }
+    .ingredients-table tbody td.col-cost {
+        grid-column: 1;
+        grid-row: 2;
+        padding-top: 0.35rem;
+        text-align: left;
+    }
+    .ingredients-table tbody td.col-purchase {
+        grid-column: 2;
+        grid-row: 2;
+        padding-top: 0.35rem;
+        text-align: right;
+    }
+    .ingredients-table tbody td.col-actions {
+        grid-column: 1 / -1;
+        grid-row: 3;
+        display: flex;
+        justify-content: flex-end;
+        gap: 0.25rem;
+        padding-top: 0.35rem;
     }
 
-    .ingredients-kpis {
-        width: 100%;
-    }
-
-    .kpi-card {
-        flex: 1;
-        min-width: 80px;
-    }
+    .ingredients-table tbody td.empty-cell { grid-column: 1 / -1; }
 }
 </style>

@@ -14,44 +14,44 @@
 
         <teleport to="body">
             <transition name="modal-fade" appear>
-                <div v-if="showFormModal" class="sup-modal-overlay" @keyup.esc="closeFormModal" tabindex="0">
-                    <div class="sup-modal" ref="formModalRef">
-                        <div class="sup-modal-header">
+                <div v-if="showFormModal" class="modal-backdrop" @keyup.esc="closeFormModal" tabindex="0">
+                    <div class="modal-box" ref="formModalRef">
+                        <div class="modal-header">
                             <div>
                                 <h2>{{ editingId ? 'Edit supplier' : 'Add supplier' }}</h2>
                                 <p>Save trusted supplier details for purchase orders.</p>
                             </div>
-                            <button class="sup-modal-close" @click="closeFormModal" aria-label="Close">
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                            <button class="modal-close" @click="closeFormModal" aria-label="Close">
+                                <mdicon name="close" size="20" />
                             </button>
                         </div>
 
-                        <div v-if="!canWrite" class="panel-state sup-modal-body">
+                        <div v-if="!canWrite" class="panel-state modal-body">
                             You have view-only access. Ask an owner or manager to manage suppliers.
                         </div>
 
-                        <form v-else class="sup-modal-body" @submit.prevent="submitForm">
+                        <form v-else class="modal-body" @submit.prevent="submitForm">
                             <div v-if="formError" class="form-alert">{{ formError }}</div>
 
                             <label class="form-field">
-                                Supplier name
+                                <span>Supplier name</span>
                                 <input ref="supplierNameInputRef" v-model="form.name" type="text" placeholder="Fresh Supplier Co" required />
                             </label>
 
                             <label class="form-field">
-                                Email
+                                <span>Email <em>optional</em></span>
                                 <input v-model="form.email" type="email" placeholder="ops@supplier.com" />
                             </label>
 
                             <label class="form-field">
-                                Phone
-                                <input v-model="form.phone" type="tel" placeholder="+1 555 000 0000" />
+                                <span>Phone <em>optional</em></span>
+                                <input v-model="form.phone" type="tel" placeholder="+63 900 000 0000" />
                             </label>
 
-                            <div class="sup-modal-footer">
-                                <button type="button" class="sup-btn-ghost" @click="closeFormModal">Cancel</button>
-                                <button class="sup-btn-primary" type="submit" :disabled="isSaving">
-                                    {{ isSaving ? 'Saving...' : editingId ? 'Update supplier' : 'Create supplier' }}
+                            <div class="modal-footer">
+                                <button type="button" class="ghost-button" @click="closeFormModal">Cancel</button>
+                                <button class="primary-button" type="submit" :disabled="isSaving">
+                                    {{ isSaving ? 'Saving…' : editingId ? 'Update supplier' : 'Create supplier' }}
                                 </button>
                             </div>
                         </form>
@@ -61,123 +61,132 @@
         </teleport>
 
         <div class="suppliers-shell">
-            <header class="suppliers-header">
-                <div class="suppliers-title">
-                    <span class="suppliers-eyebrow">Purchasing</span>
-                    <h1>Suppliers</h1>
-                    <p>Manage supplier contacts for {{ currentStoreLabel }}.</p>
-                </div>
-                <div class="suppliers-actions">
-                    <button class="sup-btn-ghost" @click="goToPurchaseOrders">Back to purchase orders</button>
+            <header class="list-header">
+                <button type="button" class="back-link" @click="goToPurchaseOrders">
+                    <mdicon name="arrow-left" size="15" />
+                    Purchase orders
+                </button>
+                <div class="list-header-row">
+                    <div class="list-title">
+                        <h1>Suppliers</h1>
+                        <p>Supplier contacts for {{ currentStoreLabel }}.</p>
+                    </div>
+                    <div class="header-actions">
+                        <button v-if="canWrite" class="primary-button" :disabled="!storeContext.currentStoreId" @click="openAddModal">
+                            <mdicon name="plus" size="16" />
+                            Add supplier
+                        </button>
+                        <span v-else-if="storeContext.currentStoreId" class="readonly-chip">View-only access</span>
+                    </div>
                 </div>
             </header>
 
-            <div class="suppliers-content">
-                <PlanGate
-                    v-if="isPlanLocked"
-                    feature="purchaseOrders"
-                    title="Suppliers are available on Standard."
-                    description="Upgrade to Standard to manage suppliers and connect them to purchase orders."
-                />
-                <template v-else>
-                    <section class="suppliers-panel">
-                        <div class="panel-header">
-                            <div>
-                                <h2>Supplier directory</h2>
-                                <p>Manage supplier contacts and details.</p>
-                            </div>
-                            <button class="sup-btn-primary" :disabled="!canWrite" @click="openAddModal">Add supplier</button>
-                        </div>
+            <PlanGate
+                v-if="isPlanLocked"
+                feature="purchaseOrders"
+                title="Suppliers are available on Standard."
+                description="Upgrade to Standard to manage suppliers and connect them to purchase orders."
+            />
 
-                        <div class="list-toolbar">
-                            <input v-model="searchQuery" class="search-input" placeholder="Search suppliers…" />
-                        </div>
-
-                        <div v-if="!storeContext.currentStoreId" class="panel-state">
-                            Select or create a store to manage suppliers.
-                        </div>
-
-                        <div v-else-if="isLoading" class="panel-state">Loading suppliers...</div>
-
-                        <div v-else-if="filteredSuppliers.length === 0" class="empty-state">
-                            <p class="empty-heading">No suppliers found</p>
-                            <p class="empty-sub">{{ searchQuery ? 'Try a different search term.' : 'Add your first supplier using the button above.' }}</p>
-                        </div>
-
-                        <div v-else class="table-wrap">
-                            <table class="suppliers-table table-compact">
-                                <thead>
-                                    <tr>
-                                        <th>Supplier</th>
-                                        <th>Contact</th>
-                                        <th>Updated</th>
-                                        <th class="align-right">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr
-                                        v-for="supplier in paginatedSuppliers"
-                                        :key="supplier.id"
-                                    >
-                                        <td>
-                                            <div class="supplier-name">{{ supplier.name }}</div>
-                                        </td>
-                                        <td>
-                                            <div>{{ supplier.email || '—' }}</div>
-                                            <div class="supplier-meta">{{ supplier.phone || '—' }}</div>
-                                        </td>
-                                        <td>{{ formatDate(supplier.updatedAt) }}</td>
-                                        <td class="table-actions">
-                                            <button
-                                                class="sup-btn-ghost"
-                                                @click="goToSupplierDetail(supplier.id)"
-                                            >
-                                                View
-                                            </button>
-                                            <button
-                                                class="sup-btn-ghost"
-                                                :disabled="!canWrite"
-                                                @click="selectSupplier(supplier)"
-                                            >
-                                                Edit
-                                            </button>
-                                            <button
-                                                class="sup-btn-ghost sup-btn-danger"
-                                                :disabled="!canWrite || isDeleting === supplier.id"
-                                                @click="removeSupplier(supplier)"
-                                            >
-                                                {{ isDeleting === supplier.id ? 'Deleting…' : 'Delete' }}
-                                            </button>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-
-                        <div class="pagination">
-                            <div class="pagination-info">
-                                <span class="pagination-count">{{ filteredSuppliers.length }} supplier{{ filteredSuppliers.length !== 1 ? 's' : '' }}</span>
-                                <label class="pagination-size">
-                                    <select v-model.number="pageSize">
-                                        <option v-for="size in pageSizeOptions" :key="size" :value="size">
-                                            {{ size }} / page
-                                        </option>
-                                    </select>
-                                </label>
-                            </div>
-                            <div v-if="totalPages > 1" class="pagination-controls">
-                                <button class="page-btn" :disabled="page === 1" @click="changePage(page - 1)">
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-                                </button>
-                                <span class="page-indicator">{{ page }} / {{ totalPages }}</span>
-                                <button class="page-btn" :disabled="page === totalPages" @click="changePage(page + 1)">
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-                                </button>
-                            </div>
-                        </div>
-                    </section>
-                </template>
+            <div v-else-if="!storeContext.currentStoreId && !isLoading" class="panel-state">
+                Select or create a store to manage suppliers.
             </div>
+
+            <section v-else class="suppliers-panel">
+                <div class="panel-toolbar">
+                    <div class="search-wrap">
+                        <mdicon name="magnify" size="17" class="search-icon" />
+                        <input
+                            v-model="searchQuery"
+                            type="text"
+                            class="search-input"
+                            placeholder="Search by name, email, or phone…"
+                        />
+                    </div>
+                </div>
+
+                <SkeletonLoader v-if="isLoading" :rows="6" label="Loading suppliers…" />
+
+                <div v-else-if="filteredSuppliers.length === 0" class="empty-state">
+                    <mdicon name="truck-outline" size="34" class="empty-icon" />
+                    <p class="empty-heading">No suppliers found</p>
+                    <p class="empty-sub">{{ searchQuery ? 'Try a different search term.' : 'Add your first supplier to start creating purchase orders.' }}</p>
+                </div>
+
+                <template v-else>
+                    <div class="table-wrap">
+                        <table class="suppliers-table">
+                            <thead>
+                                <tr>
+                                    <th>Supplier</th>
+                                    <th>Contact</th>
+                                    <th>Updated</th>
+                                    <th v-if="canWrite" class="align-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr
+                                    v-for="supplier in paginatedSuppliers"
+                                    :key="supplier.id"
+                                    class="row-clickable"
+                                    @click="goToSupplierDetail(supplier.id)"
+                                >
+                                    <td class="col-name">
+                                        <div class="supplier-name">{{ supplier.name }}</div>
+                                    </td>
+                                    <td class="col-contact">
+                                        <div v-if="supplier.email" class="contact-line">
+                                            <mdicon name="email-outline" size="13" />
+                                            {{ supplier.email }}
+                                        </div>
+                                        <div v-if="supplier.phone" class="contact-line">
+                                            <mdicon name="phone-outline" size="13" />
+                                            {{ supplier.phone }}
+                                        </div>
+                                        <span v-if="!supplier.email && !supplier.phone" class="contact-empty">No contact details</span>
+                                    </td>
+                                    <td class="col-updated">{{ formatDate(supplier.updatedAt) }}</td>
+                                    <td v-if="canWrite" class="col-actions" @click.stop>
+                                        <button class="icon-btn" title="Edit" :aria-label="`Edit ${supplier.name}`" @click="selectSupplier(supplier)">
+                                            <mdicon name="pencil-outline" size="17" />
+                                        </button>
+                                        <button
+                                            class="icon-btn icon-btn--danger"
+                                            title="Delete"
+                                            :aria-label="`Delete ${supplier.name}`"
+                                            :disabled="isDeleting === supplier.id"
+                                            @click="removeSupplier(supplier)"
+                                        >
+                                            <mdicon name="trash-can-outline" size="17" />
+                                        </button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="pagination">
+                        <div class="pagination-info">
+                            <span>{{ filteredSuppliers.length }} supplier{{ filteredSuppliers.length !== 1 ? 's' : '' }}</span>
+                            <label class="pagination-size">
+                                <span>Show</span>
+                                <select v-model.number="pageSize">
+                                    <option v-for="size in pageSizeOptions" :key="size" :value="size">{{ size }}</option>
+                                </select>
+                            </label>
+                        </div>
+                        <div v-if="totalPages > 1" class="pagination-controls">
+                            <button class="page-btn" :disabled="page === 1" @click="changePage(page - 1)" aria-label="Previous page">
+                                <mdicon name="chevron-left" size="18" />
+                            </button>
+                            <span class="page-indicator">{{ page }} / {{ totalPages }}</span>
+                            <button class="page-btn" :disabled="page === totalPages" @click="changePage(page + 1)" aria-label="Next page">
+                                <mdicon name="chevron-right" size="18" />
+                            </button>
+                        </div>
+                    </div>
+                </template>
+            </section>
         </div>
     </section>
 </template>
@@ -193,6 +202,7 @@ import { canAccess } from '@/utils/roleAccess';
 import { hasPlanFeature } from '@/utils/planAccess';
 import PlanGate from '@/components/PlanGate.vue';
 import ConfirmModal from '@/components/ConfirmModal.vue';
+import SkeletonLoader from '@/components/SkeletonLoader.vue';
 
 const router = useRouter();
 const route = useRoute();
@@ -232,7 +242,7 @@ const form = reactive({
 const currentStoreLabel = computed(() => {
     const store = storeContext.currentStore;
     if (!store) return 'your store';
-    return `${store.name} - ${store.currency}`;
+    return store.name;
 });
 
 const canWrite = computed(() => canAccess(storeContext.currentStore?.role, 'purchaseOrdersWrite'));
@@ -497,8 +507,6 @@ watch(
 </script>
 
 <style scoped>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-
 /* ============================================================
    TOKENS
 ============================================================ */
@@ -509,224 +517,272 @@ watch(
     --c-accent-dark: #0f766e;
     --c-border: #e2e8f0;
     --c-surface: #ffffff;
-    --c-bg: #f8fafc;
-    font-family: 'Inter', sans-serif;
+    --c-bg: #f6f8f9;
     min-height: 100vh;
-    padding: 2.5rem 1.5rem 4rem;
+    padding: 2rem 1.5rem 3rem;
     background: var(--c-bg);
     color: var(--c-text);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
 /* ============================================================
-   SHELL / HEADER
+   SHELL & HEADER
 ============================================================ */
 .suppliers-shell {
-    max-width: 1200px;
+    max-width: 1000px;
     margin: 0 auto;
     display: flex;
     flex-direction: column;
-    gap: 1.75rem;
+    gap: 1.25rem;
 }
 
-.suppliers-header {
+.list-header {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+}
+
+.back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    border: none;
+    background: none;
+    padding: 0;
+    margin-bottom: 0.75rem;
+    font-size: 0.82rem;
+    font-weight: 600;
+    font-family: inherit;
+    color: var(--c-muted);
+    cursor: pointer;
+    transition: color 0.15s;
+    align-self: flex-start;
+}
+
+.back-link:hover { color: var(--c-accent-dark); }
+
+.list-header-row {
     display: flex;
     flex-wrap: wrap;
-    gap: 1.5rem;
-    align-items: flex-end;
+    gap: 1rem;
+    align-items: flex-start;
     justify-content: space-between;
 }
 
-.suppliers-eyebrow {
-    display: inline-flex;
-    align-items: center;
-    padding: 0.3rem 0.75rem;
-    border-radius: 999px;
-    font-size: 0.7rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.14em;
-    background: #ccfbf1;
-    color: var(--c-accent-dark);
-    margin-bottom: 0.4rem;
-}
-
-.suppliers-title h1 {
-    font-size: 2rem;
+.list-title h1 {
+    font-size: 1.9rem;
     font-weight: 800;
     letter-spacing: -0.03em;
     margin: 0 0 0.35rem;
     color: var(--c-text);
 }
 
-.suppliers-title p {
-    margin: 0;
+.list-title p {
     color: var(--c-muted);
-    font-size: 0.95rem;
+    max-width: 480px;
+    line-height: 1.55;
+    margin: 0;
+    font-size: 0.92rem;
 }
 
-.suppliers-actions {
+.header-actions {
     display: flex;
-    gap: 0.75rem;
+    gap: 0.6rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.readonly-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.35rem 0.85rem;
+    border-radius: 999px;
+    background: #f1f5f9;
+    border: 1px solid var(--c-border);
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--c-muted);
+    white-space: nowrap;
 }
 
 /* ============================================================
-   CONTENT LAYOUT
-============================================================ */
-.suppliers-content {
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
-}
-
-/* ============================================================
-   PANEL
+   PANEL & TOOLBAR
 ============================================================ */
 .suppliers-panel {
     background: var(--c-surface);
     border: 1px solid var(--c-border);
     border-radius: 16px;
-    padding: 1.75rem 2rem;
+    padding: 1.25rem 1.5rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    min-width: 0;
 }
 
-.panel-header {
+.panel-toolbar {
     display: flex;
-    justify-content: space-between;
+    gap: 0.75rem;
     align-items: center;
-    gap: 1rem;
     flex-wrap: wrap;
 }
 
-.panel-header h2 {
-    font-size: 1.05rem;
-    font-weight: 700;
-    margin: 0 0 0.2rem;
-    color: var(--c-text);
+.search-wrap {
+    position: relative;
+    flex: 1;
+    min-width: 220px;
+    max-width: 380px;
 }
 
-.panel-header p {
-    color: var(--c-muted);
-    margin: 0;
+.search-icon {
+    position: absolute;
+    left: 0.7rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #94a3b8;
+    pointer-events: none;
+}
+
+.search-input {
+    border-radius: 9px;
+    border: 1.5px solid var(--c-border);
+    padding: 0.55rem 0.9rem 0.55rem 2.3rem;
+    width: 100%;
+    box-sizing: border-box;
     font-size: 0.875rem;
-}
-
-/* ============================================================
-   TOOLBAR
-============================================================ */
-.list-toolbar {
-    margin-top: 1.25rem;
-}
-
-/* ============================================================
-   PANEL STATE
-============================================================ */
-.panel-state {
-    margin-top: 1.25rem;
-    padding: 1.25rem 1.5rem;
-    border-radius: 10px;
-    background: #f0fdf9;
-    color: var(--c-accent-dark);
-    font-size: 0.9rem;
-}
-
-/* ============================================================
-   EMPTY STATE
-============================================================ */
-.empty-state {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 0.35rem;
-    padding: 2.5rem 1rem;
-    margin-top: 1.25rem;
-    border: 1px dashed var(--c-border);
-    border-radius: 12px;
-    color: var(--c-muted);
-    text-align: center;
-}
-
-.empty-heading {
-    font-size: 0.95rem;
-    font-weight: 600;
+    font-family: 'Inter', -apple-system, sans-serif;
     color: var(--c-text);
-    margin: 0;
+    background: var(--c-surface);
+    transition: border-color 0.15s, box-shadow 0.15s;
 }
 
-.empty-sub {
-    font-size: 0.85rem;
+.search-input::placeholder { color: #94a3b8; }
+
+.search-input:focus {
+    outline: none;
+    border-color: var(--c-accent);
+    box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.12);
+}
+
+.panel-state {
+    padding: 2rem;
+    border-radius: 10px;
+    background: #f1f5f9;
     color: var(--c-muted);
-    margin: 0;
+    font-size: 0.9rem;
+    text-align: center;
 }
 
 /* ============================================================
    TABLE
 ============================================================ */
-.table-wrap {
-    margin-top: 1.25rem;
-    overflow-x: auto;
-}
+.table-wrap { overflow-x: auto; min-width: 0; }
 
 .suppliers-table {
     width: 100%;
     border-collapse: collapse;
     font-size: 0.875rem;
-    font-family: 'Inter', sans-serif;
 }
 
-.suppliers-table th {
+.suppliers-table thead th {
+    padding: 0.6rem 0.9rem;
     text-align: left;
-    padding: 0.6rem 0.75rem;
-    font-size: 0.72rem;
-    font-weight: 600;
+    font-size: 0.68rem;
+    font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.07em;
     color: var(--c-muted);
-    border-bottom: 2px solid var(--c-border);
+    border-bottom: 1.5px solid var(--c-border);
     white-space: nowrap;
 }
 
-.suppliers-table td {
-    padding: 0.75rem;
+.suppliers-table thead th.align-right { text-align: right; }
+
+.suppliers-table tbody tr {
     border-bottom: 1px solid var(--c-border);
-    color: var(--c-text);
+    transition: background 0.12s;
+}
+
+.suppliers-table tbody tr:last-child { border-bottom: none; }
+.suppliers-table tbody tr:hover { background: #f8fafc; }
+.suppliers-table tbody tr.row-clickable { cursor: pointer; }
+
+.suppliers-table tbody td {
+    padding: 0.85rem 0.9rem;
     vertical-align: middle;
-}
-
-.suppliers-table tbody tr:last-child td {
-    border-bottom: none;
-}
-
-.suppliers-table tbody tr:hover td {
-    background: var(--c-bg);
 }
 
 .supplier-name {
     font-weight: 600;
-    font-size: 0.9rem;
+    color: var(--c-text);
 }
 
-.supplier-meta {
-    font-size: 0.78rem;
-    color: var(--c-muted);
-    margin-top: 0.1rem;
-    font-family: 'SF Mono', ui-monospace, monospace;
-}
-
-.align-right {
-    text-align: right;
-}
-
-.table-actions {
+.contact-line {
     display: flex;
-    justify-content: flex-end;
     align-items: center;
-    gap: 0.25rem;
+    gap: 0.4rem;
+    font-size: 0.82rem;
+    color: var(--c-muted);
+}
+
+.contact-line + .contact-line { margin-top: 0.2rem; }
+
+.contact-empty {
+    font-size: 0.8rem;
+    color: #cbd5e1;
+}
+
+.col-updated {
+    color: var(--c-muted);
+    font-size: 0.82rem;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.col-actions {
+    text-align: right;
     white-space: nowrap;
 }
 
-.table-actions .sup-btn-ghost {
-    padding: 0.35rem 0.65rem;
-    font-size: 0.8rem;
+.icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: none;
+    background: transparent;
+    color: var(--c-muted);
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s;
+}
+
+.icon-btn:hover:not(:disabled) { background: rgba(13, 148, 136, 0.08); color: var(--c-accent-dark); }
+.icon-btn--danger:hover:not(:disabled) { background: #fef2f2; color: #dc2626; }
+.icon-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 2.5rem 1rem;
+    text-align: center;
+}
+
+.empty-icon { color: #cbd5e1; margin-bottom: 0.35rem; }
+
+.empty-heading {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--c-text);
+}
+
+.empty-sub {
+    margin: 0;
+    font-size: 0.82rem;
+    color: var(--c-muted);
 }
 
 /* ============================================================
@@ -736,53 +792,52 @@ watch(
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-top: 1.25rem;
-    padding-top: 1.25rem;
-    border-top: 1px solid var(--c-border);
-    gap: 1rem;
     flex-wrap: wrap;
+    gap: 0.75rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--c-border);
+    font-size: 0.85rem;
+    color: var(--c-muted);
 }
 
 .pagination-info {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-    flex-wrap: wrap;
-}
-
-.pagination-count {
+    gap: 1rem;
     font-size: 0.82rem;
-    color: var(--c-muted);
 }
 
 .pagination-size {
     display: flex;
     align-items: center;
-    gap: 0.4rem;
-    font-size: 0.82rem;
-    color: var(--c-muted);
+    gap: 0.5rem;
 }
 
 .pagination-size select {
-    font-family: 'Inter', sans-serif;
-    font-size: 0.82rem;
-    border: 1px solid var(--c-border);
+    border: 1.5px solid var(--c-border);
     border-radius: 6px;
-    padding: 0.3rem 0.5rem;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.82rem;
+    font-family: 'Inter', -apple-system, sans-serif;
     color: var(--c-text);
     background: var(--c-surface);
+    cursor: pointer;
+}
+
+.pagination-size select:focus {
+    outline: none;
+    border-color: var(--c-accent);
 }
 
 .pagination-controls {
     display: flex;
     align-items: center;
-    gap: 0.4rem;
+    gap: 0.5rem;
 }
 
 .page-indicator {
     font-size: 0.82rem;
-    color: var(--c-muted);
-    min-width: 48px;
+    min-width: 50px;
     text-align: center;
 }
 
@@ -790,134 +845,174 @@ watch(
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
+    width: 30px;
+    height: 30px;
     border-radius: 6px;
-    border: 1px solid var(--c-border);
-    background: var(--c-surface);
+    border: 1.5px solid var(--c-border);
+    background: transparent;
     color: var(--c-text);
     cursor: pointer;
-    transition: background 0.15s, border-color 0.15s;
-    padding: 0;
+    transition: all 0.15s;
 }
 
-.page-btn:hover:not(:disabled) {
-    background: var(--c-bg);
-    border-color: var(--c-accent);
-    color: var(--c-accent);
-}
-
-.page-btn:disabled {
-    opacity: 0.35;
-    cursor: not-allowed;
-}
+.page-btn:hover:not(:disabled) { border-color: var(--c-accent); color: var(--c-accent-dark); background: rgba(13, 148, 136, 0.05); }
+.page-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 
 /* ============================================================
-   FORM MODAL
+   BUTTONS
 ============================================================ */
-.sup-modal-overlay {
+.primary-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.6rem 1.1rem;
+    border-radius: 9px;
+    border: none;
+    background: var(--c-accent);
+    color: #fff;
+    font-size: 0.875rem;
+    font-weight: 600;
+    font-family: 'Inter', -apple-system, sans-serif;
+    cursor: pointer;
+    transition: background 0.15s, box-shadow 0.15s, transform 0.15s;
+    box-shadow: 0 2px 8px rgba(13, 148, 136, 0.25);
+    white-space: nowrap;
+}
+
+.primary-button:hover:not(:disabled) { background: var(--c-accent-dark); transform: translateY(-1px); box-shadow: 0 4px 14px rgba(13, 148, 136, 0.35); }
+.primary-button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+.ghost-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.58rem 1rem;
+    border-radius: 9px;
+    border: 1.5px solid var(--c-border);
+    background: var(--c-surface);
+    color: var(--c-text);
+    font-size: 0.875rem;
+    font-weight: 600;
+    font-family: 'Inter', -apple-system, sans-serif;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+}
+
+.ghost-button:hover:not(:disabled) { border-color: var(--c-accent); color: var(--c-accent-dark); background: rgba(13, 148, 136, 0.05); }
+.ghost-button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ============================================================
+   MODAL
+============================================================ */
+.modal-backdrop {
     position: fixed;
     inset: 0;
-    background: rgba(15, 23, 42, 0.4);
+    background: rgba(15, 23, 42, 0.45);
+    backdrop-filter: blur(4px);
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 1000;
-    backdrop-filter: blur(2px);
+    z-index: 9999;
     padding: 1rem;
 }
 
-.sup-modal {
-    background: var(--c-surface);
-    border-radius: 16px;
-    box-shadow: 0 24px 48px rgba(15, 23, 42, 0.2);
+.modal-box {
+    background: #ffffff;
+    border-radius: 18px;
+    box-shadow: 0 24px 60px rgba(15, 23, 42, 0.18);
     width: 100%;
-    max-width: 480px;
-    overflow: hidden;
-}
-
-.sup-modal-header {
+    max-width: 440px;
     display: flex;
-    justify-content: space-between;
+    flex-direction: column;
+    max-height: calc(100vh - 2rem);
+    overflow-y: auto;
+}
+
+.modal-header {
+    display: flex;
     align-items: flex-start;
+    justify-content: space-between;
     gap: 1rem;
-    padding: 1.5rem 1.5rem 1.25rem;
-    border-bottom: 1px solid var(--c-border);
+    padding: 1.5rem 1.75rem 0;
 }
 
-.sup-modal-header h2 {
-    font-size: 1.05rem;
+.modal-header h2 {
+    font-size: 1.1rem;
     font-weight: 700;
-    margin: 0 0 0.2rem;
     color: var(--c-text);
+    margin: 0 0 0.2rem;
 }
 
-.sup-modal-header p {
-    font-size: 0.875rem;
-    color: var(--c-muted);
+.modal-header p {
     margin: 0;
+    color: var(--c-muted);
+    font-size: 0.82rem;
 }
 
-.sup-modal-close {
+.modal-close {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     width: 32px;
     height: 32px;
     border-radius: 8px;
-    border: 1px solid var(--c-border);
-    background: transparent;
+    border: none;
+    background: #f1f5f9;
     color: var(--c-muted);
     cursor: pointer;
     flex-shrink: 0;
     transition: background 0.15s, color 0.15s;
 }
 
-.sup-modal-close:hover {
-    background: var(--c-bg);
-    color: var(--c-text);
-}
+.modal-close:hover { background: #e2e8f0; color: var(--c-text); }
 
-.sup-modal-body {
+.modal-body {
+    padding: 1.25rem 1.75rem 1.5rem;
     display: flex;
     flex-direction: column;
     gap: 1rem;
-    padding: 1.5rem;
 }
 
-.sup-modal-footer {
+.modal-footer {
     display: flex;
     justify-content: flex-end;
     gap: 0.75rem;
-    padding-top: 0.5rem;
+    margin-top: 0.25rem;
 }
 
-/* ============================================================
-   FORM FIELDS
-============================================================ */
 .form-field {
     display: flex;
     flex-direction: column;
     gap: 0.35rem;
-    font-size: 0.78rem;
+}
+
+.form-field > span {
+    font-size: 0.8rem;
     font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
+    color: var(--c-text);
+}
+
+.form-field > span em {
+    font-style: normal;
+    font-weight: 400;
     color: var(--c-muted);
 }
 
 .form-field input {
-    font-family: 'Inter', sans-serif;
-    border-radius: 8px;
-    border: 1px solid var(--c-border);
-    padding: 0.6rem 0.75rem;
-    font-size: 0.9rem;
+    border: 1.5px solid var(--c-border);
+    border-radius: 9px;
+    padding: 0.6rem 0.875rem;
+    font-size: 0.875rem;
+    font-family: 'Inter', -apple-system, sans-serif;
     color: var(--c-text);
     background: var(--c-surface);
-    transition: border-color 0.15s;
-    text-transform: none;
-    letter-spacing: 0;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    width: 100%;
+    box-sizing: border-box;
 }
+
+.form-field input::placeholder { color: #94a3b8; }
 
 .form-field input:focus {
     outline: none;
@@ -925,137 +1020,77 @@ watch(
     box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.12);
 }
 
-/* ============================================================
-   LOCAL BUTTONS
-============================================================ */
-.sup-btn-ghost {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.35rem;
-    background: transparent;
-    border: 1px solid var(--c-border);
-    border-radius: 8px;
-    padding: 0.55rem 1rem;
-    font-family: 'Inter', sans-serif;
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: #475569;
-    cursor: pointer;
-    transition: background 0.15s, border-color 0.15s, color 0.15s;
-    white-space: nowrap;
-}
-
-.sup-btn-ghost:hover:not(:disabled) {
-    background: var(--c-bg);
-    border-color: #cbd5e1;
-    color: var(--c-text);
-}
-
-.sup-btn-ghost:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
-.sup-btn-ghost.sup-btn-danger {
-    color: #b91c1c;
-    border-color: rgba(185, 28, 28, 0.35);
-}
-
-.sup-btn-ghost.sup-btn-danger:hover:not(:disabled) {
-    background: #fef2f2;
-    border-color: #fca5a5;
-}
-
-.sup-btn-primary {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.35rem;
-    background: var(--c-accent);
-    border: none;
-    border-radius: 8px;
-    padding: 0.55rem 1.1rem;
-    font-family: 'Inter', sans-serif;
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: #ffffff;
-    cursor: pointer;
-    transition: background 0.15s;
-    white-space: nowrap;
-}
-
-.sup-btn-primary:hover:not(:disabled) {
-    background: var(--c-accent-dark);
-}
-
-.sup-btn-primary:disabled {
-    opacity: 0.55;
-    cursor: not-allowed;
-}
-
 .form-alert {
-    border-radius: 8px;
+    border-radius: 10px;
+    padding: 0.7rem 1rem;
+    font-size: 0.85rem;
     background: #fef2f2;
-    border: 1px solid #fecaca;
+    border: 1px solid #fca5a5;
     color: #b91c1c;
-    padding: 0.65rem 0.9rem;
-    font-weight: 500;
-    font-size: 0.875rem;
 }
 
-/* ============================================================
-   SEARCH INPUT
-============================================================ */
-.search-input {
-    font-family: 'Inter', sans-serif;
-    border-radius: 8px;
-    border: 1px solid var(--c-border);
-    padding: 0.6rem 0.85rem;
-    min-width: 180px;
-    font-size: 0.9rem;
-    color: var(--c-text);
-    background: var(--c-surface);
-    transition: border-color 0.15s;
-    width: 100%;
-    max-width: 260px;
-}
-
-.search-input:focus {
-    outline: none;
-    border-color: var(--c-accent);
-    box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.12);
-}
-
-/* ============================================================
-   MODAL TRANSITION
-============================================================ */
 .modal-fade-enter-active,
-.modal-fade-leave-active {
-    transition: opacity 0.2s ease;
-}
-
-.modal-fade-enter-active .sup-modal,
-.modal-fade-leave-active .sup-modal {
-    transition: transform 0.2s ease;
-}
+.modal-fade-leave-active { transition: opacity 0.18s ease; }
 
 .modal-fade-enter-from,
-.modal-fade-leave-to {
-    opacity: 0;
-}
-
-.modal-fade-enter-from .sup-modal,
-.modal-fade-leave-to .sup-modal {
-    transform: scale(0.95);
-}
+.modal-fade-leave-to { opacity: 0; }
 
 /* ============================================================
    RESPONSIVE
 ============================================================ */
-@media (max-width: 600px) {
-    .suppliers-page {
-        padding: 2rem 1rem 3rem;
+@media (max-width: 640px) {
+    .suppliers-page { padding: 1rem 0.875rem 2.5rem; }
+    .suppliers-shell { gap: 1rem; }
+    .list-title h1 { font-size: 1.5rem; }
+
+    .header-actions { width: 100%; }
+    .header-actions .primary-button { flex: 1; justify-content: center; }
+
+    .suppliers-panel { padding: 1rem 0 0.75rem; border-radius: 12px; }
+    .panel-toolbar { padding: 0 1rem; }
+    .search-wrap { max-width: none; }
+    .pagination { padding: 1rem 1rem 0; flex-direction: column; align-items: flex-start; gap: 0.5rem; }
+
+    /* ── Table → card view ── */
+    .suppliers-table thead { display: none; }
+    .suppliers-table,
+    .suppliers-table tbody { display: block; }
+
+    .suppliers-table tbody tr {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        grid-template-rows: auto auto;
+        padding: 0.875rem 1rem;
+        gap: 0.2rem 0.625rem;
+        border-bottom: 1px solid var(--c-border);
+    }
+    .suppliers-table tbody tr:last-child { border-bottom: none; }
+
+    .suppliers-table tbody td {
+        padding: 0;
+        border: none;
+        vertical-align: top;
+    }
+
+    .suppliers-table tbody td.col-name { grid-column: 1; grid-row: 1; }
+    .suppliers-table tbody td.col-updated {
+        grid-column: 2;
+        grid-row: 1;
+        text-align: right;
+        font-size: 0.75rem;
+    }
+    .suppliers-table tbody td.col-contact {
+        grid-column: 1;
+        grid-row: 2;
+        padding-top: 0.2rem;
+    }
+    .suppliers-table tbody td.col-actions {
+        grid-column: 2;
+        grid-row: 2;
+        display: flex;
+        justify-content: flex-end;
+        align-items: flex-end;
+        gap: 0.25rem;
     }
 }
 </style>

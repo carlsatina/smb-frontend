@@ -344,6 +344,7 @@ const canViewExpenses = computed(() => canAccess(storeContext.currentStore?.role
 const planKnown = computed(() => userContext.planTier !== null);
 const isPurchaseOrdersLocked = computed(() => planKnown.value && !hasPlanFeature(userContext.effectivePlan, 'purchaseOrders'));
 const isExpensesLocked = computed(() => planKnown.value && !hasPlanFeature(userContext.effectivePlan, 'expenses'));
+const isIngredientsLocked = computed(() => planKnown.value && !hasPlanFeature(userContext.effectivePlan, 'ingredients'));
 
 // ── Nav configuration ─────────────────────────────────────
 // Single source of truth for the store nav. `primaryLinks` render inline;
@@ -358,7 +359,7 @@ interface NavLink {
     group: NavGroupKey;
     visible: boolean;
     locked?: boolean;
-    upgradeFeature?: 'purchaseOrders' | 'expenses';
+    upgradeFeature?: 'purchaseOrders' | 'expenses' | 'ingredients';
 }
 
 // Inline (primary) items per role. Owners/Admins get the focused set;
@@ -375,6 +376,7 @@ const allNavLinks = computed<NavLink[]>(() => [
     { key: 'pos', label: 'POS', icon: 'point-of-sale', route: 'pos', group: 'sell', visible: canViewPos.value },
     { key: 'products', label: 'Products', icon: 'package-variant', route: 'products', group: 'sell', visible: canViewProducts.value },
     { key: 'inventory', label: 'Inventory', icon: 'warehouse', route: 'inventory', group: 'sell', visible: canViewInventory.value },
+    { key: 'ingredients', label: 'Ingredients', icon: 'food-apple-outline', route: 'ingredients', group: 'sell', visible: canViewInventory.value, locked: isIngredientsLocked.value, upgradeFeature: 'ingredients' },
     { key: 'reports', label: 'Reports', icon: 'chart-line', route: 'reports', group: 'insights', visible: canViewReports.value },
     { key: 'daily-sales', label: 'Daily Sales', icon: 'cash-register', route: 'daily-sales', group: 'insights', visible: canViewDailySales.value },
     { key: 'ai-insights', label: 'AI Insights', icon: 'robot-happy-outline', route: 'ai-insights', group: 'insights', visible: canViewAi.value },
@@ -556,7 +558,7 @@ const handleLogout = async () => {
     }
 };
 
-const openUpgradeFromMore = (feature: 'purchaseOrders' | 'expenses') => {
+const openUpgradeFromMore = (feature: 'purchaseOrders' | 'expenses' | 'ingredients') => {
     closeMore();
     openPlanUpgradeModal(feature);
 };

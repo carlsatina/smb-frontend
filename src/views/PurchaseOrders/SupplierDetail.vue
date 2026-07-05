@@ -1,26 +1,26 @@
 <template>
     <section class="supplier-page">
         <div class="supplier-shell">
-            <header class="supplier-header">
-                <div class="supplier-title">
-                    <span class="supplier-eyebrow">Purchasing</span>
-                    <h1>Supplier detail</h1>
-                    <p v-if="supplier">Manage orders and receipts for {{ supplier.name }}.</p>
-                    <p v-else>Review supplier activity for {{ currentStoreLabel }}.</p>
-                </div>
-                <div class="supplier-actions">
-                    <button class="ghost-button" @click="goToSuppliers">Back to suppliers</button>
-                    <button class="ghost-button" @click="goToPurchaseOrders">Back to POs</button>
-                    <button v-if="supplier && canWrite" class="primary-button" @click="createPurchaseOrder">
-                        Create PO
-                    </button>
-                    <button
-                        v-if="supplier && canWrite"
-                        class="ghost-button"
-                        @click="toggleEdit"
-                    >
-                        {{ isEditing ? 'Cancel edit' : 'Edit details' }}
-                    </button>
+            <header class="detail-header">
+                <button type="button" class="back-link" @click="goToSuppliers">
+                    <mdicon name="arrow-left" size="15" />
+                    Suppliers
+                </button>
+                <div class="detail-header-row">
+                    <div class="detail-title">
+                        <h1>{{ supplier?.name || 'Supplier' }}</h1>
+                        <p>Orders, receipts, and contact details for {{ currentStoreLabel }}.</p>
+                    </div>
+                    <div class="header-actions" v-if="supplier && canWrite">
+                        <button class="ghost-button" @click="toggleEdit">
+                            <mdicon :name="isEditing ? 'close' : 'pencil-outline'" size="15" />
+                            {{ isEditing ? 'Cancel edit' : 'Edit details' }}
+                        </button>
+                        <button class="primary-button" @click="createPurchaseOrder">
+                            <mdicon name="plus" size="16" />
+                            New purchase order
+                        </button>
+                    </div>
                 </div>
             </header>
 
@@ -30,274 +30,221 @@
                 title="Suppliers are available on Standard."
                 description="Upgrade to Standard to manage supplier analytics and linked receipts."
             />
+
+            <div v-else-if="isLoading" class="panel-state">Loading supplier…</div>
+
+            <div v-else-if="!supplier" class="panel-state">Supplier not found.</div>
+
             <template v-else>
-            <section class="supplier-card">
-                <div v-if="isLoading" class="panel-state">Loading supplier...</div>
-                <div v-else-if="!supplier" class="panel-state">Supplier not found.</div>
-                <div v-else class="supplier-body">
-                    <div class="supplier-summary">
-                        <div>
-                            <span>Name</span>
-                            <strong>{{ supplier.name }}</strong>
-                        </div>
-                        <div>
+                <!-- ── Summary ── -->
+                <section class="detail-card">
+                    <div class="meta-grid">
+                        <div class="meta-item">
                             <span>Email</span>
-                            <strong>{{ supplier.email || '-' }}</strong>
+                            <strong>{{ supplier.email || '—' }}</strong>
                         </div>
-                        <div>
+                        <div class="meta-item">
                             <span>Phone</span>
-                            <strong>{{ supplier.phone || '-' }}</strong>
+                            <strong>{{ supplier.phone || '—' }}</strong>
                         </div>
-                        <div>
-                            <span>Last updated</span>
+                        <div class="meta-item">
+                            <span>Updated</span>
                             <strong>{{ formatDate(supplier.updatedAt) }}</strong>
                         </div>
-                        <div>
-                            <span>Total POs</span>
-                            <strong>{{ ordersTotal }}</strong>
+                        <div class="meta-item">
+                            <span>Orders</span>
+                            <strong>{{ formatNumber(ordersTotal) }}</strong>
                         </div>
-                        <div>
-                            <span>Total receipts</span>
-                            <strong>{{ receiptsTotal }}</strong>
+                        <div class="meta-item">
+                            <span>Receipts</span>
+                            <strong>{{ formatNumber(receiptCount) }}</strong>
                         </div>
-                    </div>
-
-                    <div class="supplier-analytics">
-                        <div class="analytics-header">
-                            <div>
-                                <h2>Receipt analytics</h2>
-                                <p>Totals for the selected receipt filters.</p>
-                            </div>
+                        <div class="meta-item meta-item--highlight">
+                            <span>Total spend</span>
+                            <strong>{{ formatMoney(receiptTotalSpend) }}</strong>
                         </div>
-                        <div v-if="isSummaryLoading" class="panel-state">Loading analytics...</div>
-                        <div v-else class="analytics-grid">
-                            <div class="analytics-card">
-                                <span class="analytics-label">Total spend</span>
-                                <strong class="analytics-value">{{ formatMoney(receiptTotalSpend) }}</strong>
-                                <span class="analytics-meta">{{ formatNumber(receiptCount) }} receipts</span>
-                            </div>
-                            <div class="analytics-card">
-                                <span class="analytics-label">Avg receipt</span>
-                                <strong class="analytics-value">{{ formatMoney(receiptAverage) }}</strong>
-                                <span class="analytics-meta">Across the range</span>
-                            </div>
-                            <div class="analytics-card">
-                                <span class="analytics-label">Last receipt</span>
-                                <strong class="analytics-value">
-                                    {{ lastReceiptAt ? formatDate(lastReceiptAt) : '-' }}
-                                </strong>
-                                <span class="analytics-meta">Most recent receipt</span>
-                            </div>
+                        <div class="meta-item">
+                            <span>Avg receipt</span>
+                            <strong>{{ formatMoney(receiptAverage) }}</strong>
+                        </div>
+                        <div class="meta-item">
+                            <span>Last receipt</span>
+                            <strong>{{ lastReceiptAt ? formatDate(lastReceiptAt) : '—' }}</strong>
                         </div>
                     </div>
+                </section>
 
-                    <div v-if="supplier && !canWrite" class="panel-state">
-                        You have view-only access. Ask an owner or manager to update supplier details.
+                <!-- ── Edit details ── -->
+                <section v-if="isEditing && canWrite" class="detail-card">
+                    <div class="card-title">
+                        <h2>Edit details</h2>
                     </div>
-
-                    <form v-else-if="supplier && isEditing" class="supplier-form" @submit.prevent="saveSupplier">
-                        <div v-if="formError" class="form-error">{{ formError }}</div>
+                    <form class="edit-form" @submit.prevent="saveSupplier">
+                        <div v-if="formError" class="form-alert">{{ formError }}</div>
                         <div class="form-grid">
                             <label class="form-field">
-                                Name
+                                <span>Name</span>
                                 <input v-model="editForm.name" type="text" required />
                             </label>
                             <label class="form-field">
-                                Email
+                                <span>Email <em>optional</em></span>
                                 <input v-model="editForm.email" type="email" />
                             </label>
                             <label class="form-field">
-                                Phone
+                                <span>Phone <em>optional</em></span>
                                 <input v-model="editForm.phone" type="tel" />
                             </label>
                         </div>
-                        <div class="form-actions">
-                            <button type="button" class="secondary-button" @click="cancelEdit">Cancel</button>
-                            <button class="primary-button" type="submit" :disabled="isSaving">
-                                {{ isSaving ? 'Saving...' : 'Save changes' }}
+                        <div class="edit-actions">
+                            <button type="button" class="ghost-button" @click="cancelEdit">Cancel</button>
+                            <button class="primary-button primary-button--sm" type="submit" :disabled="isSaving">
+                                {{ isSaving ? 'Saving…' : 'Save changes' }}
                             </button>
                         </div>
                     </form>
+                </section>
 
-                    <div class="supplier-grid">
-                        <div class="supplier-panel">
-                            <div class="panel-header">
-                                <div>
-                                    <h2>Recent purchase orders</h2>
-                                    <p>Latest orders tied to this supplier.</p>
-                                </div>
-                                <button class="ghost-button" @click="goToPurchaseOrders">View all</button>
+                <!-- ── Orders & receipts ── -->
+                <div class="panels-grid">
+                    <section class="detail-card">
+                        <div class="card-title card-title--row">
+                            <div>
+                                <h2>Purchase orders</h2>
+                                <p>Orders tied to this supplier</p>
                             </div>
-
-                            <div class="filter-row">
-                                <label class="filter-field">
-                                    <span>Status</span>
-                                    <select v-model="orderStatusFilter">
-                                        <option value="ALL">All statuses</option>
-                                        <option value="DRAFT">Draft</option>
-                                        <option value="SENT">Sent</option>
-                                        <option value="PARTIALLY_RECEIVED">Partial</option>
-                                        <option value="RECEIVED">Received</option>
-                                        <option value="CANCELLED">Cancelled</option>
-                                    </select>
-                                </label>
-                                <label class="filter-field">
-                                    <span>From</span>
-                                    <input v-model="orderFromDate" type="date" />
-                                </label>
-                                <label class="filter-field">
-                                    <span>To</span>
-                                    <input v-model="orderToDate" type="date" />
-                                </label>
-                                <div class="filter-actions">
-                                    <button class="secondary-button button-compact" @click="resetOrderFilters">Reset</button>
-                                    <button class="primary-button button-compact" @click="applyOrderFilters">Apply</button>
-                                </div>
-                            </div>
-
-                            <div v-if="isOrdersLoading" class="panel-state">Loading purchase orders...</div>
-                            <div v-else-if="purchaseOrders.length === 0" class="panel-state">
-                                No purchase orders yet.
-                            </div>
-                            <div v-else class="table-wrap">
-                                <table class="data-table table-compact">
-                                    <thead>
-                                        <tr>
-                                            <th>Status</th>
-                                            <th>Ordered</th>
-                                            <th>Expected</th>
-                                            <th class="align-right">Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <tr v-for="order in purchaseOrders" :key="order.id">
-                                            <td>
-                                                <div class="status-pill" :class="statusClass(order.status)">
-                                                    {{ formatStatus(order.status) }}
-                                                </div>
-                                            </td>
-                                            <td>{{ formatQty(order.qtyOrdered) }}</td>
-                                            <td>{{ order.expectedDate ? formatDate(order.expectedDate) : 'Anytime' }}</td>
-                                            <td class="align-right table-actions">
-                                                <button class="ghost-button" @click="goToPurchaseOrder(order.id)">View</button>
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-
-                            <div v-if="orderTotalPages > 1" class="pagination">
-                                <label class="pagination-size">
-                                    <span>Rows</span>
-                                    <select v-model.number="orderPageSize">
-                                        <option v-for="size in pageSizeOptions" :key="size" :value="size">
-                                            {{ size }}
-                                        </option>
-                                    </select>
-                                </label>
-                                <div class="pagination-controls">
-                                    <button
-                                        class="ghost-button"
-                                        :disabled="orderPage === 1"
-                                        @click="changeOrderPage(orderPage - 1)"
-                                    >
-                                        Previous
-                                    </button>
-                                    <span>Page {{ orderPage }} of {{ orderTotalPages }}</span>
-                                    <button
-                                        class="ghost-button"
-                                        :disabled="orderPage === orderTotalPages"
-                                        @click="changeOrderPage(orderPage + 1)"
-                                    >
-                                        Next
-                                    </button>
-                                </div>
-                            </div>
+                            <button class="card-link" type="button" @click="goToPurchaseOrders">
+                                View all
+                                <mdicon name="chevron-right" size="14" />
+                            </button>
                         </div>
 
-                        <div class="supplier-panel">
-                            <div class="panel-header">
-                                <div>
-                                    <h2>Recent receipts</h2>
-                                    <p>Latest inbound receipts for this supplier.</p>
-                                </div>
-                                <button class="ghost-button" @click="goToReceipts">View all</button>
-                            </div>
-
-                            <div class="filter-row">
-                                <label class="filter-field">
-                                    <span>From</span>
-                                    <input v-model="receiptFromDate" type="date" />
-                                </label>
-                                <label class="filter-field">
-                                    <span>To</span>
-                                    <input v-model="receiptToDate" type="date" />
-                                </label>
-                                <div class="filter-actions">
-                                    <button class="secondary-button button-compact" @click="resetReceiptFilters">Reset</button>
-                                    <button class="primary-button button-compact" @click="applyReceiptFilters">Apply</button>
-                                </div>
-                            </div>
-
-                            <div v-if="isReceiptsLoading" class="panel-state">Loading receipts...</div>
-                            <div v-else-if="receipts.length === 0" class="panel-state">No receipts yet.</div>
-                            <div v-else class="table-wrap">
-                                <table class="data-table table-compact">
-                                    <thead>
-                                        <tr>
-                                            <th>Receipt</th>
-                                            <th>Invoice</th>
-                                            <th>Total</th>
-                                            <th class="align-right">Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <tr v-for="receipt in receipts" :key="receipt.id">
-                                            <td>
-                                                <div class="receipt-id">#{{ receipt.id }}</div>
-                                                <div class="receipt-meta">{{ formatDate(receipt.receivedAt) }}</div>
-                                            </td>
-                                            <td>{{ receipt.invoiceNumber || '-' }}</td>
-                                            <td>{{ formatMoney(receipt.totalCost) }}</td>
-                                            <td class="align-right table-actions">
-                                                <button class="ghost-button" @click="goToReceipt(receipt.id)">View</button>
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-
-                            <div v-if="receiptTotalPages > 1" class="pagination">
-                                <label class="pagination-size">
-                                    <span>Rows</span>
-                                    <select v-model.number="receiptPageSize">
-                                        <option v-for="size in pageSizeOptions" :key="size" :value="size">
-                                            {{ size }}
-                                        </option>
-                                    </select>
-                                </label>
-                                <div class="pagination-controls">
-                                    <button
-                                        class="ghost-button"
-                                        :disabled="receiptPage === 1"
-                                        @click="changeReceiptPage(receiptPage - 1)"
-                                    >
-                                        Previous
-                                    </button>
-                                    <span>Page {{ receiptPage }} of {{ receiptTotalPages }}</span>
-                                    <button
-                                        class="ghost-button"
-                                        :disabled="receiptPage === receiptTotalPages"
-                                        @click="changeReceiptPage(receiptPage + 1)"
-                                    >
-                                        Next
-                                    </button>
-                                </div>
-                            </div>
+                        <div class="filter-row">
+                            <select v-model="orderStatusFilter" class="filter-select">
+                                <option value="ALL">All statuses</option>
+                                <option value="DRAFT">Draft</option>
+                                <option value="SENT">Sent</option>
+                                <option value="PARTIALLY_RECEIVED">Partial</option>
+                                <option value="RECEIVED">Received</option>
+                                <option value="CANCELLED">Cancelled</option>
+                            </select>
+                            <input v-model="orderFromDate" type="date" class="filter-date" aria-label="Orders from date" />
+                            <input v-model="orderToDate" type="date" class="filter-date" aria-label="Orders to date" />
+                            <button class="ghost-button ghost-button--sm" @click="resetOrderFilters">Reset</button>
+                            <button class="ghost-button ghost-button--sm ghost-button--apply" @click="applyOrderFilters">Apply</button>
                         </div>
-                    </div>
+
+                        <SkeletonLoader v-if="isOrdersLoading" :rows="4" label="Loading purchase orders…" />
+                        <div v-else-if="purchaseOrders.length === 0" class="panel-state panel-state--small">
+                            No purchase orders for this supplier yet.
+                        </div>
+                        <div v-else class="mini-table-wrap">
+                            <table class="mini-table">
+                                <thead>
+                                    <tr>
+                                        <th>Status</th>
+                                        <th class="num">Ordered</th>
+                                        <th>Expected</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr
+                                        v-for="order in purchaseOrders"
+                                        :key="order.id"
+                                        class="row-clickable"
+                                        @click="goToPurchaseOrder(order.id)"
+                                    >
+                                        <td>
+                                            <span class="status-pill" :class="statusClass(order.status)">
+                                                {{ formatStatus(order.status) }}
+                                            </span>
+                                        </td>
+                                        <td class="num">{{ formatQty(order.qtyOrdered) }}</td>
+                                        <td class="date-cell">{{ order.expectedDate ? formatDate(order.expectedDate) : 'Anytime' }}</td>
+                                        <td class="col-open">
+                                            <mdicon name="chevron-right" size="16" class="row-chevron" />
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div v-if="orderTotalPages > 1" class="mini-pagination">
+                            <button class="page-btn" :disabled="orderPage === 1" @click="changeOrderPage(orderPage - 1)" aria-label="Previous page">
+                                <mdicon name="chevron-left" size="18" />
+                            </button>
+                            <span class="page-indicator">{{ orderPage }} / {{ orderTotalPages }}</span>
+                            <button class="page-btn" :disabled="orderPage === orderTotalPages" @click="changeOrderPage(orderPage + 1)" aria-label="Next page">
+                                <mdicon name="chevron-right" size="18" />
+                            </button>
+                        </div>
+                    </section>
+
+                    <section class="detail-card">
+                        <div class="card-title card-title--row">
+                            <div>
+                                <h2>Receipts</h2>
+                                <p>Inbound deliveries from this supplier</p>
+                            </div>
+                            <button class="card-link" type="button" @click="goToReceipts">
+                                View all
+                                <mdicon name="chevron-right" size="14" />
+                            </button>
+                        </div>
+
+                        <div class="filter-row">
+                            <input v-model="receiptFromDate" type="date" class="filter-date" aria-label="Receipts from date" />
+                            <input v-model="receiptToDate" type="date" class="filter-date" aria-label="Receipts to date" />
+                            <button class="ghost-button ghost-button--sm" @click="resetReceiptFilters">Reset</button>
+                            <button class="ghost-button ghost-button--sm ghost-button--apply" @click="applyReceiptFilters">Apply</button>
+                        </div>
+
+                        <SkeletonLoader v-if="isReceiptsLoading" :rows="4" label="Loading receipts…" />
+                        <div v-else-if="receipts.length === 0" class="panel-state panel-state--small">
+                            No receipts from this supplier yet.
+                        </div>
+                        <div v-else class="mini-table-wrap">
+                            <table class="mini-table">
+                                <thead>
+                                    <tr>
+                                        <th>Receipt</th>
+                                        <th>Invoice</th>
+                                        <th class="num">Total</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr
+                                        v-for="receipt in receipts"
+                                        :key="receipt.id"
+                                        class="row-clickable"
+                                        @click="goToReceipt(receipt.id)"
+                                    >
+                                        <td>
+                                            <div class="receipt-id" :title="receipt.id">#{{ receipt.id.slice(0, 8) }}</div>
+                                            <div class="receipt-meta">{{ formatDate(receipt.receivedAt) }}</div>
+                                        </td>
+                                        <td class="date-cell">{{ receipt.invoiceNumber || '—' }}</td>
+                                        <td class="num">{{ formatMoney(receipt.totalCost) }}</td>
+                                        <td class="col-open">
+                                            <mdicon name="chevron-right" size="16" class="row-chevron" />
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div v-if="receiptTotalPages > 1" class="mini-pagination">
+                            <button class="page-btn" :disabled="receiptPage === 1" @click="changeReceiptPage(receiptPage - 1)" aria-label="Previous page">
+                                <mdicon name="chevron-left" size="18" />
+                            </button>
+                            <span class="page-indicator">{{ receiptPage }} / {{ receiptTotalPages }}</span>
+                            <button class="page-btn" :disabled="receiptPage === receiptTotalPages" @click="changeReceiptPage(receiptPage + 1)" aria-label="Next page">
+                                <mdicon name="chevron-right" size="18" />
+                            </button>
+                        </div>
+                    </section>
                 </div>
-            </section>
             </template>
         </div>
     </section>
@@ -321,6 +268,7 @@ import { canAccess } from '@/utils/roleAccess';
 import { hasPlanFeature } from '@/utils/planAccess';
 import { zonedDayStartIso, zonedDayEndIso } from '@/utils/datetime';
 import PlanGate from '@/components/PlanGate.vue';
+import SkeletonLoader from '@/components/SkeletonLoader.vue';
 
 const route = useRoute();
 const router = useRouter();
@@ -363,7 +311,7 @@ const supplierId = computed(() => route.params.supplierId as string | undefined)
 const currentStoreLabel = computed(() => {
     const store = storeContext.currentStore;
     if (!store) return 'your store';
-    return `${store.name} - ${store.currency}`;
+    return store.name;
 });
 
 const canWrite = computed(() => canAccess(storeContext.currentStore?.role, 'purchaseOrdersWrite'));
@@ -560,12 +508,21 @@ const goToReceipt = (receiptId: string) => {
     router.push(`/stores/${routeStoreId.value}/purchase-orders/receipts/${receiptId}`);
 };
 
-const formatStatus = (status: string) => status.replace('_', ' ');
+const STATUS_LABELS: Record<string, string> = {
+    DRAFT: 'Draft',
+    SENT: 'Sent',
+    PARTIALLY_RECEIVED: 'Partial',
+    RECEIVED: 'Received',
+    CANCELLED: 'Cancelled',
+};
+
+const formatStatus = (status: string) => STATUS_LABELS[status] ?? status.replace(/_/g, ' ');
 
 const statusClass = (status: string) => {
     if (status === 'RECEIVED') return 'status-pill--active';
     if (status === 'CANCELLED') return 'status-pill--inactive';
     if (status === 'PARTIALLY_RECEIVED') return 'status-pill--warning';
+    if (status === 'DRAFT') return 'status-pill--draft';
     return '';
 };
 
@@ -751,7 +708,9 @@ watch(
 </script>
 
 <style scoped>
-
+/* ============================================================
+   TOKENS
+============================================================ */
 .supplier-page {
     --c-text: #0f172a;
     --c-muted: #64748b;
@@ -759,158 +718,235 @@ watch(
     --c-accent-dark: #0f766e;
     --c-border: #e2e8f0;
     --c-surface: #ffffff;
-    --c-bg: #f8fafc;
+    --c-bg: #f6f8f9;
     min-height: 100vh;
-    padding: 2.5rem 1.5rem 4rem;
+    padding: 2rem 1.5rem 3rem;
     background: var(--c-bg);
     color: var(--c-text);
-    font-family: 'Inter', sans-serif;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
+/* ============================================================
+   SHELL & HEADER
+============================================================ */
 .supplier-shell {
-    max-width: 1200px;
+    max-width: 1000px;
     margin: 0 auto;
     display: flex;
     flex-direction: column;
-    gap: 1.75rem;
+    gap: 1rem;
 }
 
-.supplier-header {
+.detail-header {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    margin-bottom: 0.25rem;
+}
+
+.back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    border: none;
+    background: none;
+    padding: 0;
+    margin-bottom: 0.75rem;
+    font-size: 0.82rem;
+    font-weight: 600;
+    font-family: inherit;
+    color: var(--c-muted);
+    cursor: pointer;
+    transition: color 0.15s;
+    align-self: flex-start;
+}
+
+.back-link:hover { color: var(--c-accent-dark); }
+
+.detail-header-row {
     display: flex;
     flex-wrap: wrap;
-    gap: 1.25rem;
+    gap: 1rem;
     align-items: flex-start;
     justify-content: space-between;
 }
 
-.supplier-eyebrow {
-    display: inline-flex;
-    align-items: center;
-    padding: 0.2rem 0.65rem;
-    border-radius: 999px;
-    font-size: 0.65rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.14em;
-    background: rgba(13, 148, 136, 0.1);
-    color: var(--c-accent);
-    margin-bottom: 0.3rem;
-}
-
-.supplier-title h1 {
-    font-size: 2rem;
+.detail-title h1 {
+    font-size: 1.7rem;
     font-weight: 800;
-    margin: 0.3rem 0 0.4rem;
     letter-spacing: -0.03em;
+    margin: 0 0 0.35rem;
     color: var(--c-text);
 }
 
-.supplier-title p {
-    margin: 0;
+.detail-title p {
     color: var(--c-muted);
-    font-size: 0.9rem;
+    line-height: 1.55;
+    margin: 0;
+    font-size: 0.92rem;
 }
 
-.supplier-actions {
+.header-actions {
     display: flex;
-    gap: 0.65rem;
+    gap: 0.6rem;
+    align-items: center;
     flex-wrap: wrap;
-    flex-shrink: 0;
-    padding-top: 0.25rem;
 }
 
-.supplier-card {
+/* ============================================================
+   CARDS
+============================================================ */
+.detail-card {
     background: var(--c-surface);
     border: 1px solid var(--c-border);
     border-radius: 16px;
-    padding: 1.75rem;
+    padding: 1.5rem;
     display: flex;
     flex-direction: column;
-    gap: 1.5rem;
+    gap: 1rem;
+    min-width: 0;
 }
+
+.card-title h2 {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--c-text);
+    margin: 0;
+}
+
+.card-title p {
+    margin: 0.2rem 0 0;
+    color: var(--c-muted);
+    font-size: 0.82rem;
+}
+
+.card-title--row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.card-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.15rem;
+    border: none;
+    background: none;
+    padding: 0;
+    font-size: 0.78rem;
+    font-weight: 600;
+    font-family: inherit;
+    color: var(--c-accent-dark);
+    cursor: pointer;
+}
+
+.card-link:hover { text-decoration: underline; }
 
 .panel-state {
-    padding: 1.25rem 1.5rem;
-    border-radius: 10px;
-    background: var(--c-bg);
+    padding: 2rem;
+    border-radius: 12px;
+    background: #f1f5f9;
     color: var(--c-muted);
     font-size: 0.9rem;
+    text-align: center;
 }
 
-.supplier-body {
-    display: grid;
-    gap: 2rem;
+.panel-state--small {
+    padding: 1.5rem 1rem;
+    font-size: 0.82rem;
 }
 
-.supplier-summary {
+/* ============================================================
+   META GRID
+============================================================ */
+.meta-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 1rem;
-    font-size: 0.9rem;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1px;
+    background: var(--c-border);
+    border: 1px solid var(--c-border);
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.meta-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.85rem 1rem;
+    background: #fafbfc;
+    min-width: 0;
+}
+
+.meta-item > span {
+    font-size: 0.66rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
     color: var(--c-muted);
 }
 
-.supplier-summary strong {
-    display: block;
-    margin-top: 0.2rem;
+.meta-item > strong {
+    font-size: 0.9rem;
+    font-weight: 700;
     color: var(--c-text);
-    font-size: 1rem;
+    font-variant-numeric: tabular-nums;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
-.supplier-analytics {
-    display: grid;
+.meta-item--highlight { background: rgba(13, 148, 136, 0.06); }
+.meta-item--highlight > span { color: var(--c-accent-dark); }
+.meta-item--highlight > strong { color: var(--c-accent-dark); }
+
+/* ============================================================
+   EDIT FORM
+============================================================ */
+.edit-form {
+    display: flex;
+    flex-direction: column;
     gap: 1rem;
-}
-
-.analytics-header h2 {
-    margin: 0 0 0.25rem;
-    font-size: 1.2rem;
-}
-
-.analytics-header p {
-    margin: 0;
-    color: var(--c-muted);
-    font-size: 0.9rem;
-}
-
-.analytics-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 1rem;
-}
-
-.supplier-form {
-    display: grid;
-    gap: 1rem;
-    padding: 1rem 1.2rem;
-    border-radius: 10px;
-    border: 1px solid rgba(13, 148, 136, 0.2);
-    background: rgba(13, 148, 136, 0.04);
 }
 
 .form-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 0.75rem;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1rem;
 }
 
 .form-field {
-    display: grid;
+    display: flex;
+    flex-direction: column;
     gap: 0.35rem;
+    min-width: 0;
+}
+
+.form-field > span {
     font-size: 0.8rem;
-    color: var(--c-muted);
     font-weight: 600;
+    color: var(--c-text);
+}
+
+.form-field > span em {
+    font-style: normal;
+    font-weight: 400;
+    color: var(--c-muted);
 }
 
 .form-field input {
-    border-radius: 8px;
-    border: 1px solid var(--c-border);
-    padding: 0.6rem 0.75rem;
-    font-size: 0.9rem;
+    border: 1.5px solid var(--c-border);
+    border-radius: 9px;
+    padding: 0.55rem 0.85rem;
+    font-size: 0.875rem;
+    font-family: 'Inter', -apple-system, sans-serif;
     color: var(--c-text);
     background: var(--c-surface);
-    font-family: 'Inter', sans-serif;
-    transition: border-color 0.15s;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .form-field input:focus {
@@ -919,218 +955,261 @@ watch(
     box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.12);
 }
 
-.form-actions {
+.form-alert {
+    border-radius: 10px;
+    padding: 0.7rem 1rem;
+    font-size: 0.85rem;
+    background: #fef2f2;
+    border: 1px solid #fca5a5;
+    color: #b91c1c;
+}
+
+.edit-actions {
     display: flex;
     justify-content: flex-end;
-    gap: 0.75rem;
-    flex-wrap: wrap;
+    gap: 0.6rem;
 }
 
-.form-error {
-    border-radius: 8px;
-    background: #fff5f5;
-    border: 1px solid #fecaca;
-    color: #b91c1c;
-    padding: 0.6rem 0.9rem;
-    font-weight: 600;
-    font-size: 0.85rem;
-}
-
-.supplier-grid {
+/* ============================================================
+   PANELS GRID
+============================================================ */
+.panels-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 1.5rem;
-}
-
-.supplier-panel {
-    background: var(--c-surface);
-    border-radius: 14px;
-    padding: 1.5rem;
-    border: 1px solid var(--c-border);
-    display: grid;
-    gap: 1.2rem;
-}
-
-.panel-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 1rem;
-    flex-wrap: wrap;
-}
-
-.panel-header h2 {
-    margin: 0 0 0.2rem;
-    font-size: 1rem;
-    font-weight: 700;
-    color: var(--c-text);
-}
-
-.panel-header p {
-    margin: 0;
-    color: var(--c-muted);
-    font-size: 0.85rem;
+    align-items: start;
 }
 
 .filter-row {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-    gap: 0.75rem;
-    align-items: end;
-    margin-top: 0.5rem;
-}
-
-.filter-field {
-    display: grid;
-    gap: 0.35rem;
-    font-size: 0.7rem;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--c-muted);
-    font-weight: 600;
-}
-
-.filter-field select,
-.filter-field input {
-    border-radius: 8px;
-    border: 1px solid var(--c-border);
-    padding: 0.55rem 0.75rem;
-    font-size: 0.9rem;
-    color: var(--c-text);
-    background: var(--c-surface);
-    font-family: 'Inter', sans-serif;
-    text-transform: none;
-    letter-spacing: normal;
-}
-
-.filter-actions {
     display: flex;
     gap: 0.5rem;
     align-items: center;
+    flex-wrap: wrap;
 }
 
-.primary-button {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.35rem;
-    background: var(--c-accent);
-    border: none;
+.filter-select,
+.filter-date {
+    border: 1.5px solid var(--c-border);
     border-radius: 8px;
-    padding: 0.55rem 1.1rem;
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: #ffffff;
-    cursor: pointer;
-    font-family: 'Inter', sans-serif;
-    transition: background 0.15s;
-    white-space: nowrap;
+    padding: 0.45rem 0.6rem;
+    font-size: 0.8rem;
+    font-family: 'Inter', -apple-system, sans-serif;
+    color: var(--c-text);
+    background: var(--c-surface);
+    transition: border-color 0.15s, box-shadow 0.15s;
+    min-width: 0;
 }
 
-.primary-button:hover:not(:disabled) { background: var(--c-accent-dark); }
-.primary-button:disabled { opacity: 0.5; cursor: not-allowed; }
+.filter-select { flex: 1; min-width: 96px; }
+.filter-date { flex: 1; min-width: 96px; max-width: 150px; }
 
-.secondary-button {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.35rem;
-    background: transparent;
-    border: 1px solid var(--c-border);
-    border-radius: 8px;
-    padding: 0.55rem 1rem;
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: #475569;
-    cursor: pointer;
-    font-family: 'Inter', sans-serif;
-    transition: background 0.15s, border-color 0.15s;
-    white-space: nowrap;
+.filter-select:focus,
+.filter-date:focus {
+    outline: none;
+    border-color: var(--c-accent);
+    box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.12);
 }
 
-.secondary-button:hover:not(:disabled) { background: #f1f5f9; border-color: #cbd5e1; }
-.secondary-button:disabled { opacity: 0.5; cursor: not-allowed; }
+/* ============================================================
+   MINI TABLES
+============================================================ */
+.mini-table-wrap { overflow-x: auto; min-width: 0; }
 
-.data-table {
+.mini-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 0.88rem;
+    font-size: 0.84rem;
 }
 
-.data-table td {
-    padding: 0.8rem 0.5rem;
-    border-top: 1px solid rgba(148, 163, 184, 0.2);
-}
-
-.status-pill {
-    display: inline-flex;
-    align-items: center;
-    padding: 0.2rem 0.6rem;
-    border-radius: 999px;
-    font-size: 0.65rem;
+.mini-table thead th {
+    padding: 0.5rem 0.6rem;
+    text-align: left;
+    font-size: 0.64rem;
+    font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.1em;
-    background: rgba(15, 118, 110, 0.12);
-    color: var(--c-accent-dark);
+    letter-spacing: 0.07em;
+    color: var(--c-muted);
+    border-bottom: 1.5px solid var(--c-border);
+    white-space: nowrap;
 }
 
-.status-pill--inactive {
-    background: rgba(148, 163, 184, 0.2);
-    color: #475569;
+.mini-table thead th.num { text-align: right; }
+
+.mini-table tbody tr {
+    border-bottom: 1px solid #f1f5f9;
+    transition: background 0.12s;
 }
 
-.status-pill--active {
-    background: rgba(16, 185, 129, 0.18);
-    color: #047857;
+.mini-table tbody tr:last-child { border-bottom: none; }
+.mini-table tbody tr:hover { background: #f8fafc; }
+.mini-table tbody tr.row-clickable { cursor: pointer; }
+
+.mini-table tbody td {
+    padding: 0.65rem 0.6rem;
+    vertical-align: middle;
 }
 
-.status-pill--warning {
-    background: rgba(234, 179, 8, 0.2);
-    color: #92400e;
+.mini-table td.num {
+    text-align: right;
+    font-weight: 600;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.date-cell {
+    color: var(--c-muted);
+    font-size: 0.8rem;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
 }
 
 .receipt-id {
     font-weight: 600;
+    color: var(--c-text);
+    font-variant-numeric: tabular-nums;
 }
 
 .receipt-meta {
-    font-size: 0.8rem;
+    font-size: 0.72rem;
     color: var(--c-muted);
+    margin-top: 0.1rem;
+    white-space: nowrap;
 }
 
-.pagination {
-    justify-content: flex-end;
+.col-open { text-align: right; width: 26px; }
+.row-chevron { color: #cbd5e1; }
+.mini-table tbody tr:hover .row-chevron { color: var(--c-accent-dark); }
+
+/* ── Status pills ── */
+.status-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.18rem 0.55rem;
+    border-radius: 999px;
+    font-size: 0.64rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    background: rgba(148, 163, 184, 0.15);
     color: var(--c-muted);
-    font-size: 0.85rem;
-    gap: 0.75rem;
+    white-space: nowrap;
+}
+
+.status-pill--active { background: rgba(13, 148, 136, 0.1); color: var(--c-accent-dark); }
+.status-pill--inactive { background: rgba(148, 163, 184, 0.15); color: #64748b; }
+.status-pill--warning { background: rgba(245, 158, 11, 0.12); color: #92400e; }
+.status-pill--draft { background: rgba(99, 102, 241, 0.1); color: #4338ca; }
+
+.mini-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid #f1f5f9;
+}
+
+.page-indicator {
+    font-size: 0.8rem;
+    color: var(--c-muted);
+    min-width: 44px;
+    text-align: center;
+}
+
+.page-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    border: 1.5px solid var(--c-border);
+    background: transparent;
+    color: var(--c-text);
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.page-btn:hover:not(:disabled) { border-color: var(--c-accent); color: var(--c-accent-dark); background: rgba(13, 148, 136, 0.05); }
+.page-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+/* ============================================================
+   BUTTONS
+============================================================ */
+.primary-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.6rem 1.1rem;
+    border-radius: 9px;
+    border: none;
+    background: var(--c-accent);
+    color: #fff;
+    font-size: 0.875rem;
+    font-weight: 600;
+    font-family: 'Inter', -apple-system, sans-serif;
+    cursor: pointer;
+    transition: background 0.15s, box-shadow 0.15s, transform 0.15s;
+    box-shadow: 0 2px 8px rgba(13, 148, 136, 0.25);
+    white-space: nowrap;
+}
+
+.primary-button:hover:not(:disabled) { background: var(--c-accent-dark); transform: translateY(-1px); box-shadow: 0 4px 14px rgba(13, 148, 136, 0.35); }
+.primary-button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+.primary-button--sm {
+    padding: 0.5rem 0.9rem;
+    font-size: 0.82rem;
 }
 
 .ghost-button {
     display: inline-flex;
     align-items: center;
-    justify-content: center;
-    gap: 0.35rem;
-    background: transparent;
-    border: 1px solid var(--c-border);
-    border-radius: 8px;
-    padding: 0.55rem 1rem;
+    gap: 0.4rem;
+    padding: 0.58rem 1rem;
+    border-radius: 9px;
+    border: 1.5px solid var(--c-border);
+    background: var(--c-surface);
+    color: var(--c-text);
     font-size: 0.875rem;
     font-weight: 600;
-    color: #475569;
+    font-family: 'Inter', -apple-system, sans-serif;
     cursor: pointer;
-    font-family: 'Inter', sans-serif;
-    transition: background 0.15s, border-color 0.15s;
+    transition: all 0.15s;
     white-space: nowrap;
-    backdrop-filter: none;
 }
 
-.ghost-button:hover:not(:disabled) { background: #f1f5f9; border-color: #cbd5e1; }
-.ghost-button:disabled { opacity: 0.5; cursor: not-allowed; }
+.ghost-button:hover:not(:disabled) { border-color: var(--c-accent); color: var(--c-accent-dark); background: rgba(13, 148, 136, 0.05); }
+.ghost-button:disabled { opacity: 0.4; cursor: not-allowed; }
 
-@media (max-width: 720px) {
-    .supplier-header {
-        flex-direction: column;
-        align-items: flex-start;
-    }
+.ghost-button--sm {
+    padding: 0.45rem 0.75rem;
+    font-size: 0.78rem;
+}
+
+.ghost-button--apply {
+    color: var(--c-accent-dark);
+    border-color: rgba(13, 148, 136, 0.4);
+}
+
+/* ============================================================
+   RESPONSIVE
+============================================================ */
+@media (max-width: 900px) {
+    .panels-grid { grid-template-columns: 1fr; }
+    .meta-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 640px) {
+    .supplier-page { padding: 1rem 0.875rem 2.5rem; }
+    .supplier-shell { gap: 0.875rem; }
+    .detail-title h1 { font-size: 1.35rem; }
+
+    .header-actions { width: 100%; }
+    .header-actions .ghost-button,
+    .header-actions .primary-button { flex: 1; justify-content: center; }
+
+    .detail-card { padding: 1.1rem; border-radius: 12px; }
+    .form-grid { grid-template-columns: 1fr; }
 }
 </style>

@@ -3,177 +3,134 @@
         <PullToRefresh :on-refresh="loadMovements" :disabled="isLoading" />
 
         <div class="movements-shell">
-            <header class="movements-header">
-                <div class="movements-title">
-                    <span class="movements-eyebrow">Inventory</span>
-                    <h1>Movement history</h1>
-                    <p>Track every stock change for {{ currentStoreLabel }} with filters and audit context.</p>
-                </div>
-                <div class="movements-actions">
-                    <button class="ghost-button" @click="goToInventory">Back to inventory</button>
-                    <button class="primary-button" :disabled="!canAdjust" @click="goToAdjustments">
-                        New adjustment
-                    </button>
+            <header class="detail-header">
+                <button type="button" class="back-link" @click="goToInventory">
+                    <mdicon name="arrow-left" size="15" />
+                    Inventory
+                </button>
+                <div class="detail-header-row">
+                    <div class="detail-title">
+                        <h1>Movement history</h1>
+                        <p>Every stock change for {{ currentStoreLabel }}, with audit context.</p>
+                    </div>
+                    <div class="header-actions">
+                        <button
+                            class="ghost-button"
+                            :disabled="isExporting || !canExport || !storeContext.currentStoreId"
+                            @click="exportMovements"
+                        >
+                            <mdicon name="download-outline" size="16" />
+                            {{ isExporting ? 'Exporting…' : 'Export CSV' }}
+                        </button>
+                        <button class="primary-button" :disabled="!canAdjust" @click="goToAdjustments">
+                            <mdicon name="plus" size="16" />
+                            New adjustment
+                        </button>
+                    </div>
                 </div>
             </header>
 
-            <div class="movements-content">
-                <section class="movements-panel">
-                    <div class="toolbar-row">
-                        <div class="toolbar-left">
-                            <div class="filter-pills">
-                                <button class="pill" :class="{ active: filterMovementType === 'ALL' }" @click="setMovementType('ALL')">All</button>
-                                <button class="pill" :class="{ active: filterMovementType === 'SALE' }" @click="setMovementType('SALE')">Sales</button>
-                                <button class="pill" :class="{ active: filterMovementType === 'STOCK_ADJUSTMENT' }" @click="setMovementType('STOCK_ADJUSTMENT')">Adjustments</button>
-                                <button class="pill" :class="{ active: filterMovementType === 'PURCHASE_RECEIPT' }" @click="setMovementType('PURCHASE_RECEIPT')">Purchases</button>
-                                <button class="pill" :class="{ active: filterMovementType === 'VOID' }" @click="setMovementType('VOID')">Voids</button>
-                            </div>
-                        </div>
-                        <div class="toolbar-right">
-                            <div class="date-filter">
-                                <button class="date-filter__btn" @click="showDateModal = true">
-                                    <mdicon name="calendar-outline" size="16" />
-                                    <span>{{ dateFilterLabel }}</span>
-                                    <mdicon name="chevron-down" size="14" />
-                                </button>
-                                <button
-                                    v-if="fromDate || toDate"
-                                    class="date-filter__clear"
-                                    @click="clearDateFilter"
-                                    title="Clear date filter"
-                                >
-                                    <mdicon name="close" size="14" />
-                                </button>
-                            </div>
-                            <div class="search-wrap">
-                                <mdicon name="magnify" size="16" class="search-icon" />
-                                <input
-                                    v-model="searchQuery"
-                                    class="search-input"
-                                    placeholder="Search item or note..."
-                                />
-                            </div>
-                            <button
-                                class="ghost-button ghost-button--compact"
-                                :disabled="isExporting || !canExport"
-                                @click="exportMovements"
-                            >
-                                <mdicon name="download-outline" size="16" />
-                                <span>{{ isExporting ? 'Exporting...' : 'Export' }}</span>
-                            </button>
-                        </div>
+            <div v-if="!storeContext.currentStoreId && !isLoading" class="panel-state">
+                Select or create a store to view movement history.
+            </div>
+
+            <section v-else class="movements-panel">
+                <div class="panel-toolbar">
+                    <div class="search-wrap">
+                        <mdicon name="magnify" size="17" class="search-icon" />
+                        <input
+                            v-model="searchQuery"
+                            type="text"
+                            class="search-input"
+                            placeholder="Search item, note, or staff…"
+                        />
                     </div>
-
-                    <Teleport to="body">
-                        <Transition name="modal">
-                            <div v-if="showDateModal" class="date-modal-overlay" @click.self="showDateModal = false">
-                                <div class="date-modal">
-                                    <div class="date-modal__header">
-                                        <h3>Filter by date</h3>
-                                        <button class="date-modal__close" @click="showDateModal = false">
-                                            <mdicon name="close" size="18" />
-                                        </button>
-                                    </div>
-                                    <div class="date-modal__options">
-                                        <button class="date-modal__option" @click="setDatePreset('today')">
-                                            <mdicon name="calendar-today" size="18" />
-                                            <span>Today</span>
-                                        </button>
-                                        <button class="date-modal__option" @click="setDatePreset('week')">
-                                            <mdicon name="calendar-week" size="18" />
-                                            <span>This week</span>
-                                        </button>
-                                        <button class="date-modal__option" @click="setDatePreset('month')">
-                                            <mdicon name="calendar-month" size="18" />
-                                            <span>This month</span>
-                                        </button>
-                                        <button class="date-modal__option" @click="showCustomDate = true">
-                                            <mdicon name="calendar-range" size="18" />
-                                            <span>Custom range</span>
-                                        </button>
-                                    </div>
-                                    <div v-if="showCustomDate" class="date-modal__custom">
-                                        <label class="date-modal__field">
-                                            <span>From</span>
-                                            <input v-model="customFromDate" type="date" />
-                                        </label>
-                                        <label class="date-modal__field">
-                                            <span>To</span>
-                                            <input v-model="customToDate" type="date" />
-                                        </label>
-                                        <button class="date-modal__apply" @click="applyCustomDateRange">
-                                            Apply range
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </Transition>
-                    </Teleport>
-
-                    <div v-if="!storeContext.currentStoreId" class="panel-state">
-                        Select or create a store to view movement history.
+                    <select v-model="filterMovementType" class="type-select" aria-label="Movement type">
+                        <option value="ALL">All movements</option>
+                        <option value="SALE">Sales</option>
+                        <option value="STOCK_ADJUSTMENT">Adjustments</option>
+                        <option value="PURCHASE_RECEIPT">Purchases</option>
+                        <option value="VOID">Voids</option>
+                        <option value="REFUND">Refunds</option>
+                        <option value="WASTE">Waste</option>
+                        <option value="TRANSFER_IN">Transfers in</option>
+                        <option value="TRANSFER_OUT">Transfers out</option>
+                    </select>
+                    <div class="date-filter">
+                        <button type="button" class="date-filter__btn" @click="showDateModal = true">
+                            <mdicon name="calendar-outline" size="16" />
+                            <span>{{ dateFilterLabel }}</span>
+                            <mdicon name="chevron-down" size="14" />
+                        </button>
+                        <button
+                            v-if="fromDate || toDate"
+                            type="button"
+                            class="date-filter__clear"
+                            @click="clearDateFilter"
+                            title="Clear date filter"
+                        >
+                            <mdicon name="close" size="14" />
+                        </button>
                     </div>
+                </div>
 
-                    <div v-else-if="isLoading" class="panel-state">Loading movements...</div>
-
-                    <div v-else class="table-wrap">
+                <SkeletonLoader v-if="isLoading" :rows="8" label="Loading movements…" />
+                <template v-else>
+                    <div class="table-wrap">
                         <table class="movements-table">
                             <thead>
                                 <tr>
                                     <th>When</th>
                                     <th>Item</th>
-                                    <th>Item type</th>
                                     <th>Movement</th>
-                                    <th>Qty change</th>
+                                    <th class="num">Qty change</th>
                                     <th>Reference</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <tr v-for="movement in filteredMovements" :key="movement.id">
-                                    <td>
+                                    <td class="col-when">
                                         <div class="date-cell">{{ formatDate(movement.createdAt) }}</div>
                                         <div class="item-meta" v-if="movement.createdBy?.fullName">
                                             {{ movement.createdBy.fullName }}
                                         </div>
                                     </td>
-                                    <td>
+                                    <td class="col-item">
                                         <div class="item-name">{{ movement.itemName }}</div>
                                         <div class="item-meta">
+                                            <span>{{ movement.itemType === 'INGREDIENT' ? 'Ingredient' : 'Product' }}</span>
                                             <span v-if="movement.itemSku">SKU {{ movement.itemSku }}</span>
                                             <span v-if="movement.itemCategory">{{ movement.itemCategory }}</span>
-                                            <span v-if="movement.note" class="note">{{ movement.note }}</span>
                                         </div>
+                                        <div v-if="movement.note" class="item-note">{{ movement.note }}</div>
                                     </td>
-                                    <td>
-                                        <span :class="['item-type-chip', `item-type-chip--${movement.itemType.toLowerCase()}`]">
-                                            {{ movement.itemType === 'INGREDIENT' ? 'Ingredient' : 'Product' }}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <span :class="['movement-pill', `movement-pill--${movement.type.toLowerCase()}`]">
+                                    <td class="col-type">
+                                        <span :class="['movement-pill', movementPillClass(movement.type)]">
                                             {{ formatMovementType(movement.type) }}
                                         </span>
                                     </td>
-                                    <td class="item-qty" :class="movement.qtyDelta >= 0 ? 'positive' : 'negative'">
+                                    <td class="col-qty num" :class="movement.qtyDelta >= 0 ? 'positive' : 'negative'">
                                         {{ movement.qtyDelta >= 0 ? '+' : '' }}{{ formatQty(movement.qtyDelta) }}
+                                        <span v-if="movement.itemUnit" class="qty-unit">{{ movement.itemUnit }}</span>
                                     </td>
-                                    <td>
+                                    <td class="col-ref">
                                         <RouterLink
                                             v-if="getReferenceRoute(movement)"
                                             class="reference-link"
                                             :to="getReferenceRoute(movement)!"
                                         >
                                             {{ getReferenceLabel(movement) }}
+                                            <mdicon name="chevron-right" size="13" />
                                         </RouterLink>
-                                        <span v-else class="muted-text">—</span>
+                                        <span v-else class="cell-empty">—</span>
                                     </td>
                                 </tr>
                                 <tr v-if="filteredMovements.length === 0">
-                                    <td colspan="6">
+                                    <td colspan="5" class="empty-cell">
                                         <div class="empty-state">
                                             <mdicon name="swap-horizontal" size="32" class="empty-icon" />
                                             <p class="empty-heading">No movements found</p>
-                                            <p class="empty-sub">Try adjusting your filters or date range.</p>
+                                            <p class="empty-sub">{{ hasActiveFilters ? 'Try adjusting your filters or date range.' : 'Stock changes appear here as you sell, receive, and adjust inventory.' }}</p>
                                         </div>
                                     </td>
                                 </tr>
@@ -182,71 +139,83 @@
                     </div>
 
                     <div class="pagination">
-                        <div class="pagination-left">
+                        <div class="pagination-info">
+                            <span>{{ total }} record{{ total !== 1 ? 's' : '' }}</span>
                             <label class="pagination-size">
-                                <span>Rows</span>
+                                <span>Show</span>
                                 <select v-model.number="pageSize">
                                     <option v-for="size in pageSizeOptions" :key="size" :value="size">{{ size }}</option>
                                 </select>
                             </label>
-                            <span class="pagination-info">{{ total }} records</span>
                         </div>
-                        <div class="pagination-controls">
-                            <button class="page-btn" :disabled="page === 1" @click="changePage(page - 1)">
+                        <div v-if="totalPages > 1" class="pagination-controls">
+                            <button class="page-btn" :disabled="page === 1" @click="changePage(page - 1)" aria-label="Previous page">
                                 <mdicon name="chevron-left" size="18" />
                             </button>
-                            <span class="pagination-info">{{ page }} / {{ totalPages }}</span>
-                            <button class="page-btn" :disabled="page >= totalPages" @click="changePage(page + 1)">
+                            <span class="page-indicator">{{ page }} / {{ totalPages }}</span>
+                            <button class="page-btn" :disabled="page >= totalPages" @click="changePage(page + 1)" aria-label="Next page">
                                 <mdicon name="chevron-right" size="18" />
                             </button>
                         </div>
                     </div>
-                </section>
-
-                <aside class="insight-panel">
-                    <div class="insight-card">
-                        <h3>Summary</h3>
-                        <div class="summary-grid">
-                            <div class="summary-row">
-                                <span class="summary-label">Total records</span>
-                                <span class="summary-value">{{ total }}</span>
-                            </div>
-                            <div class="summary-row">
-                                <span class="summary-label">Net change</span>
-                                <span class="summary-value" :class="netDelta >= 0 ? 'positive' : 'negative'">
-                                    {{ netDelta >= 0 ? '+' : '' }}{{ formatQty(netDelta) }}
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="insight-card">
-                        <h3>Breakdown</h3>
-                        <div class="breakdown-list">
-                            <div class="breakdown-item">
-                                <span class="breakdown-dot breakdown-dot--sale"></span>
-                                <span class="breakdown-label">Sales</span>
-                                <span class="breakdown-count">{{ movementTypeCounts.SALE }}</span>
-                            </div>
-                            <div class="breakdown-item">
-                                <span class="breakdown-dot breakdown-dot--adjustment"></span>
-                                <span class="breakdown-label">Adjustments</span>
-                                <span class="breakdown-count">{{ movementTypeCounts.STOCK_ADJUSTMENT }}</span>
-                            </div>
-                            <div class="breakdown-item">
-                                <span class="breakdown-dot breakdown-dot--purchase"></span>
-                                <span class="breakdown-label">Purchases</span>
-                                <span class="breakdown-count">{{ movementTypeCounts.PURCHASE_RECEIPT }}</span>
-                            </div>
-                            <div class="breakdown-item">
-                                <span class="breakdown-dot breakdown-dot--void"></span>
-                                <span class="breakdown-label">Voids</span>
-                                <span class="breakdown-count">{{ movementTypeCounts.VOID }}</span>
-                            </div>
-                        </div>
-                    </div>
-                </aside>
-            </div>
+                </template>
+            </section>
         </div>
+
+        <Teleport to="body">
+            <Transition name="modal-fade">
+                <div v-if="showDateModal" class="modal-backdrop" @click.self="showDateModal = false">
+                    <div class="modal-box" role="dialog" aria-modal="true" aria-label="Filter by date">
+                        <div class="modal-header">
+                            <div>
+                                <h2>Filter by date</h2>
+                            </div>
+                            <button class="modal-close" @click="showDateModal = false" aria-label="Close">
+                                <mdicon name="close" size="20" />
+                            </button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="date-options">
+                                <button type="button" class="date-option" @click="setDatePreset('today')">
+                                    <mdicon name="calendar-today" size="18" />
+                                    <span>Today</span>
+                                </button>
+                                <button type="button" class="date-option" @click="setDatePreset('week')">
+                                    <mdicon name="calendar-week" size="18" />
+                                    <span>This week</span>
+                                </button>
+                                <button type="button" class="date-option" @click="setDatePreset('month')">
+                                    <mdicon name="calendar-month" size="18" />
+                                    <span>This month</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    class="date-option"
+                                    :class="{ 'date-option--active': showCustomDate }"
+                                    @click="showCustomDate = !showCustomDate"
+                                >
+                                    <mdicon name="calendar-range" size="18" />
+                                    <span>Custom range</span>
+                                </button>
+                            </div>
+                            <div v-if="showCustomDate" class="date-custom">
+                                <label class="date-field">
+                                    <span>From</span>
+                                    <input v-model="customFromDate" type="date" />
+                                </label>
+                                <label class="date-field">
+                                    <span>To</span>
+                                    <input v-model="customToDate" type="date" />
+                                </label>
+                                <button type="button" class="primary-button primary-button--sm" @click="applyCustomDateRange">
+                                    Apply range
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </Transition>
+        </Teleport>
     </section>
 </template>
 
@@ -260,6 +229,7 @@ import { useStoreContextStore } from '@/stores/storeContext';
 import { canAccess } from '@/utils/roleAccess';
 import { hasPlanFeature, openPlanUpgradeModal } from '@/utils/planAccess';
 import { zonedDayStartIso, zonedDayEndIso } from '@/utils/datetime';
+import SkeletonLoader from '@/components/SkeletonLoader.vue';
 
 const router = useRouter();
 const route = useRoute();
@@ -312,12 +282,6 @@ const dateFilterLabel = computed(() => {
     return `${formatShort(fromDate.value)} – ${formatShort(toDate.value)}`;
 });
 
-const setMovementType = async (type: string) => {
-    filterMovementType.value = type;
-    page.value = 1;
-    await loadMovements();
-};
-
 const setDatePreset = async (preset: 'today' | 'week' | 'month') => {
     const today = new Date();
     if (preset === 'today') {
@@ -361,20 +325,23 @@ const clearDateFilter = async () => {
     page.value = 1;
     await loadMovements();
 };
+
 // Use the store owner's plan tier for feature access (not the logged-in user's)
 const ownerPlanTier = computed(() => storeContext.currentStore?.ownerPlanTier ?? null);
 const planKnown = computed(() => ownerPlanTier.value !== null);
-const canUseIngredients = computed(() => planKnown.value && hasPlanFeature(ownerPlanTier.value, 'ingredients'));
-const showIngredients = computed(() => !planKnown.value || canUseIngredients.value);
 const canExport = computed(() => planKnown.value && hasPlanFeature(ownerPlanTier.value, 'importExport'));
 
 const currentStoreLabel = computed(() => {
     const store = storeContext.currentStore;
     if (!store) return 'your store';
-    return `${store.name} · ${store.currency}`;
+    return store.name;
 });
 
 const canAdjust = computed(() => canAccess(storeContext.currentStore?.role, 'inventoryAdjustments'));
+
+const hasActiveFilters = computed(() =>
+    Boolean(searchQuery.value.trim() || filterMovementType.value !== 'ALL' || fromDate.value || toDate.value)
+);
 
 const loadMovements = async () => {
     const storeId = storeContext.currentStoreId;
@@ -417,7 +384,6 @@ const filteredMovements = computed(() => {
 });
 
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize.value)));
-const netDelta = computed(() => movements.value.reduce((sum, movement) => sum + movement.qtyDelta, 0));
 
 const changePage = async (nextPage: number) => {
     page.value = nextPage;
@@ -443,6 +409,11 @@ const formatDate = (value: string) => {
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return value;
     return date.toLocaleString(undefined, {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
         timeZone: storeContext.currentStore?.timezone || 'Asia/Manila',
     });
 };
@@ -591,23 +562,31 @@ const exportMovements = async () => {
     }
 };
 
-const formatMovementType = (type: string) => {
-    const labels: Record<string, string> = {
-        SALE: 'Sale',
-        STOCK_ADJUSTMENT: 'Adjustment',
-        PURCHASE_RECEIPT: 'Purchase',
-        VOID: 'Void',
-    };
-    return labels[type] ?? type.replace(/_/g, ' ');
+const MOVEMENT_LABELS: Record<string, string> = {
+    SALE: 'Sale',
+    STOCK_ADJUSTMENT: 'Adjustment',
+    PURCHASE_RECEIPT: 'Purchase',
+    VOID: 'Void',
+    REFUND: 'Refund',
+    WASTE: 'Waste',
+    TRANSFER_IN: 'Transfer in',
+    TRANSFER_OUT: 'Transfer out',
 };
 
-const movementTypeCounts = computed(() => {
-    const counts: Record<string, number> = { SALE: 0, STOCK_ADJUSTMENT: 0, PURCHASE_RECEIPT: 0, VOID: 0 };
-    movements.value.forEach((m) => {
-        if (m.type in counts) counts[m.type]++;
-    });
-    return counts;
-});
+const formatMovementType = (type: string) => MOVEMENT_LABELS[type] ?? type.replace(/_/g, ' ');
+
+const MOVEMENT_PILL_CLASSES: Record<string, string> = {
+    SALE: 'movement-pill--sale',
+    STOCK_ADJUSTMENT: 'movement-pill--adjustment',
+    PURCHASE_RECEIPT: 'movement-pill--purchase',
+    VOID: 'movement-pill--void',
+    REFUND: 'movement-pill--void',
+    WASTE: 'movement-pill--waste',
+    TRANSFER_IN: 'movement-pill--transfer',
+    TRANSFER_OUT: 'movement-pill--transfer',
+};
+
+const movementPillClass = (type: string) => MOVEMENT_PILL_CLASSES[type] ?? 'movement-pill--default';
 
 onMounted(async () => {
     await storeContext.fetchStores();
@@ -625,6 +604,14 @@ watch(
         if (storeId && storeId !== storeContext.currentStoreId) {
             storeContext.setCurrentStore(storeId);
         }
+    }
+);
+
+watch(
+    () => filterMovementType.value,
+    async () => {
+        page.value = 1;
+        await loadMovements();
     }
 );
 
@@ -648,8 +635,6 @@ watch(
 </script>
 
 <style scoped>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-
 /* ============================================================
    TOKENS
 ============================================================ */
@@ -660,7 +645,7 @@ watch(
     --c-accent-dark: #0f766e;
     --c-border: #e2e8f0;
     --c-surface: #ffffff;
-    --c-bg: #f8fafc;
+    --c-bg: #f6f8f9;
     min-height: 100vh;
     padding: 2rem 1.5rem 3rem;
     background: var(--c-bg);
@@ -672,35 +657,47 @@ watch(
    SHELL & HEADER
 ============================================================ */
 .movements-shell {
-    max-width: 1200px;
+    max-width: 1100px;
     margin: 0 auto;
     display: flex;
     flex-direction: column;
-    gap: 1.75rem;
+    gap: 1.25rem;
 }
 
-.movements-header {
+.detail-header {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+}
+
+.back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    border: none;
+    background: none;
+    padding: 0;
+    margin-bottom: 0.75rem;
+    font-size: 0.82rem;
+    font-weight: 600;
+    font-family: inherit;
+    color: var(--c-muted);
+    cursor: pointer;
+    transition: color 0.15s;
+    align-self: flex-start;
+}
+
+.back-link:hover { color: var(--c-accent-dark); }
+
+.detail-header-row {
     display: flex;
     flex-wrap: wrap;
-    gap: 1.25rem;
+    gap: 1rem;
     align-items: flex-start;
     justify-content: space-between;
 }
 
-.movements-eyebrow {
-    display: inline-block;
-    font-size: 0.68rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-    color: var(--c-accent);
-    background: rgba(13, 148, 136, 0.08);
-    padding: 0.28rem 0.75rem;
-    border-radius: 999px;
-    margin-bottom: 0.6rem;
-}
-
-.movements-title h1 {
+.detail-title h1 {
     font-size: 1.9rem;
     font-weight: 800;
     letter-spacing: -0.03em;
@@ -708,164 +705,68 @@ watch(
     color: var(--c-text);
 }
 
-.movements-title p {
+.detail-title p {
     color: var(--c-muted);
-    max-width: 520px;
+    max-width: 480px;
     line-height: 1.55;
     margin: 0;
     font-size: 0.92rem;
 }
 
-.movements-actions {
+.header-actions {
     display: flex;
+    gap: 0.6rem;
     align-items: center;
-    gap: 0.75rem;
-    flex-shrink: 0;
+    flex-wrap: wrap;
 }
 
 /* ============================================================
-   LAYOUT
-============================================================ */
-.movements-content {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 260px;
-    gap: 1.5rem;
-    align-items: start;
-}
-
-/* ============================================================
-   PANEL
+   PANEL & TOOLBAR
 ============================================================ */
 .movements-panel {
     background: var(--c-surface);
     border: 1px solid var(--c-border);
     border-radius: 16px;
-    padding: 1.75rem;
+    padding: 1.25rem 1.5rem 1.5rem;
     display: flex;
     flex-direction: column;
     gap: 1rem;
+    min-width: 0;
 }
 
-/* ============================================================
-   TOOLBAR
-============================================================ */
-.toolbar-row {
+.panel-toolbar {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 1rem;
-    flex-wrap: wrap;
-}
-
-.toolbar-left {
-    display: flex;
-    align-items: center;
     gap: 0.75rem;
+    align-items: center;
     flex-wrap: wrap;
 }
-
-.toolbar-right {
-    display: flex;
-    align-items: center;
-    gap: 0.65rem;
-    flex-shrink: 0;
-    flex-wrap: wrap;
-}
-
-.filter-pills {
-    display: flex;
-    gap: 0.25rem;
-    padding: 0.2rem;
-    background: #f1f5f9;
-    border-radius: 10px;
-}
-
-.pill {
-    padding: 0.4rem 0.75rem;
-    border: none;
-    border-radius: 7px;
-    background: transparent;
-    color: var(--c-muted);
-    font-size: 0.8rem;
-    font-weight: 600;
-    cursor: pointer;
-    font-family: 'Inter', -apple-system, sans-serif;
-    transition: all 0.15s;
-    white-space: nowrap;
-}
-
-.pill:hover { color: var(--c-text); }
-
-.pill.active {
-    background: #ffffff;
-    color: var(--c-text);
-    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.1);
-}
-
-.date-filter {
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-}
-
-.date-filter__btn {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    padding: 0.45rem 0.75rem;
-    border: 1.5px solid var(--c-border);
-    border-radius: 8px;
-    background: var(--c-surface);
-    color: var(--c-text);
-    font-size: 0.8rem;
-    font-weight: 500;
-    font-family: 'Inter', -apple-system, sans-serif;
-    cursor: pointer;
-    transition: border-color 0.15s;
-    white-space: nowrap;
-}
-
-.date-filter__btn:hover { border-color: var(--c-accent); }
-
-.date-filter__clear {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 26px;
-    height: 26px;
-    border: none;
-    border-radius: 6px;
-    background: #fee2e2;
-    color: #b91c1c;
-    cursor: pointer;
-    transition: background 0.15s;
-}
-
-.date-filter__clear:hover { background: #fecaca; }
 
 .search-wrap {
     position: relative;
-    display: flex;
-    align-items: center;
+    flex: 1;
+    min-width: 200px;
 }
 
 .search-icon {
     position: absolute;
-    left: 0.75rem;
-    color: var(--c-muted);
+    left: 0.7rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #94a3b8;
     pointer-events: none;
 }
 
 .search-input {
-    border-radius: 8px;
+    border-radius: 9px;
     border: 1.5px solid var(--c-border);
-    padding: 0.5rem 0.9rem 0.5rem 2.25rem;
-    min-width: 180px;
-    font-size: 0.84rem;
+    padding: 0.55rem 0.9rem 0.55rem 2.3rem;
+    width: 100%;
+    box-sizing: border-box;
+    font-size: 0.875rem;
     font-family: 'Inter', -apple-system, sans-serif;
-    background: var(--c-surface);
     color: var(--c-text);
-    transition: border-color 0.15s;
+    background: var(--c-surface);
+    transition: border-color 0.15s, box-shadow 0.15s;
 }
 
 .search-input::placeholder { color: #94a3b8; }
@@ -876,14 +777,82 @@ watch(
     box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.12);
 }
 
+.type-select {
+    border: 1.5px solid var(--c-border);
+    border-radius: 9px;
+    padding: 0.55rem 0.85rem;
+    font-size: 0.875rem;
+    font-family: 'Inter', -apple-system, sans-serif;
+    color: var(--c-text);
+    background: var(--c-surface);
+    transition: border-color 0.15s, box-shadow 0.15s;
+    min-width: 160px;
+}
+
+.type-select:focus {
+    outline: none;
+    border-color: var(--c-accent);
+    box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.12);
+}
+
+.date-filter {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.date-filter__btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.55rem 0.9rem;
+    border-radius: 9px;
+    border: 1.5px solid var(--c-border);
+    background: var(--c-surface);
+    color: var(--c-text);
+    font-size: 0.84rem;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+}
+
+.date-filter__btn:hover {
+    border-color: var(--c-accent);
+    color: var(--c-accent-dark);
+    background: rgba(13, 148, 136, 0.05);
+}
+
+.date-filter__clear {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 999px;
+    border: none;
+    background: #f1f5f9;
+    color: var(--c-muted);
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s;
+}
+
+.date-filter__clear:hover { background: #e2e8f0; color: var(--c-text); }
+
+.panel-state {
+    padding: 2rem;
+    border-radius: 10px;
+    background: #f1f5f9;
+    color: var(--c-muted);
+    font-size: 0.9rem;
+    text-align: center;
+}
+
 /* ============================================================
    TABLE
 ============================================================ */
-.table-wrap {
-    border: 1px solid var(--c-border);
-    border-radius: 12px;
-    overflow: hidden;
-}
+.table-wrap { overflow-x: auto; min-width: 0; }
 
 .movements-table {
     width: 100%;
@@ -899,18 +868,32 @@ watch(
     text-transform: uppercase;
     letter-spacing: 0.07em;
     color: var(--c-muted);
-    background: #f8fafc;
     border-bottom: 1.5px solid var(--c-border);
+    white-space: nowrap;
 }
+
+.movements-table thead th.num { text-align: right; }
+
+.movements-table tbody tr {
+    border-bottom: 1px solid var(--c-border);
+    transition: background 0.12s;
+}
+
+.movements-table tbody tr:last-child { border-bottom: none; }
+.movements-table tbody tr:hover { background: #f8fafc; }
 
 .movements-table tbody td {
-    padding: 0.65rem 0.9rem;
-    border-bottom: 1px solid var(--c-border);
-    vertical-align: middle;
+    padding: 0.85rem 0.9rem;
+    vertical-align: top;
 }
 
-.movements-table tbody tr:last-child td { border-bottom: none; }
-.movements-table tbody tr:hover { background: #f8fafc; }
+.date-cell {
+    font-size: 0.82rem;
+    color: var(--c-text);
+    font-weight: 600;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
 
 .item-name {
     font-weight: 600;
@@ -918,135 +901,103 @@ watch(
 }
 
 .item-meta {
-    font-size: 0.72rem;
+    font-size: 0.75rem;
     color: var(--c-muted);
     display: flex;
-    gap: 0.5rem;
+    gap: 0.35rem;
     flex-wrap: wrap;
-    margin-top: 0.15rem;
+    margin-top: 0.1rem;
 }
 
-.item-meta .note {
-    color: var(--c-accent-dark);
+.item-meta span + span::before {
+    content: '·';
+    margin-right: 0.35rem;
+    color: #cbd5e1;
+}
+
+.item-note {
+    font-size: 0.75rem;
+    color: var(--c-muted);
     font-style: italic;
+    margin-top: 0.2rem;
+    max-width: 320px;
 }
 
-.item-type-chip {
-    display: inline-flex;
-    padding: 0.18rem 0.55rem;
-    border-radius: 999px;
-    font-size: 0.7rem;
-    font-weight: 600;
-    letter-spacing: 0.03em;
-    white-space: nowrap;
-}
-
-.item-type-chip--product {
-    background: rgba(13, 148, 136, 0.08);
-    color: #0f766e;
-}
-
-.item-type-chip--ingredient {
-    background: rgba(139, 92, 246, 0.08);
-    color: #6d28d9;
-}
-
-.item-qty {
-    font-weight: 700;
-    white-space: nowrap;
-}
-
-.item-qty.positive { color: #059669; }
-.item-qty.negative { color: #dc2626; }
-
-/* Movement type pills */
 .movement-pill {
     display: inline-flex;
-    padding: 0.2rem 0.6rem;
+    align-items: center;
+    padding: 0.2rem 0.65rem;
     border-radius: 999px;
-    font-size: 0.7rem;
-    font-weight: 700;
-    letter-spacing: 0.04em;
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
     white-space: nowrap;
 }
 
-.movement-pill--sale {
-    background: rgba(13, 148, 136, 0.1);
-    color: #0f766e;
+.movement-pill--sale { background: rgba(13, 148, 136, 0.1); color: var(--c-accent-dark); }
+.movement-pill--adjustment { background: rgba(99, 102, 241, 0.1); color: #4338ca; }
+.movement-pill--purchase { background: rgba(37, 99, 235, 0.1); color: #1d4ed8; }
+.movement-pill--void { background: rgba(239, 68, 68, 0.1); color: #b91c1c; }
+.movement-pill--waste { background: rgba(245, 158, 11, 0.12); color: #92400e; }
+.movement-pill--transfer { background: rgba(14, 165, 233, 0.1); color: #0369a1; }
+.movement-pill--default { background: #f1f5f9; color: var(--c-muted); }
+
+.col-qty {
+    text-align: right;
+    font-weight: 700;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
 }
 
-.movement-pill--stock_adjustment {
-    background: rgba(59, 130, 246, 0.1);
-    color: #1d4ed8;
-}
+.col-qty.positive { color: #059669; }
+.col-qty.negative { color: #dc2626; }
 
-.movement-pill--purchase_receipt {
-    background: rgba(139, 92, 246, 0.1);
-    color: #6d28d9;
-}
-
-.movement-pill--void {
-    background: rgba(239, 68, 68, 0.1);
-    color: #b91c1c;
+.qty-unit {
+    font-size: 0.72rem;
+    font-weight: 500;
+    color: var(--c-muted);
+    margin-left: 0.2rem;
 }
 
 .reference-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.1rem;
     font-size: 0.82rem;
     font-weight: 600;
-    color: var(--c-accent);
+    color: var(--c-accent-dark);
     text-decoration: none;
 }
 
-.reference-link:hover {
-    color: var(--c-accent-dark);
-    text-decoration: underline;
-}
+.reference-link:hover { text-decoration: underline; }
 
-.muted-text { color: var(--c-muted); }
+.cell-empty { color: #cbd5e1; }
 
-.date-cell {
-    font-size: 0.82rem;
-    font-weight: 500;
-    color: var(--c-text);
-    white-space: nowrap;
-}
+.empty-cell { padding: 0; }
 
 .empty-state {
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 3rem 1.5rem;
+    gap: 0.35rem;
+    padding: 2.5rem 1rem;
     text-align: center;
 }
 
-.empty-icon {
-    color: #cbd5e1;
-    margin-bottom: 0.75rem;
-}
+.empty-icon { color: #cbd5e1; margin-bottom: 0.35rem; }
 
 .empty-heading {
+    margin: 0;
     font-size: 0.95rem;
     font-weight: 700;
     color: var(--c-text);
-    margin: 0 0 0.3rem;
 }
 
 .empty-sub {
+    margin: 0;
     font-size: 0.82rem;
     color: var(--c-muted);
-    margin: 0;
-}
-
-/* ============================================================
-   PANEL STATE
-============================================================ */
-.panel-state {
-    padding: 2rem;
-    border-radius: 10px;
-    background: #f1f5f9;
-    color: var(--c-muted);
-    font-size: 0.875rem;
-    text-align: center;
 }
 
 /* ============================================================
@@ -1056,167 +1007,71 @@ watch(
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 1rem;
     flex-wrap: wrap;
-    padding-top: 0.75rem;
-    border-top: 1px solid var(--c-border);
-}
-
-.pagination-left {
-    display: flex;
-    align-items: center;
     gap: 0.75rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--c-border);
+    font-size: 0.85rem;
+    color: var(--c-muted);
 }
 
 .pagination-info {
-    font-size: 0.8rem;
-    color: var(--c-muted);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    font-size: 0.82rem;
+}
+
+.pagination-size {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.pagination-size select {
+    border: 1.5px solid var(--c-border);
+    border-radius: 6px;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.82rem;
+    font-family: 'Inter', -apple-system, sans-serif;
+    color: var(--c-text);
+    background: var(--c-surface);
+    cursor: pointer;
+}
+
+.pagination-size select:focus {
+    outline: none;
+    border-color: var(--c-accent);
 }
 
 .pagination-controls {
     display: flex;
     align-items: center;
-    gap: 0.35rem;
+    gap: 0.5rem;
+}
+
+.page-indicator {
+    font-size: 0.82rem;
+    min-width: 50px;
+    text-align: center;
 }
 
 .page-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
+    width: 30px;
+    height: 30px;
+    border-radius: 6px;
     border: 1.5px solid var(--c-border);
-    border-radius: 8px;
-    background: var(--c-surface);
+    background: transparent;
     color: var(--c-text);
     cursor: pointer;
     transition: all 0.15s;
 }
 
-.page-btn:hover:not(:disabled) {
-    border-color: var(--c-accent);
-    color: var(--c-accent);
-}
-
-.page-btn:disabled {
-    opacity: 0.35;
-    cursor: not-allowed;
-}
-
-.pagination-size {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    font-size: 0.78rem;
-    color: var(--c-muted);
-    font-weight: 500;
-}
-
-.pagination-size select {
-    padding: 0.25rem 0.5rem;
-    border: 1.5px solid var(--c-border);
-    border-radius: 6px;
-    font-size: 0.78rem;
-    font-family: 'Inter', -apple-system, sans-serif;
-    color: var(--c-text);
-    background: var(--c-surface);
-}
-
-/* ============================================================
-   ASIDE
-============================================================ */
-.insight-panel {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-}
-
-.insight-card {
-    background: var(--c-surface);
-    border: 1px solid var(--c-border);
-    border-radius: 16px;
-    padding: 1.25rem 1.4rem;
-}
-
-.insight-card h3 {
-    font-size: 0.875rem;
-    font-weight: 700;
-    color: var(--c-text);
-    margin: 0 0 0.75rem;
-}
-
-.summary-grid {
-    display: flex;
-    flex-direction: column;
-}
-
-.summary-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.5rem 0;
-    border-bottom: 1px solid var(--c-border);
-    font-size: 0.82rem;
-}
-
-.summary-row:last-child { border-bottom: none; }
-
-.summary-label {
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.07em;
-    color: var(--c-muted);
-}
-
-.summary-value {
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: var(--c-text);
-}
-
-.summary-value.positive { color: #059669; }
-.summary-value.negative { color: #dc2626; }
-
-.breakdown-list {
-    display: flex;
-    flex-direction: column;
-}
-
-.breakdown-item {
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-    padding: 0.5rem 0;
-    border-bottom: 1px solid var(--c-border);
-    font-size: 0.82rem;
-}
-
-.breakdown-item:last-child { border-bottom: none; }
-
-.breakdown-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    flex-shrink: 0;
-}
-
-.breakdown-dot--sale       { background: #0d9488; }
-.breakdown-dot--adjustment { background: #3b82f6; }
-.breakdown-dot--purchase   { background: #8b5cf6; }
-.breakdown-dot--void       { background: #ef4444; }
-
-.breakdown-label {
-    flex: 1;
-    color: var(--c-text);
-    font-weight: 500;
-}
-
-.breakdown-count {
-    font-weight: 700;
-    color: var(--c-text);
-    font-size: 0.875rem;
-}
+.page-btn:hover:not(:disabled) { border-color: var(--c-accent); color: var(--c-accent-dark); background: rgba(13, 148, 136, 0.05); }
+.page-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 
 /* ============================================================
    BUTTONS
@@ -1225,34 +1080,36 @@ watch(
     display: inline-flex;
     align-items: center;
     gap: 0.4rem;
-    padding: 0.65rem 1.25rem;
-    border-radius: 8px;
+    padding: 0.6rem 1.1rem;
+    border-radius: 9px;
     border: none;
     background: var(--c-accent);
-    color: #ffffff;
+    color: #fff;
     font-size: 0.875rem;
     font-weight: 600;
     font-family: 'Inter', -apple-system, sans-serif;
     cursor: pointer;
-    transition: background 0.15s;
+    transition: background 0.15s, box-shadow 0.15s, transform 0.15s;
+    box-shadow: 0 2px 8px rgba(13, 148, 136, 0.25);
     white-space: nowrap;
 }
 
-.primary-button:hover:not(:disabled) { background: var(--c-accent-dark); }
+.primary-button:hover:not(:disabled) { background: var(--c-accent-dark); transform: translateY(-1px); box-shadow: 0 4px 14px rgba(13, 148, 136, 0.35); }
+.primary-button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 
-.primary-button:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
+.primary-button--sm {
+    padding: 0.5rem 0.9rem;
+    font-size: 0.82rem;
 }
 
 .ghost-button {
     display: inline-flex;
     align-items: center;
-    gap: 0.35rem;
-    padding: 0.6rem 1rem;
-    border-radius: 8px;
+    gap: 0.4rem;
+    padding: 0.58rem 1rem;
+    border-radius: 9px;
     border: 1.5px solid var(--c-border);
-    background: transparent;
+    background: var(--c-surface);
     color: var(--c-text);
     font-size: 0.875rem;
     font-weight: 600;
@@ -1262,204 +1119,221 @@ watch(
     white-space: nowrap;
 }
 
-.ghost-button:hover:not(:disabled) {
+.ghost-button:hover:not(:disabled) { border-color: var(--c-accent); color: var(--c-accent-dark); background: rgba(13, 148, 136, 0.05); }
+.ghost-button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ============================================================
+   DATE MODAL
+============================================================ */
+.modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.45);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    padding: 1rem;
+}
+
+.modal-box {
+    background: #ffffff;
+    border-radius: 18px;
+    box-shadow: 0 24px 60px rgba(15, 23, 42, 0.18);
+    width: 100%;
+    max-width: 380px;
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100vh - 2rem);
+    overflow-y: auto;
+}
+
+.modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1.5rem 1.75rem 0;
+}
+
+.modal-header h2 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--c-text);
+    margin: 0;
+}
+
+.modal-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: none;
+    background: #f1f5f9;
+    color: var(--c-muted);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.15s, color 0.15s;
+}
+
+.modal-close:hover { background: #e2e8f0; color: var(--c-text); }
+
+.modal-body {
+    padding: 1.25rem 1.75rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.date-options {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+}
+
+.date-option {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.65rem 0.85rem;
+    border-radius: 10px;
+    border: 1.5px solid var(--c-border);
+    background: var(--c-surface);
+    color: var(--c-text);
+    font-size: 0.84rem;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.date-option:hover,
+.date-option--active {
     border-color: var(--c-accent);
     color: var(--c-accent-dark);
+    background: rgba(13, 148, 136, 0.05);
 }
 
-.ghost-button:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
+.date-custom {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid #f1f5f9;
 }
 
-.ghost-button--compact {
-    padding: 0.5rem 0.85rem;
-    font-size: 0.84rem;
+.date-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--c-muted);
 }
+
+.date-field input {
+    border: 1.5px solid var(--c-border);
+    border-radius: 9px;
+    padding: 0.5rem 0.7rem;
+    font-size: 0.875rem;
+    font-family: 'Inter', -apple-system, sans-serif;
+    color: var(--c-text);
+    background: var(--c-surface);
+    transition: border-color 0.15s, box-shadow 0.15s;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.date-field input:focus {
+    outline: none;
+    border-color: var(--c-accent);
+    box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.12);
+}
+
+.date-custom .primary-button--sm { align-self: flex-end; }
+
+.modal-fade-enter-active,
+.modal-fade-leave-active { transition: opacity 0.18s ease; }
+
+.modal-fade-enter-from,
+.modal-fade-leave-to { opacity: 0; }
 
 /* ============================================================
    RESPONSIVE
 ============================================================ */
-@media (max-width: 960px) {
-    .movements-content {
-        grid-template-columns: 1fr;
-    }
-
-    .toolbar-row {
-        flex-direction: column;
-        align-items: stretch;
-    }
-
-    .toolbar-right {
-        flex-wrap: wrap;
-    }
-
-    .filter-pills {
-        overflow-x: auto;
-    }
+@media (max-width: 768px) {
+    .panel-toolbar { flex-direction: column; align-items: stretch; }
+    .search-wrap { min-width: 0; }
+    .type-select { min-width: 0; width: 100%; }
+    .date-filter { width: 100%; }
+    .date-filter__btn { flex: 1; justify-content: center; }
 }
 
 @media (max-width: 640px) {
-    .movements-page {
-        padding: 1.25rem 1rem 2.5rem;
+    .movements-page { padding: 1rem 0.875rem 2.5rem; }
+    .movements-shell { gap: 1rem; }
+    .detail-title h1 { font-size: 1.5rem; }
+
+    .header-actions { width: 100%; }
+    .header-actions .ghost-button,
+    .header-actions .primary-button { flex: 1; justify-content: center; }
+
+    .movements-panel { padding: 1rem 0 0.75rem; border-radius: 12px; }
+    .panel-toolbar { padding: 0 1rem; }
+    .pagination { padding: 1rem 1rem 0; flex-direction: column; align-items: flex-start; gap: 0.5rem; }
+
+    /* ── Table → card view ── */
+    .movements-table thead { display: none; }
+    .movements-table,
+    .movements-table tbody { display: block; }
+
+    .movements-table tbody tr {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        grid-template-rows: auto auto auto;
+        padding: 0.875rem 1rem;
+        gap: 0.2rem 0.625rem;
+        border-bottom: 1px solid var(--c-border);
+    }
+    .movements-table tbody tr:last-child { border-bottom: none; }
+
+    .movements-table tbody td {
+        padding: 0;
+        border: none;
+        vertical-align: top;
     }
 
-    .movements-title h1 {
-        font-size: 1.5rem;
+    .movements-table tbody td.col-item { grid-column: 1; grid-row: 1; }
+    .movements-table tbody td.col-type {
+        grid-column: 2;
+        grid-row: 1;
+        display: flex;
+        justify-content: flex-end;
+        align-items: flex-start;
     }
-}
+    .movements-table tbody td.col-qty {
+        grid-column: 2;
+        grid-row: 2;
+        padding-top: 0.35rem;
+    }
+    .movements-table tbody td.col-when {
+        grid-column: 1;
+        grid-row: 2;
+        padding-top: 0.35rem;
+    }
+    .movements-table tbody td.col-when .date-cell { font-size: 0.75rem; font-weight: 500; color: var(--c-muted); }
+    .movements-table tbody td.col-ref {
+        grid-column: 1 / -1;
+        grid-row: 3;
+        padding-top: 0.2rem;
+    }
+    .movements-table tbody td.col-ref .cell-empty { display: none; }
 
-/* ============================================================
-   DATE MODAL (via Teleport)
-============================================================ */
-:global(.date-modal-overlay) {
-    position: fixed;
-    inset: 0;
-    background: rgba(15, 23, 42, 0.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
-    padding: 1rem;
-}
-
-:global(.date-modal) {
-    background: #fff;
-    border-radius: 16px;
-    width: 100%;
-    max-width: 340px;
-    border: 1px solid #e2e8f0;
-    overflow: hidden;
-}
-
-:global(.date-modal__header) {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1.1rem 1.5rem;
-    border-bottom: 1px solid #e2e8f0;
-}
-
-:global(.date-modal__header h3) {
-    margin: 0;
-    font-size: 0.95rem;
-    font-weight: 700;
-    color: #0f172a;
-}
-
-:global(.date-modal__close) {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 30px;
-    height: 30px;
-    border: none;
-    border-radius: 7px;
-    background: transparent;
-    color: #64748b;
-    cursor: pointer;
-    transition: background 0.15s;
-}
-
-:global(.date-modal__close:hover) {
-    background: #f1f5f9;
-    color: #0f172a;
-}
-
-:global(.date-modal__options) {
-    display: grid;
-    gap: 0.4rem;
-    padding: 1rem 1.25rem;
-}
-
-:global(.date-modal__option) {
-    display: flex;
-    align-items: center;
-    gap: 0.65rem;
-    padding: 0.7rem 0.9rem;
-    border: 1.5px solid #e2e8f0;
-    border-radius: 10px;
-    background: #fff;
-    color: #0f172a;
-    font-size: 0.875rem;
-    font-weight: 500;
-    font-family: 'Inter', -apple-system, sans-serif;
-    cursor: pointer;
-    transition: border-color 0.15s;
-}
-
-:global(.date-modal__option:hover) {
-    border-color: #0d9488;
-}
-
-:global(.date-modal__custom) {
-    display: grid;
-    gap: 0.65rem;
-    padding: 0 1.25rem 1.25rem;
-}
-
-:global(.date-modal__field) {
-    display: grid;
-    gap: 0.3rem;
-}
-
-:global(.date-modal__field span) {
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.07em;
-    color: #64748b;
-}
-
-:global(.date-modal__field input) {
-    padding: 0.6rem 0.85rem;
-    border: 1.5px solid #e2e8f0;
-    border-radius: 8px;
-    font-size: 0.875rem;
-    font-family: 'Inter', -apple-system, sans-serif;
-    color: #0f172a;
-    transition: border-color 0.15s;
-}
-
-:global(.date-modal__field input:focus) {
-    outline: none;
-    border-color: #0d9488;
-    box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.12);
-}
-
-:global(.date-modal__apply) {
-    padding: 0.65rem 1rem;
-    border: none;
-    border-radius: 8px;
-    background: #0d9488;
-    color: #fff;
-    font-size: 0.875rem;
-    font-weight: 600;
-    font-family: 'Inter', -apple-system, sans-serif;
-    cursor: pointer;
-    transition: background 0.15s;
-}
-
-:global(.date-modal__apply:hover) { background: #0f766e; }
-
-:global(.modal-enter-active),
-:global(.modal-leave-active) {
-    transition: opacity 0.2s ease;
-}
-
-:global(.modal-enter-active .date-modal),
-:global(.modal-leave-active .date-modal) {
-    transition: transform 0.2s ease, opacity 0.2s ease;
-}
-
-:global(.modal-enter-from),
-:global(.modal-leave-to) {
-    opacity: 0;
-}
-
-:global(.modal-enter-from .date-modal),
-:global(.modal-leave-to .date-modal) {
-    transform: scale(0.95);
-    opacity: 0;
+    .movements-table tbody td.empty-cell { grid-column: 1 / -1; }
 }
 </style>
