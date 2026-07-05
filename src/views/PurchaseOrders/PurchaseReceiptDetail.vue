@@ -1,26 +1,36 @@
 <template>
     <section class="receipt-page">
         <div class="receipt-shell">
-            <header class="receipt-header">
-                <div class="receipt-title">
-                    <span class="receipt-eyebrow">Purchase Orders</span>
-                    <h1>Receipt detail</h1>
-                    <p v-if="receipt">
-                        <span class="receipt-id-badge" :title="receipt.id">#{{ receipt.id.slice(0, 8) }}…</span>
-                        · {{ currentStoreLabel }}
-                    </p>
-                    <p v-else>Review received items and costs.</p>
-                </div>
-                <div class="receipt-actions no-print">
-                    <button class="ghost-button" @click="goToReceiptsList">Back to receipts</button>
-                    <button class="ghost-button" @click="printReceipt">Print</button>
-                    <button
-                        v-if="receipt?.purchaseOrderId"
-                        class="secondary-button"
-                        @click="goToPurchaseOrder(receipt.purchaseOrderId)"
-                    >
-                        View PO
-                    </button>
+            <header class="detail-header">
+                <button type="button" class="back-link no-print" @click="goToReceiptsList">
+                    <mdicon name="arrow-left" size="15" />
+                    Receipts
+                </button>
+                <div class="detail-header-row">
+                    <div class="detail-title">
+                        <h1>
+                            Receipt
+                            <span v-if="receipt" class="receipt-id-badge" :title="receipt.id">#{{ receipt.id.slice(0, 8) }}</span>
+                        </h1>
+                        <p v-if="receipt">
+                            Received {{ formatDate(receipt.receivedAt) }} · {{ formatTime(receipt.receivedAt) }} · {{ currentStoreLabel }}
+                        </p>
+                        <p v-else>Review received items and costs.</p>
+                    </div>
+                    <div class="header-actions no-print" v-if="receipt">
+                        <button class="ghost-button" @click="printReceipt">
+                            <mdicon name="printer-outline" size="16" />
+                            Print
+                        </button>
+                        <button
+                            v-if="receipt.purchaseOrderId"
+                            class="ghost-button"
+                            @click="goToPurchaseOrder(receipt.purchaseOrderId)"
+                        >
+                            <mdicon name="clipboard-text-outline" size="16" />
+                            View order
+                        </button>
+                    </div>
                 </div>
             </header>
 
@@ -30,95 +40,87 @@
                 title="Receipt details are available on Standard."
                 description="Upgrade to Standard to review receipts, suppliers, and receiving history."
             />
-            <template v-else>
-                <div v-if="isLoading" class="panel-state">Loading receipt...</div>
-                <div v-else-if="!receipt" class="panel-state">Receipt not found.</div>
-                <template v-else>
 
-                    <div class="meta-strip">
+            <div v-else-if="isLoading" class="panel-state">Loading receipt…</div>
+
+            <div v-else-if="!receipt" class="panel-state">Receipt not found.</div>
+
+            <template v-else>
+                <!-- ── Summary ── -->
+                <section class="detail-card">
+                    <div class="meta-grid">
                         <div class="meta-item">
-                            <span class="meta-label">Supplier</span>
+                            <span>Supplier</span>
                             <button
                                 v-if="receipt.supplierName"
                                 type="button"
-                                class="link-button"
+                                class="meta-link"
                                 @click="handleSupplierClick"
                             >
                                 {{ receipt.supplierName }}
                             </button>
-                            <span v-else class="meta-value">—</span>
+                            <strong v-else>—</strong>
                         </div>
                         <div class="meta-item">
-                            <span class="meta-label">Invoice</span>
-                            <span class="meta-value">{{ receipt.invoiceNumber || '—' }}</span>
+                            <span>Invoice</span>
+                            <strong>{{ receipt.invoiceNumber || '—' }}</strong>
                         </div>
                         <div class="meta-item">
-                            <span class="meta-label">Received by</span>
-                            <span class="meta-value">{{ receipt.receivedBy?.fullName || receipt.receivedBy?.email || 'System' }}</span>
-                        </div>
-                        <div class="meta-item">
-                            <span class="meta-label">Received at</span>
-                            <span class="meta-value">{{ formatDate(receipt.receivedAt) }}</span>
-                            <span class="meta-sub">{{ formatTime(receipt.receivedAt) }}</span>
+                            <span>Received by</span>
+                            <strong>{{ receipt.receivedBy?.fullName || receipt.receivedBy?.email || 'System' }}</strong>
                         </div>
                         <div class="meta-item meta-item--highlight">
-                            <span class="meta-label">Total cost</span>
-                            <span class="meta-value meta-value--large">{{ formatMoney(receipt.totalCost) }}</span>
+                            <span>Total cost</span>
+                            <strong>{{ formatMoney(receipt.totalCost) }}</strong>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ── Line items ── -->
+                <section class="detail-card">
+                    <div class="card-title card-title--row">
+                        <div>
+                            <h2>Items received</h2>
+                            <p>{{ receipt.items.length }} line{{ receipt.items.length !== 1 ? 's' : '' }} in this shipment</p>
                         </div>
                     </div>
 
-                    <section class="receipt-card">
-                        <div class="card-header">
-                            <div>
-                                <h2>Line items</h2>
-                                <p>Items received in this shipment</p>
-                            </div>
-                            <span class="item-count-pill">{{ receipt.items.length }} item{{ receipt.items.length !== 1 ? 's' : '' }}</span>
-                        </div>
-
-                        <div v-if="receipt.items.length === 0" class="empty-state">
-                            <p>No line items recorded for this receipt.</p>
-                        </div>
-                        <div v-else class="table-wrap">
-                            <table class="lines-table">
-                                <thead>
-                                    <tr>
-                                        <th>Item</th>
-                                        <th>Type</th>
-                                        <th class="col-num">Qty</th>
-                                        <th class="col-num">Unit cost</th>
-                                        <th class="col-num">Total</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr v-for="item in receipt.items" :key="item.id">
-                                        <td>
-                                            <div class="item-name">{{ item.name }}</div>
-                                            <div v-if="item.unit" class="item-unit">{{ item.unit }}</div>
-                                        </td>
-                                        <td>
-                                            <span
-                                                :class="['type-chip', item.itemType === 'INGREDIENT' ? 'type-chip--ingredient' : 'type-chip--product']"
-                                            >
-                                                {{ item.itemType === 'INGREDIENT' ? 'Ingredient' : 'Product' }}
-                                            </span>
-                                        </td>
-                                        <td class="col-num">{{ formatQty(item.qtyReceived) }}</td>
-                                        <td class="col-num">{{ formatMoney(item.unitCost) }}</td>
-                                        <td class="col-num line-total">{{ formatMoney(item.qtyReceived * item.unitCost) }}</td>
-                                    </tr>
-                                </tbody>
-                                <tfoot>
-                                    <tr>
-                                        <td colspan="4" class="total-label">Total</td>
-                                        <td class="col-num total-amount">{{ formatMoney(receipt.totalCost) }}</td>
-                                    </tr>
-                                </tfoot>
-                            </table>
-                        </div>
-                    </section>
-
-                </template>
+                    <div v-if="receipt.items.length === 0" class="panel-state">
+                        No line items recorded for this receipt.
+                    </div>
+                    <div v-else class="table-wrap">
+                        <table class="lines-table">
+                            <thead>
+                                <tr>
+                                    <th>Item</th>
+                                    <th class="num">Qty</th>
+                                    <th class="num">Unit cost</th>
+                                    <th class="num">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="item in receipt.items" :key="item.id">
+                                    <td>
+                                        <div class="item-name">{{ item.name }}</div>
+                                        <div class="item-meta">
+                                            <span>{{ item.itemType === 'INGREDIENT' ? 'Ingredient' : 'Product' }}</span>
+                                            <span v-if="item.unit">{{ item.unit }}</span>
+                                        </div>
+                                    </td>
+                                    <td class="num">{{ formatQty(item.qtyReceived) }}</td>
+                                    <td class="num">{{ formatMoney(item.unitCost) }}</td>
+                                    <td class="num num--strong">{{ formatMoney(item.qtyReceived * item.unitCost) }}</td>
+                                </tr>
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <td colspan="3" class="tfoot-label">Total</td>
+                                    <td class="num num--strong">{{ formatMoney(receipt.totalCost) }}</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </section>
             </template>
         </div>
     </section>
@@ -156,7 +158,7 @@ const receiptId = computed(() => route.params.receiptId as string | undefined);
 const currentStoreLabel = computed(() => {
     const store = storeContext.currentStore;
     if (!store) return 'your store';
-    return `${store.name} · ${store.currency}`;
+    return store.name;
 });
 
 const formatMoney = (value: number) => {
@@ -272,8 +274,6 @@ watch(
 </script>
 
 <style scoped>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-
 /* ============================================================
    TOKENS
 ============================================================ */
@@ -284,99 +284,147 @@ watch(
     --c-accent-dark: #0f766e;
     --c-border: #e2e8f0;
     --c-surface: #ffffff;
-    --c-bg: #f8fafc;
-    font-family: 'Inter', sans-serif;
+    --c-bg: #f6f8f9;
     min-height: 100vh;
-    padding: 3rem 1.5rem 4rem;
+    padding: 2rem 1.5rem 3rem;
     background: var(--c-bg);
     color: var(--c-text);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
 /* ============================================================
-   SHELL / HEADER
+   SHELL & HEADER
 ============================================================ */
 .receipt-shell {
     max-width: 860px;
     margin: 0 auto;
     display: flex;
     flex-direction: column;
-    gap: 1.5rem;
+    gap: 1rem;
 }
 
-.receipt-header {
+.detail-header {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    margin-bottom: 0.25rem;
+}
+
+.back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    border: none;
+    background: none;
+    padding: 0;
+    margin-bottom: 0.75rem;
+    font-size: 0.82rem;
+    font-weight: 600;
+    font-family: inherit;
+    color: var(--c-muted);
+    cursor: pointer;
+    transition: color 0.15s;
+    align-self: flex-start;
+}
+
+.back-link:hover { color: var(--c-accent-dark); }
+
+.detail-header-row {
     display: flex;
     flex-wrap: wrap;
-    gap: 1.5rem;
-    align-items: flex-end;
+    gap: 1rem;
+    align-items: flex-start;
     justify-content: space-between;
 }
 
-.receipt-eyebrow {
-    display: inline-flex;
+.detail-title h1 {
+    display: flex;
     align-items: center;
-    padding: 0.3rem 0.75rem;
-    border-radius: 999px;
-    font-size: 0.7rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.14em;
-    background: #ccfbf1;
-    color: var(--c-accent-dark);
-    margin-bottom: 0.4rem;
-}
-
-.receipt-title h1 {
-    font-size: 2rem;
+    gap: 0.65rem;
+    flex-wrap: wrap;
+    font-size: 1.7rem;
     font-weight: 800;
     letter-spacing: -0.03em;
     margin: 0 0 0.35rem;
     color: var(--c-text);
 }
 
-.receipt-title p {
-    margin: 0;
-    color: var(--c-muted);
-    font-size: 0.95rem;
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    flex-wrap: wrap;
-}
-
 .receipt-id-badge {
-    font-family: 'SF Mono', ui-monospace, monospace;
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: var(--c-text);
-    background: var(--c-bg);
-    border: 1px solid var(--c-border);
-    border-radius: 6px;
-    padding: 0.15rem 0.5rem;
+    display: inline-flex;
+    align-items: center;
+    padding: 0.2rem 0.65rem;
+    border-radius: 999px;
+    background: rgba(13, 148, 136, 0.08);
+    color: var(--c-accent-dark);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    font-variant-numeric: tabular-nums;
+    transform: translateY(2px);
 }
 
-.receipt-actions {
+.detail-title p {
+    color: var(--c-muted);
+    line-height: 1.55;
+    margin: 0;
+    font-size: 0.92rem;
+}
+
+.header-actions {
     display: flex;
-    gap: 0.75rem;
+    gap: 0.6rem;
+    align-items: center;
     flex-wrap: wrap;
-    flex-shrink: 0;
 }
 
 /* ============================================================
-   PANEL STATE
+   CARDS
 ============================================================ */
+.detail-card {
+    background: var(--c-surface);
+    border: 1px solid var(--c-border);
+    border-radius: 16px;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.1rem;
+    min-width: 0;
+}
+
+.card-title h2 {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--c-text);
+    margin: 0;
+}
+
+.card-title p {
+    margin: 0.2rem 0 0;
+    color: var(--c-muted);
+    font-size: 0.82rem;
+}
+
+.card-title--row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
 .panel-state {
-    padding: 1.25rem 1.5rem;
-    border-radius: 10px;
-    background: #f0fdf9;
-    color: var(--c-accent-dark);
+    padding: 2rem;
+    border-radius: 12px;
+    background: #f1f5f9;
+    color: var(--c-muted);
     font-size: 0.9rem;
     text-align: center;
 }
 
 /* ============================================================
-   METADATA STRIP
+   META GRID
 ============================================================ */
-.meta-strip {
+.meta-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
     gap: 1px;
@@ -389,122 +437,109 @@ watch(
 .meta-item {
     display: flex;
     flex-direction: column;
-    gap: 0.2rem;
-    padding: 1rem 1.25rem;
-    background: var(--c-surface);
+    gap: 0.25rem;
+    padding: 0.85rem 1rem;
+    background: #fafbfc;
+    min-width: 0;
 }
 
-.meta-item--highlight {
-    background: #f0fdf9;
-}
-
-.meta-label {
-    font-size: 0.72rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: var(--c-muted);
-}
-
-.meta-value {
-    font-size: 0.95rem;
-    font-weight: 600;
-    color: var(--c-text);
-}
-
-.meta-value--large {
-    font-size: 1.3rem;
-    font-weight: 800;
-    letter-spacing: -0.02em;
-    color: var(--c-accent-dark);
-}
-
-.meta-sub {
-    font-size: 0.78rem;
-    color: var(--c-muted);
-}
-
-/* ============================================================
-   RECEIPT CARD
-============================================================ */
-.receipt-card {
-    background: var(--c-surface);
-    border: 1px solid var(--c-border);
-    border-radius: 16px;
-    padding: 1.75rem 2rem;
-}
-
-.card-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 1rem;
-    margin-bottom: 1.25rem;
-    flex-wrap: wrap;
-}
-
-.card-header h2 {
-    font-size: 1.05rem;
+.meta-item > span {
+    font-size: 0.66rem;
     font-weight: 700;
-    margin: 0 0 0.15rem;
-    color: var(--c-text);
-}
-
-.card-header p {
-    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
     color: var(--c-muted);
-    margin: 0;
 }
 
-.item-count-pill {
-    font-size: 0.78rem;
-    font-weight: 600;
-    color: var(--c-accent-dark);
-    background: #ccfbf1;
-    border-radius: 999px;
-    padding: 0.25rem 0.75rem;
+.meta-item > strong {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--c-text);
+    font-variant-numeric: tabular-nums;
+    overflow: hidden;
+    text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-/* ============================================================
-   LINE ITEMS TABLE
-============================================================ */
-.table-wrap {
-    overflow-x: auto;
+.meta-item--highlight { background: rgba(13, 148, 136, 0.06); }
+.meta-item--highlight > span { color: var(--c-accent-dark); }
+.meta-item--highlight > strong { color: var(--c-accent-dark); font-size: 1rem; }
+
+.meta-link {
+    border: none;
+    background: none;
+    padding: 0;
+    font-family: inherit;
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--c-accent-dark);
+    cursor: pointer;
+    text-align: left;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
+
+.meta-link:hover { text-decoration: underline; }
+
+/* ============================================================
+   LINES TABLE
+============================================================ */
+.table-wrap { overflow-x: auto; min-width: 0; }
 
 .lines-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 0.9rem;
-    font-family: 'Inter', sans-serif;
+    font-size: 0.875rem;
+    min-width: 480px;
 }
 
-.lines-table th {
+.lines-table thead th {
+    padding: 0.6rem 0.9rem;
     text-align: left;
-    padding: 0.6rem 0.75rem;
-    font-size: 0.72rem;
-    font-weight: 600;
+    font-size: 0.68rem;
+    font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.07em;
     color: var(--c-muted);
-    border-bottom: 2px solid var(--c-border);
+    border-bottom: 1.5px solid var(--c-border);
     white-space: nowrap;
 }
 
-.lines-table td {
-    padding: 0.85rem 0.75rem;
+.lines-table thead th.num { text-align: right; }
+
+.lines-table tbody tr {
     border-bottom: 1px solid var(--c-border);
-    color: var(--c-text);
+    transition: background 0.12s;
+}
+
+.lines-table tbody tr:hover { background: #f8fafc; }
+
+.lines-table tbody td {
+    padding: 0.8rem 0.9rem;
     vertical-align: middle;
 }
 
-.lines-table tbody tr:hover td {
-    background: var(--c-bg);
+.lines-table td.num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
 }
 
-.col-num {
+.num--strong { font-weight: 700; color: var(--c-text); }
+
+.lines-table tfoot td {
+    padding: 0.8rem 0.9rem;
+    border-top: 1.5px solid var(--c-border);
+}
+
+.tfoot-label {
     text-align: right;
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--c-muted);
 }
 
 .item-name {
@@ -512,161 +547,83 @@ watch(
     color: var(--c-text);
 }
 
-.item-unit {
-    font-size: 0.78rem;
+.item-meta {
+    font-size: 0.75rem;
     color: var(--c-muted);
+    display: flex;
+    gap: 0.35rem;
+    flex-wrap: wrap;
     margin-top: 0.1rem;
 }
 
-.type-chip {
-    display: inline-block;
-    padding: 0.2rem 0.65rem;
-    border-radius: 999px;
-    font-size: 0.72rem;
-    font-weight: 600;
-    letter-spacing: 0.02em;
-}
-
-.type-chip--product {
-    background: #ccfbf1;
-    color: #0f766e;
-}
-
-.type-chip--ingredient {
-    background: #ede9fe;
-    color: #6d28d9;
-}
-
-.line-total {
-    font-weight: 700;
+.item-meta span + span::before {
+    content: '·';
+    margin-right: 0.35rem;
+    color: #cbd5e1;
 }
 
 /* ============================================================
-   TABLE FOOTER (TOTAL)
+   BUTTONS
 ============================================================ */
-.lines-table tfoot td {
-    border-bottom: none;
-    border-top: 2px solid var(--c-border);
-    padding: 0.9rem 0.75rem;
-    background: var(--c-bg);
-}
-
-.total-label {
-    font-size: 0.82rem;
+.ghost-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.58rem 1rem;
+    border-radius: 9px;
+    border: 1.5px solid var(--c-border);
+    background: var(--c-surface);
+    color: var(--c-text);
+    font-size: 0.875rem;
     font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--c-muted);
-}
-
-.total-amount {
-    font-size: 1.05rem;
-    font-weight: 800;
-    color: var(--c-accent-dark);
-}
-
-/* ============================================================
-   LINK BUTTON
-============================================================ */
-.link-button {
-    border: none;
-    padding: 0;
-    background: none;
-    color: var(--c-accent-dark);
-    font-weight: 600;
-    font-size: 0.95rem;
-    font-family: 'Inter', sans-serif;
+    font-family: 'Inter', -apple-system, sans-serif;
     cursor: pointer;
-    text-align: left;
-    transition: color 0.15s;
+    transition: all 0.15s;
+    white-space: nowrap;
 }
 
-.link-button:hover {
-    text-decoration: underline;
-}
-
-/* ============================================================
-   EMPTY STATE
-============================================================ */
-.empty-state {
-    padding: 2rem 1rem;
-    text-align: center;
-    color: var(--c-muted);
-    font-size: 0.9rem;
-    border: 1px dashed var(--c-border);
-    border-radius: 10px;
-}
+.ghost-button:hover:not(:disabled) { border-color: var(--c-accent); color: var(--c-accent-dark); background: rgba(13, 148, 136, 0.05); }
+.ghost-button:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* ============================================================
    RESPONSIVE
 ============================================================ */
-@media (max-width: 600px) {
-    .meta-strip {
-        grid-template-columns: 1fr 1fr;
-    }
+@media (max-width: 640px) {
+    .receipt-page { padding: 1rem 0.875rem 2.5rem; }
+    .receipt-shell { gap: 0.875rem; }
+    .detail-title h1 { font-size: 1.35rem; }
 
-    .receipt-header {
-        flex-direction: column;
-        align-items: flex-start;
-    }
+    .header-actions { width: 100%; }
+    .header-actions .ghost-button { flex: 1; justify-content: center; }
+
+    .detail-card { padding: 1.1rem; border-radius: 12px; }
+
+    .meta-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
-
-/* ── Buttons ── */
-.ghost-button {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.35rem;
-    background: transparent;
-    border: 1px solid var(--c-border);
-    border-radius: 8px;
-    padding: 0.55rem 1rem;
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: #475569;
-    cursor: pointer;
-    font-family: 'Inter', sans-serif;
-    transition: background 0.15s, border-color 0.15s;
-    white-space: nowrap;
-    backdrop-filter: none;
-}
-
-.ghost-button:hover:not(:disabled) { background: #f1f5f9; border-color: #cbd5e1; }
-.ghost-button:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* ============================================================
    PRINT
 ============================================================ */
 @media print {
-    :global(body) {
-        background: #ffffff;
-    }
-
-    :global(nav) {
-        display: none !important;
-    }
-
     .receipt-page {
         padding: 0;
-        background: #ffffff;
+        background: #fff;
+        min-height: auto;
     }
 
-    .receipt-shell {
-        max-width: none;
-        margin: 0;
+    .no-print { display: none !important; }
+
+    .detail-card {
+        border: none;
+        border-radius: 0;
+        padding: 0.75rem 0;
     }
 
-    .meta-strip {
-        border: 1px solid #e2e8f0;
-    }
+    .detail-card + .detail-card { border-top: 1px solid #e2e8f0; }
 
-    .receipt-card {
-        border: 1px solid #e2e8f0;
-        box-shadow: none;
-    }
+    .meta-grid,
+    .meta-item { background: #fff; }
 
-    .no-print {
-        display: none !important;
-    }
+    .lines-table tbody tr:hover { background: transparent; }
 }
 </style>

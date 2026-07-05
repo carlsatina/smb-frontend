@@ -1,14 +1,26 @@
 <template>
     <section class="receipts-page">
         <div class="receipts-shell">
-            <header class="receipts-header">
-                <div class="receipts-title">
-                    <span class="receipts-eyebrow">Purchase Orders</span>
-                    <h1>Receipts</h1>
-                    <p>Browse received inventory and supplier invoices for {{ currentStoreLabel }}.</p>
-                </div>
-                <div class="receipts-actions">
-                    <button class="ghost-button" @click="goToPurchaseOrders">Back to POs</button>
+            <header class="list-header">
+                <button type="button" class="back-link" @click="goToPurchaseOrders">
+                    <mdicon name="arrow-left" size="15" />
+                    Purchase orders
+                </button>
+                <div class="list-header-row">
+                    <div class="list-title">
+                        <h1>Receipts</h1>
+                        <p>Received inventory and supplier invoices for {{ currentStoreLabel }}.</p>
+                    </div>
+                    <div class="header-actions">
+                        <button
+                            class="ghost-button"
+                            :disabled="isExporting || !storeContext.currentStoreId || !canExport"
+                            @click="exportReceipts"
+                        >
+                            <mdicon name="download-outline" size="16" />
+                            {{ isExporting ? 'Exporting…' : 'Export CSV' }}
+                        </button>
+                    </div>
                 </div>
             </header>
 
@@ -18,201 +30,185 @@
                 title="Receipts are available on Standard."
                 description="Upgrade to Standard to review receiving analytics and export receipts."
             />
+
+            <div v-else-if="!storeContext.currentStoreId && !isLoading" class="panel-state">
+                Select or create a store to view receipts.
+            </div>
+
             <template v-else>
-            <section class="receipts-summary">
-                <div class="panel-header">
-                    <div>
-                        <h2>Receipt analytics</h2>
-                        <p>Totals for the selected date range.</p>
+                <!-- STAT STRIP -->
+                <div class="stat-strip">
+                    <div class="stat">
+                        <span class="stat-value">{{ summary ? formatNumber(summary.totalReceipts) : '—' }}</span>
+                        <span class="stat-label">Receipts</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-value">{{ summary ? formatMoney(summary.totalSpend) : '—' }}</span>
+                        <span class="stat-label">Total spend</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-value">{{ summary ? formatMoney(summary.avgReceipt) : '—' }}</span>
+                        <span class="stat-label">Avg receipt</span>
                     </div>
                 </div>
 
-                <div v-if="!storeContext.currentStoreId" class="panel-state">
-                    Select or create a store to view receipt analytics.
-                </div>
-
-                <div v-else-if="isSummaryLoading" class="panel-state">Loading analytics...</div>
-
-                <div v-else-if="!summary" class="panel-state">No receipt data available for this range.</div>
-
-                <div v-else>
-                    <div class="summary-grid">
-                        <div class="summary-card">
-                            <span class="summary-label">Total receipts</span>
-                            <strong class="summary-value">{{ formatNumber(summary.totalReceipts) }}</strong>
-                            <span class="summary-sub">Transactions received</span>
+                <!-- ANALYTICS -->
+                <div v-if="summary" class="analytics-grid">
+                    <section class="analytics-card">
+                        <div class="card-title">
+                            <h2>Top suppliers</h2>
+                            <p>Click a supplier to filter the log</p>
                         </div>
-                        <div class="summary-card">
-                            <span class="summary-label">Total spend</span>
-                            <strong class="summary-value">{{ formatMoney(summary.totalSpend) }}</strong>
-                            <span class="summary-sub">Across suppliers</span>
+                        <div v-if="summary.suppliers.length === 0" class="analytics-empty">
+                            No supplier receipts in this range.
                         </div>
-                        <div class="summary-card">
-                            <span class="summary-label">Avg receipt</span>
-                            <strong class="summary-value">{{ formatMoney(summary.avgReceipt) }}</strong>
-                            <span class="summary-sub">Per receipt</span>
+                        <div v-else class="analytics-rows">
+                            <button
+                                v-for="supplier in summary.suppliers"
+                                :key="supplier.supplierId || supplier.supplierName"
+                                type="button"
+                                class="analytics-row analytics-row--clickable"
+                                :class="{ active: isSupplierActive(supplier) }"
+                                @click="applySupplierDrilldown(supplier)"
+                            >
+                                <div class="analytics-info">
+                                    <span class="analytics-name">{{ supplier.supplierName }}</span>
+                                    <span class="analytics-meta">{{ formatNumber(supplier.receiptCount) }} receipt{{ supplier.receiptCount !== 1 ? 's' : '' }}</span>
+                                </div>
+                                <span class="analytics-value">{{ formatMoney(supplier.totalSpend) }}</span>
+                            </button>
                         </div>
-                    </div>
+                    </section>
 
-                    <div class="analytics-grid">
-                        <div class="analytics-card">
-                            <div class="analytics-header">Top suppliers</div>
-                            <div v-if="summary.suppliers.length === 0" class="analytics-empty">
-                                No supplier receipts yet.
+                    <section class="analytics-card">
+                        <div class="card-title">
+                            <h2>Category spend</h2>
+                            <p>Received items by category</p>
+                        </div>
+                        <div v-if="summary.categories.length === 0" class="analytics-empty">
+                            No received items in this range.
+                        </div>
+                        <div v-else class="analytics-rows">
+                            <div
+                                v-for="category in summary.categories"
+                                :key="category.category"
+                                class="analytics-row"
+                            >
+                                <div class="analytics-info">
+                                    <span class="analytics-name">{{ category.category }}</span>
+                                    <span class="analytics-meta">{{ formatQty(category.qtyReceived) }} received</span>
+                                </div>
+                                <span class="analytics-value">{{ formatMoney(category.totalSpend) }}</span>
                             </div>
-                            <div v-else>
-                                <button
-                                    v-for="supplier in summary.suppliers"
-                                    :key="supplier.supplierId || supplier.supplierName"
-                                    type="button"
-                                    class="analytics-row analytics-row--clickable"
-                                    :class="{ active: isSupplierActive(supplier) }"
-                                    @click="applySupplierDrilldown(supplier)"
-                                >
-                                    <div>
-                                        <span class="analytics-name">{{ supplier.supplierName }}</span>
-                                        <span class="analytics-meta">
-                                            {{ formatNumber(supplier.receiptCount) }} receipts
-                                        </span>
-                                    </div>
-                                    <span class="analytics-value">{{ formatMoney(supplier.totalSpend) }}</span>
+                        </div>
+                    </section>
+                </div>
+
+                <!-- RECEIPT LOG -->
+                <section class="receipts-panel">
+                    <div class="panel-toolbar">
+                        <div class="search-wrap">
+                            <mdicon name="magnify" size="17" class="search-icon" />
+                            <input
+                                v-model="searchQuery"
+                                type="text"
+                                class="search-input"
+                                placeholder="Search supplier or invoice…"
+                            />
+                        </div>
+                        <select v-model="supplierFilter" class="supplier-select" @change="applyFilters">
+                            <option value="">All suppliers</option>
+                            <option value="UNASSIGNED">Unassigned</option>
+                            <option v-for="supplier in suppliers" :key="supplier.id" :value="supplier.id">
+                                {{ supplier.name }}
+                            </option>
+                        </select>
+                        <div class="date-range">
+                            <label class="date-field">
+                                <span>From</span>
+                                <input v-model="fromDate" type="date" class="date-input" @change="applyFilters" />
+                            </label>
+                            <label class="date-field">
+                                <span>To</span>
+                                <input v-model="toDate" type="date" class="date-input" @change="applyFilters" />
+                            </label>
+                        </div>
+                        <button class="ghost-button ghost-button--sm" @click="resetFilters">Reset</button>
+                    </div>
+
+                    <div v-if="supplierNameFilter" class="drill-chip">
+                        <span>Supplier: {{ supplierNameFilter }}</span>
+                        <button type="button" class="drill-chip-clear" aria-label="Clear supplier filter" @click="clearSupplierNameFilter">
+                            <mdicon name="close" size="14" />
+                        </button>
+                    </div>
+
+                    <SkeletonLoader v-if="isLoading" :rows="6" label="Loading receipts…" />
+
+                    <div v-else-if="receipts.length === 0" class="empty-state">
+                        <mdicon name="receipt-text-outline" size="34" class="empty-icon" />
+                        <p class="empty-heading">No receipts found</p>
+                        <p class="empty-sub">{{ hasActiveFilters ? 'Try adjusting your filters or date range.' : 'Receipts appear here as purchase orders are received.' }}</p>
+                    </div>
+
+                    <template v-else>
+                        <div class="table-wrap">
+                            <table class="receipts-table">
+                                <thead>
+                                    <tr>
+                                        <th>Receipt</th>
+                                        <th>Supplier</th>
+                                        <th>Invoice</th>
+                                        <th class="num">Total</th>
+                                        <th>Received by</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr
+                                        v-for="receipt in receipts"
+                                        :key="receipt.id"
+                                        class="row-clickable"
+                                        @click="goToReceipt(receipt.id)"
+                                    >
+                                        <td class="col-receipt">
+                                            <div class="receipt-id" :title="receipt.id">#{{ receipt.id.slice(0, 8) }}</div>
+                                            <div class="receipt-meta">{{ formatDate(receipt.receivedAt) }} · {{ formatTime(receipt.receivedAt) }}</div>
+                                        </td>
+                                        <td class="col-supplier">{{ receipt.supplierName || '—' }}</td>
+                                        <td class="col-invoice">{{ receipt.invoiceNumber || '—' }}</td>
+                                        <td class="col-total num">{{ formatMoney(receipt.totalCost) }}</td>
+                                        <td class="col-by">{{ receipt.receivedBy?.fullName || receipt.receivedBy?.email || 'System' }}</td>
+                                        <td class="col-open">
+                                            <mdicon name="chevron-right" size="18" class="row-chevron" />
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="pagination">
+                            <div class="pagination-info">
+                                <span>{{ total }} receipt{{ total !== 1 ? 's' : '' }}</span>
+                                <label class="pagination-size">
+                                    <span>Show</span>
+                                    <select v-model.number="pageSize">
+                                        <option v-for="size in pageSizeOptions" :key="size" :value="size">{{ size }}</option>
+                                    </select>
+                                </label>
+                            </div>
+                            <div v-if="totalPages > 1" class="pagination-controls">
+                                <button class="page-btn" :disabled="page === 1" @click="changePage(page - 1)" aria-label="Previous page">
+                                    <mdicon name="chevron-left" size="18" />
+                                </button>
+                                <span class="page-indicator">{{ page }} / {{ totalPages }}</span>
+                                <button class="page-btn" :disabled="page === totalPages" @click="changePage(page + 1)" aria-label="Next page">
+                                    <mdicon name="chevron-right" size="18" />
                                 </button>
                             </div>
                         </div>
-
-                        <div class="analytics-card">
-                            <div class="analytics-header">Category spend</div>
-                            <div v-if="summary.categories.length === 0" class="analytics-empty">
-                                No received items yet.
-                            </div>
-                            <div v-else>
-                                <div
-                                    v-for="category in summary.categories"
-                                    :key="category.category"
-                                    class="analytics-row"
-                                >
-                                    <div>
-                                        <span class="analytics-name">{{ category.category }}</span>
-                                        <span class="analytics-meta">
-                                            {{ formatQty(category.qtyReceived) }} received
-                                        </span>
-                                    </div>
-                                    <span class="analytics-value">{{ formatMoney(category.totalSpend) }}</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <section class="receipts-card">
-                <div class="panel-header">
-                    <div>
-                        <h2>Receipt log</h2>
-                        <p>Filter by date and drill into receipt detail.</p>
-                    </div>
-                </div>
-
-                <div class="log-toolbar">
-                    <div class="toolbar-left">
-                        <input v-model="searchQuery" class="search-input" placeholder="Search supplier or invoice" />
-                        <label class="filter-field">
-                            <span>Supplier</span>
-                            <select v-model="supplierFilter" @change="applyFilters">
-                                <option value="">All suppliers</option>
-                                <option value="UNASSIGNED">Unassigned</option>
-                                <option v-for="supplier in suppliers" :key="supplier.id" :value="supplier.id">
-                                    {{ supplier.name }}
-                                </option>
-                            </select>
-                        </label>
-                        <label class="filter-field">
-                            <span>From</span>
-                            <input v-model="fromDate" type="date" @change="applyFilters" />
-                        </label>
-                        <label class="filter-field">
-                            <span>To</span>
-                            <input v-model="toDate" type="date" @change="applyFilters" />
-                        </label>
-                    </div>
-                    <div class="toolbar-right">
-                        <button
-                            class="secondary-button button-compact"
-                            :disabled="isExporting || !storeContext.currentStoreId || !canExport"
-                            @click="exportReceipts"
-                        >
-                            {{ isExporting ? 'Exporting...' : 'Export CSV' }}
-                        </button>
-                        <button class="ghost-button button-compact" @click="resetFilters">Reset</button>
-                    </div>
-                </div>
-
-                <div v-if="supplierNameFilter" class="supplier-pill">
-                    <span>Custom supplier: {{ supplierNameFilter }}</span>
-                    <button type="button" class="ghost-button" @click="clearSupplierNameFilter">Clear</button>
-                </div>
-
-                <div v-if="!storeContext.currentStoreId" class="panel-state">
-                    Select or create a store to view receipts.
-                </div>
-
-                <div v-else-if="isLoading" class="panel-state">Loading receipts...</div>
-
-                <div v-else-if="receipts.length === 0" class="empty-state">
-                    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-                    <p class="empty-heading">No receipts found</p>
-                    <p class="empty-sub">Try adjusting your filters or date range.</p>
-                </div>
-                <div v-else class="table-wrap">
-                    <table class="receipts-table table-compact">
-                        <thead>
-                            <tr>
-                                <th>Receipt</th>
-                                <th>Supplier</th>
-                                <th>Invoice</th>
-                                <th>Total</th>
-                                <th>Received by</th>
-                                <th class="align-right">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr v-for="receipt in receipts" :key="receipt.id">
-                                <td>
-                                    <div class="receipt-id" :title="receipt.id">#{{ receipt.id.slice(0, 8) }}…</div>
-                                    <div class="receipt-meta">{{ formatDate(receipt.receivedAt) }} · {{ formatTime(receipt.receivedAt) }}</div>
-                                </td>
-                                <td>{{ receipt.supplierName || '—' }}</td>
-                                <td>{{ receipt.invoiceNumber || '—' }}</td>
-                                <td class="receipt-total">{{ formatMoney(receipt.totalCost) }}</td>
-                                <td>{{ receipt.receivedBy?.fullName || receipt.receivedBy?.email || 'System' }}</td>
-                                <td class="table-actions">
-                                    <button class="ghost-button" @click="goToReceipt(receipt.id)">View</button>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-
-                <div v-if="!isLoading && receipts.length > 0" class="pagination">
-                    <span class="pagination-info">{{ total }} receipt{{ total !== 1 ? 's' : '' }}</span>
-                    <div class="pagination-controls">
-                        <label class="pagination-size">
-                            <select v-model.number="pageSize">
-                                <option v-for="size in pageSizeOptions" :key="size" :value="size">
-                                    {{ size }} / page
-                                </option>
-                            </select>
-                        </label>
-                        <button class="page-btn" :disabled="page === 1" @click="changePage(page - 1)" aria-label="Previous page">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-                        </button>
-                        <span class="page-count">{{ page }} / {{ totalPages }}</span>
-                        <button class="page-btn" :disabled="page === totalPages" @click="changePage(page + 1)" aria-label="Next page">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-                        </button>
-                    </div>
-                </div>
-            </section>
+                    </template>
+                </section>
             </template>
         </div>
     </section>
@@ -233,6 +229,7 @@ import { useStoreContextStore } from '@/stores/storeContext';
 import { hasPlanFeature, openPlanUpgradeModal } from '@/utils/planAccess';
 import { zonedDayStartIso, zonedDayEndIso } from '@/utils/datetime';
 import PlanGate from '@/components/PlanGate.vue';
+import SkeletonLoader from '@/components/SkeletonLoader.vue';
 
 const router = useRouter();
 const route = useRoute();
@@ -259,7 +256,7 @@ const isApplyingQuery = ref(false);
 const currentStoreLabel = computed(() => {
     const store = storeContext.currentStore;
     if (!store) return 'your store';
-    return `${store.name} · ${store.currency}`;
+    return store.name;
 });
 
 // Use the store owner's plan tier for feature access (not the logged-in user's)
@@ -272,6 +269,10 @@ const isPlanLocked = computed(
         (planKnown.value && !hasPlanFeature(ownerPlanTier.value, 'purchaseOrders'))
 );
 const canExport = computed(() => planKnown.value && hasPlanFeature(ownerPlanTier.value, 'importExport'));
+
+const hasActiveFilters = computed(() =>
+    Boolean(searchQuery.value.trim() || supplierFilter.value || supplierNameFilter.value || fromDate.value || toDate.value)
+);
 
 const loadReceipts = async () => {
     if (isPlanLocked.value) {
@@ -646,8 +647,6 @@ watch(
 </script>
 
 <style scoped>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-
 /* ============================================================
    TOKENS
 ============================================================ */
@@ -658,333 +657,275 @@ watch(
     --c-accent-dark: #0f766e;
     --c-border: #e2e8f0;
     --c-surface: #ffffff;
-    --c-bg: #f8fafc;
-    font-family: 'Inter', sans-serif;
+    --c-bg: #f6f8f9;
     min-height: 100vh;
-    padding: 3rem 1.5rem 4rem;
+    padding: 2rem 1.5rem 3rem;
     background: var(--c-bg);
     color: var(--c-text);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
 /* ============================================================
-   SHELL / HEADER
+   SHELL & HEADER
 ============================================================ */
 .receipts-shell {
-    max-width: 1200px;
+    max-width: 1100px;
     margin: 0 auto;
     display: flex;
     flex-direction: column;
-    gap: 1.75rem;
+    gap: 1.25rem;
 }
 
-.receipts-header {
+.list-header {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+}
+
+.back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    border: none;
+    background: none;
+    padding: 0;
+    margin-bottom: 0.75rem;
+    font-size: 0.82rem;
+    font-weight: 600;
+    font-family: inherit;
+    color: var(--c-muted);
+    cursor: pointer;
+    transition: color 0.15s;
+    align-self: flex-start;
+}
+
+.back-link:hover { color: var(--c-accent-dark); }
+
+.list-header-row {
     display: flex;
     flex-wrap: wrap;
-    gap: 1.5rem;
-    align-items: flex-end;
+    gap: 1rem;
+    align-items: flex-start;
     justify-content: space-between;
 }
 
-.receipts-eyebrow {
-    display: inline-flex;
-    align-items: center;
-    padding: 0.3rem 0.75rem;
-    border-radius: 999px;
-    font-size: 0.7rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.14em;
-    background: #ccfbf1;
-    color: var(--c-accent-dark);
-    margin-bottom: 0.4rem;
-}
-
-.receipts-title h1 {
-    font-size: 2rem;
+.list-title h1 {
+    font-size: 1.9rem;
     font-weight: 800;
     letter-spacing: -0.03em;
     margin: 0 0 0.35rem;
     color: var(--c-text);
 }
 
-.receipts-title p {
-    margin: 0;
+.list-title p {
     color: var(--c-muted);
-    font-size: 0.95rem;
+    max-width: 480px;
+    line-height: 1.55;
+    margin: 0;
+    font-size: 0.92rem;
 }
 
-.receipts-actions {
+.header-actions {
     display: flex;
-    gap: 0.75rem;
-    flex-shrink: 0;
+    gap: 0.6rem;
+    align-items: center;
+    flex-wrap: wrap;
 }
 
 /* ============================================================
-   PANELS
+   STAT STRIP
 ============================================================ */
-.receipts-summary,
-.receipts-card {
+.stat-strip {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     background: var(--c-surface);
     border: 1px solid var(--c-border);
-    border-radius: 16px;
-    padding: 1.75rem 2rem;
+    border-radius: 14px;
+    overflow: hidden;
 }
 
-/* ============================================================
-   PANEL HEADER
-============================================================ */
-.panel-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 1.5rem;
-    flex-wrap: wrap;
-}
-
-.panel-header h2 {
-    font-size: 1.1rem;
-    font-weight: 700;
-    margin: 0 0 0.2rem;
-    color: var(--c-text);
-}
-
-.panel-header p {
-    color: var(--c-muted);
-    margin: 0;
-    font-size: 0.875rem;
-}
-
-.panel-actions {
-    display: flex;
-    gap: 0.75rem;
-    flex-wrap: wrap;
-    align-items: center;
-}
-
-/* ============================================================
-   SUMMARY KPI GRID
-============================================================ */
-.summary-grid {
-    margin-top: 1.5rem;
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 1rem;
-}
-
-.summary-card {
+.stat {
     display: flex;
     flex-direction: column;
     gap: 0.2rem;
-    padding: 1.1rem 1.25rem;
-    border: 1px solid var(--c-border);
-    border-radius: 12px;
-    background: var(--c-bg);
+    padding: 1rem 1.4rem;
+    border-left: 1px solid var(--c-border);
+    min-width: 0;
 }
 
-.summary-label {
-    font-size: 0.72rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: var(--c-muted);
-}
+.stat:first-child { border-left: none; }
 
-.summary-value {
-    font-size: 1.6rem;
+.stat-value {
+    font-size: 1.5rem;
     font-weight: 800;
     letter-spacing: -0.03em;
-    color: var(--c-text);
     line-height: 1.1;
+    color: var(--c-text);
+    font-variant-numeric: tabular-nums;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
-.summary-sub {
-    font-size: 0.78rem;
+.stat-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
     color: var(--c-muted);
+    white-space: nowrap;
 }
 
 /* ============================================================
-   ANALYTICS GRID
+   ANALYTICS
 ============================================================ */
 .analytics-grid {
-    margin-top: 1.25rem;
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-    gap: 1rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.25rem;
 }
 
 .analytics-card {
+    background: var(--c-surface);
     border: 1px solid var(--c-border);
-    border-radius: 12px;
-    padding: 1rem 1.25rem;
-    background: var(--c-bg);
+    border-radius: 16px;
+    padding: 1.25rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    min-width: 0;
 }
 
-.analytics-header {
-    font-size: 0.78rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
+.card-title h2 {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--c-text);
+    margin: 0;
+}
+
+.card-title p {
+    margin: 0.2rem 0 0;
     color: var(--c-muted);
-    margin-bottom: 0.75rem;
+    font-size: 0.82rem;
+}
+
+.analytics-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
 }
 
 .analytics-row {
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    padding: 0.55rem 0;
-    border-top: 1px solid var(--c-border);
-    gap: 1rem;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.55rem 0.7rem;
+    border-radius: 10px;
+    border: 1px solid transparent;
+    background: transparent;
+    font-family: inherit;
+    text-align: left;
+    width: 100%;
 }
 
 .analytics-row--clickable {
-    background: transparent;
-    border: none;
-    border-top: 1px solid var(--c-border);
-    width: 100%;
-    text-align: left;
     cursor: pointer;
-    padding: 0.55rem 0;
+    transition: background 0.12s, border-color 0.12s;
+}
+
+.analytics-row--clickable:hover { background: #f8fafc; }
+
+.analytics-row.active {
+    background: rgba(13, 148, 136, 0.06);
+    border-color: rgba(13, 148, 136, 0.35);
+}
+
+.analytics-info {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 1rem;
-    color: var(--c-text);
-    font-family: 'Inter', sans-serif;
-    font-size: 0.9rem;
-    transition: color 0.15s;
-}
-
-.analytics-row--clickable:hover {
-    color: var(--c-accent-dark);
-}
-
-.analytics-row--clickable.active {
-    color: var(--c-accent-dark);
-    font-weight: 600;
-}
-
-.analytics-row:first-of-type,
-.analytics-row--clickable:first-of-type {
-    border-top: none;
-}
-
-.analytics-name {
-    font-weight: 600;
-    font-size: 0.9rem;
-    display: block;
-}
-
-.analytics-meta {
-    font-size: 0.75rem;
-    color: var(--c-muted);
-    display: block;
-    margin-top: 0.1rem;
-}
-
-.analytics-value {
-    font-weight: 700;
-    font-size: 0.9rem;
-    white-space: nowrap;
-}
-
-.analytics-empty {
-    color: var(--c-muted);
-    font-size: 0.875rem;
-    padding: 0.25rem 0;
-}
-
-/* ============================================================
-   SUPPLIER DRILLDOWN PILL
-============================================================ */
-.supplier-pill {
-    margin-top: 1rem;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
-    padding: 0.6rem 0.9rem;
-    border-radius: 8px;
-    border: 1px solid #99f6e4;
-    background: #f0fdf9;
-    color: var(--c-accent-dark);
-    font-size: 0.875rem;
-    font-weight: 600;
-    flex-wrap: wrap;
-}
-
-/* ============================================================
-   LOG TOOLBAR
-============================================================ */
-.log-toolbar {
-    margin-top: 1.25rem;
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: 1rem;
-    flex-wrap: wrap;
-}
-
-.toolbar-left {
-    display: flex;
-    align-items: flex-end;
-    gap: 0.75rem;
-    flex-wrap: wrap;
-    flex: 1;
+    flex-direction: column;
+    gap: 0.1rem;
     min-width: 0;
 }
 
-.toolbar-right {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    flex-shrink: 0;
+.analytics-name {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--c-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.analytics-meta {
+    font-size: 0.72rem;
+    color: var(--c-muted);
+}
+
+.analytics-value {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--c-text);
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.analytics-empty {
+    font-size: 0.82rem;
+    color: var(--c-muted);
+    padding: 0.5rem 0;
 }
 
 /* ============================================================
-   FILTERS
+   PANEL & TOOLBAR
 ============================================================ */
-.filter-field {
+.receipts-panel {
+    background: var(--c-surface);
+    border: 1px solid var(--c-border);
+    border-radius: 16px;
+    padding: 1.25rem 1.5rem 1.5rem;
     display: flex;
     flex-direction: column;
-    gap: 0.35rem;
-    font-size: 0.78rem;
-    color: var(--c-muted);
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
+    gap: 1rem;
+    min-width: 0;
 }
 
-.filter-field input,
-.filter-field select {
-    font-family: 'Inter', sans-serif;
-    border-radius: 8px;
-    border: 1px solid var(--c-border);
-    padding: 0.6rem 0.75rem;
-    font-size: 0.9rem;
-    color: var(--c-text);
-    background: var(--c-surface);
-    transition: border-color 0.15s;
+.panel-toolbar {
+    display: flex;
+    gap: 0.75rem;
+    align-items: flex-end;
+    flex-wrap: wrap;
 }
 
-.filter-field input:focus,
-.filter-field select:focus {
-    outline: none;
-    border-color: var(--c-accent);
-    box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.12);
+.search-wrap {
+    position: relative;
+    flex: 1;
+    min-width: 200px;
+}
+
+.search-icon {
+    position: absolute;
+    left: 0.7rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #94a3b8;
+    pointer-events: none;
 }
 
 .search-input {
-    font-family: 'Inter', sans-serif;
-    border-radius: 8px;
-    border: 1px solid var(--c-border);
-    padding: 0.6rem 0.85rem;
-    min-width: 200px;
-    font-size: 0.9rem;
+    border-radius: 9px;
+    border: 1.5px solid var(--c-border);
+    padding: 0.55rem 0.9rem 0.55rem 2.3rem;
+    width: 100%;
+    box-sizing: border-box;
+    font-size: 0.875rem;
+    font-family: 'Inter', -apple-system, sans-serif;
     color: var(--c-text);
     background: var(--c-surface);
-    transition: border-color 0.15s;
+    transition: border-color 0.15s, box-shadow 0.15s;
 }
+
+.search-input::placeholder { color: #94a3b8; }
 
 .search-input:focus {
     outline: none;
@@ -992,132 +933,230 @@ watch(
     box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.12);
 }
 
-/* ============================================================
-   PANEL STATE
-============================================================ */
-.panel-state {
-    margin-top: 1.5rem;
-    padding: 1.25rem 1.5rem;
-    border-radius: 10px;
-    background: #f0fdf9;
-    color: var(--c-accent-dark);
-    font-size: 0.9rem;
+.supplier-select {
+    border: 1.5px solid var(--c-border);
+    border-radius: 9px;
+    padding: 0.55rem 0.85rem;
+    font-size: 0.875rem;
+    font-family: 'Inter', -apple-system, sans-serif;
+    color: var(--c-text);
+    background: var(--c-surface);
+    transition: border-color 0.15s, box-shadow 0.15s;
+    min-width: 170px;
 }
 
-/* ============================================================
-   EMPTY STATE
-============================================================ */
-.empty-state {
+.supplier-select:focus {
+    outline: none;
+    border-color: var(--c-accent);
+    box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.12);
+}
+
+.date-range {
+    display: flex;
+    gap: 0.5rem;
+    align-items: flex-end;
+}
+
+.date-field {
     display: flex;
     flex-direction: column;
+    gap: 0.25rem;
+    font-size: 0.62rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--c-muted);
+}
+
+.date-input {
+    border: 1.5px solid var(--c-border);
+    border-radius: 9px;
+    padding: 0.5rem 0.7rem;
+    font-size: 0.84rem;
+    font-family: 'Inter', -apple-system, sans-serif;
+    color: var(--c-text);
+    background: var(--c-surface);
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.date-input:focus {
+    outline: none;
+    border-color: var(--c-accent);
+    box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.12);
+}
+
+.drill-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    align-self: flex-start;
+    padding: 0.35rem 0.5rem 0.35rem 0.85rem;
+    border-radius: 999px;
+    background: rgba(13, 148, 136, 0.08);
+    border: 1px solid rgba(13, 148, 136, 0.25);
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--c-accent-dark);
+}
+
+.drill-chip-clear {
+    display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 0.5rem;
-    padding: 3rem 1rem;
-    color: var(--c-muted);
-    margin-top: 1.25rem;
-    border: 1px dashed var(--c-border);
-    border-radius: 12px;
+    width: 20px;
+    height: 20px;
+    border-radius: 999px;
+    border: none;
+    background: rgba(13, 148, 136, 0.12);
+    color: var(--c-accent-dark);
+    cursor: pointer;
+    transition: background 0.12s;
 }
 
-.empty-heading {
-    font-size: 1rem;
-    font-weight: 600;
-    color: var(--c-text);
-    margin: 0.25rem 0 0;
-}
+.drill-chip-clear:hover { background: rgba(13, 148, 136, 0.22); }
 
-.empty-sub {
-    font-size: 0.875rem;
+.panel-state {
+    padding: 2rem;
+    border-radius: 10px;
+    background: #f1f5f9;
     color: var(--c-muted);
-    margin: 0;
+    font-size: 0.9rem;
+    text-align: center;
 }
 
 /* ============================================================
    TABLE
 ============================================================ */
-.table-wrap {
-    margin-top: 1.25rem;
-    overflow-x: auto;
-}
+.table-wrap { overflow-x: auto; min-width: 0; }
 
 .receipts-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 0.9rem;
-    font-family: 'Inter', sans-serif;
+    font-size: 0.875rem;
 }
 
-.receipts-table th {
+.receipts-table thead th {
+    padding: 0.6rem 0.9rem;
     text-align: left;
-    padding: 0.6rem 0.75rem;
-    font-size: 0.72rem;
-    font-weight: 600;
+    font-size: 0.68rem;
+    font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.07em;
     color: var(--c-muted);
-    border-bottom: 2px solid var(--c-border);
+    border-bottom: 1.5px solid var(--c-border);
     white-space: nowrap;
 }
 
-.receipts-table td {
-    padding: 0.75rem;
+.receipts-table thead th.num { text-align: right; }
+
+.receipts-table tbody tr {
     border-bottom: 1px solid var(--c-border);
-    color: var(--c-text);
+    transition: background 0.12s;
+}
+
+.receipts-table tbody tr:last-child { border-bottom: none; }
+.receipts-table tbody tr:hover { background: #f8fafc; }
+.receipts-table tbody tr.row-clickable { cursor: pointer; }
+
+.receipts-table tbody td {
+    padding: 0.85rem 0.9rem;
     vertical-align: middle;
 }
 
-.receipts-table tbody tr:last-child td {
-    border-bottom: none;
-}
-
-.receipts-table tbody tr:hover td {
-    background: var(--c-bg);
+.receipts-table td.num {
+    text-align: right;
+    font-weight: 700;
+    color: var(--c-text);
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
 }
 
 .receipt-id {
     font-weight: 600;
-    font-size: 0.88rem;
+    color: var(--c-text);
+    font-variant-numeric: tabular-nums;
 }
 
 .receipt-meta {
-    font-size: 0.78rem;
+    font-size: 0.75rem;
     color: var(--c-muted);
     margin-top: 0.1rem;
+    white-space: nowrap;
 }
 
-.receipt-total {
+.col-supplier { font-weight: 600; }
+.col-invoice, .col-by { color: var(--c-muted); font-size: 0.84rem; }
+
+.col-open { text-align: right; width: 34px; }
+.row-chevron { color: #cbd5e1; }
+.receipts-table tbody tr:hover .row-chevron { color: var(--c-accent-dark); }
+
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 2.5rem 1rem;
+    text-align: center;
+}
+
+.empty-icon { color: #cbd5e1; margin-bottom: 0.35rem; }
+
+.empty-heading {
+    margin: 0;
+    font-size: 0.95rem;
     font-weight: 700;
     color: var(--c-text);
 }
 
-.align-right {
-    text-align: right;
-}
-
-.table-actions {
-    display: flex;
-    justify-content: flex-end;
-    align-items: center;
-    gap: 0.5rem;
-    white-space: nowrap;
+.empty-sub {
+    margin: 0;
+    font-size: 0.82rem;
+    color: var(--c-muted);
 }
 
 /* ============================================================
    PAGINATION
 ============================================================ */
 .pagination {
-    margin-top: 1.25rem;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 1rem;
     flex-wrap: wrap;
+    gap: 0.75rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--c-border);
+    font-size: 0.85rem;
+    color: var(--c-muted);
 }
 
 .pagination-info {
-    font-size: 0.85rem;
-    color: var(--c-muted);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    font-size: 0.82rem;
+}
+
+.pagination-size {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.pagination-size select {
+    border: 1.5px solid var(--c-border);
+    border-radius: 6px;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.82rem;
+    font-family: 'Inter', -apple-system, sans-serif;
+    color: var(--c-text);
+    background: var(--c-surface);
+    cursor: pointer;
+}
+
+.pagination-size select:focus {
+    outline: none;
+    border-color: var(--c-accent);
 }
 
 .pagination-controls {
@@ -1126,89 +1165,139 @@ watch(
     gap: 0.5rem;
 }
 
-.pagination-size select {
-    font-family: 'Inter', sans-serif;
+.page-indicator {
     font-size: 0.82rem;
-    border: 1px solid var(--c-border);
-    border-radius: 6px;
-    padding: 0.35rem 0.6rem;
-    color: var(--c-text);
-    background: var(--c-surface);
-    cursor: pointer;
+    min-width: 50px;
+    text-align: center;
 }
 
 .page-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
+    width: 30px;
+    height: 30px;
     border-radius: 6px;
-    border: 1px solid var(--c-border);
-    background: var(--c-surface);
+    border: 1.5px solid var(--c-border);
+    background: transparent;
     color: var(--c-text);
     cursor: pointer;
-    transition: background 0.15s, border-color 0.15s;
-    padding: 0;
+    transition: all 0.15s;
 }
 
-.page-btn:hover:not(:disabled) {
-    background: var(--c-bg);
-    border-color: var(--c-accent);
-    color: var(--c-accent);
-}
+.page-btn:hover:not(:disabled) { border-color: var(--c-accent); color: var(--c-accent-dark); background: rgba(13, 148, 136, 0.05); }
+.page-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 
-.page-btn:disabled {
-    opacity: 0.35;
-    cursor: not-allowed;
-}
-
-.page-count {
-    font-size: 0.85rem;
-    color: var(--c-muted);
-    min-width: 48px;
-    text-align: center;
-}
-
-/* ── Buttons ── */
+/* ============================================================
+   BUTTONS
+============================================================ */
 .ghost-button {
     display: inline-flex;
     align-items: center;
-    justify-content: center;
-    gap: 0.35rem;
-    background: transparent;
-    border: 1px solid var(--c-border);
-    border-radius: 8px;
-    padding: 0.55rem 1rem;
+    gap: 0.4rem;
+    padding: 0.58rem 1rem;
+    border-radius: 9px;
+    border: 1.5px solid var(--c-border);
+    background: var(--c-surface);
+    color: var(--c-text);
     font-size: 0.875rem;
     font-weight: 600;
-    color: #475569;
+    font-family: 'Inter', -apple-system, sans-serif;
     cursor: pointer;
-    font-family: 'Inter', sans-serif;
-    transition: background 0.15s, border-color 0.15s;
+    transition: all 0.15s;
     white-space: nowrap;
-    backdrop-filter: none;
 }
 
-.ghost-button:hover:not(:disabled) { background: #f1f5f9; border-color: #cbd5e1; }
-.ghost-button:disabled { opacity: 0.5; cursor: not-allowed; }
+.ghost-button:hover:not(:disabled) { border-color: var(--c-accent); color: var(--c-accent-dark); background: rgba(13, 148, 136, 0.05); }
+.ghost-button:disabled { opacity: 0.4; cursor: not-allowed; }
 
-.ghost-button.button-compact {
-    padding: 0.35rem 0.75rem;
+.ghost-button--sm {
+    padding: 0.5rem 0.85rem;
     font-size: 0.8rem;
 }
 
 /* ============================================================
    RESPONSIVE
 ============================================================ */
-@media (max-width: 720px) {
-    .receipts-header {
-        flex-direction: column;
-        align-items: flex-start;
+@media (max-width: 900px) {
+    .analytics-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 768px) {
+    .panel-toolbar { flex-direction: column; align-items: stretch; }
+    .search-wrap { min-width: 0; }
+    .supplier-select { min-width: 0; width: 100%; }
+    .date-range { width: 100%; }
+    .date-field { flex: 1; }
+    .date-input { width: 100%; box-sizing: border-box; }
+    .panel-toolbar .ghost-button--sm { align-self: flex-start; }
+}
+
+@media (max-width: 640px) {
+    .receipts-page { padding: 1rem 0.875rem 2.5rem; }
+    .receipts-shell { gap: 1rem; }
+    .list-title h1 { font-size: 1.5rem; }
+
+    .header-actions { width: 100%; }
+    .header-actions .ghost-button { flex: 1; justify-content: center; }
+
+    .stat { padding: 0.75rem 0.7rem; }
+    .stat-value { font-size: 0.95rem; }
+    .stat-label { font-size: 0.6rem; }
+
+    .receipts-panel { padding: 1rem 0 0.75rem; border-radius: 12px; }
+    .panel-toolbar { padding: 0 1rem; }
+    .drill-chip { margin: 0 1rem; }
+    .pagination { padding: 1rem 1rem 0; flex-direction: column; align-items: flex-start; gap: 0.5rem; }
+
+    /* ── Table → card view ── */
+    .receipts-table thead { display: none; }
+    .receipts-table,
+    .receipts-table tbody { display: block; }
+
+    .receipts-table tbody tr {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        grid-template-rows: auto auto auto;
+        padding: 0.875rem 1rem;
+        gap: 0.15rem 0.625rem;
+        border-bottom: 1px solid var(--c-border);
+    }
+    .receipts-table tbody tr:last-child { border-bottom: none; }
+
+    .receipts-table tbody td {
+        padding: 0;
+        border: none;
+        vertical-align: top;
     }
 
-    .receipts-page {
-        padding: 2rem 1rem 3rem;
+    .receipts-table tbody td.col-receipt { grid-column: 1; grid-row: 1; }
+    .receipts-table tbody td.col-total {
+        grid-column: 2;
+        grid-row: 1;
+        display: flex;
+        justify-content: flex-end;
+        align-items: flex-start;
     }
+    .receipts-table tbody td.col-supplier {
+        grid-column: 1;
+        grid-row: 2;
+        padding-top: 0.35rem;
+        font-size: 0.82rem;
+    }
+    .receipts-table tbody td.col-invoice {
+        grid-column: 2;
+        grid-row: 2;
+        padding-top: 0.35rem;
+        text-align: right;
+        font-size: 0.78rem;
+    }
+    .receipts-table tbody td.col-by {
+        grid-column: 1 / -1;
+        grid-row: 3;
+        padding-top: 0.15rem;
+        font-size: 0.75rem;
+    }
+    .receipts-table tbody td.col-open { display: none; }
 }
 </style>
