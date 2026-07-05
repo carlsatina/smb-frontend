@@ -1,5 +1,6 @@
 <template>
     <section class="store-page">
+        <PullToRefresh :on-refresh="refreshStores" :disabled="storeContext.isLoading" />
 
         <teleport to="body">
             <transition name="modal-fade" appear>
@@ -11,7 +12,7 @@
                                 <p>Set the defaults that drive pricing and inventory controls.</p>
                             </div>
                             <button class="st-modal-close" @click="closeCreateModal" aria-label="Close">
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                                <mdicon name="close" size="18" />
                             </button>
                         </div>
 
@@ -104,18 +105,28 @@
                     <h1>Stores</h1>
                     <p>Switch between storefronts, tune inventory rules, and keep teams aligned.</p>
                 </div>
-                <div class="store-kpis">
-                    <div class="kpi-card">
-                        <span class="kpi-label">Total stores</span>
-                        <span class="kpi-value">{{ storeCount }}</span>
-                    </div>
-                    <div class="kpi-card">
-                        <span class="kpi-label">Active store</span>
-                        <span class="kpi-value">{{ currentStoreName }}</span>
-                        <span class="kpi-sub">Role: {{ currentStoreRole }}</span>
-                    </div>
+                <div class="header-actions">
+                    <button class="primary-button" @click="openCreateModal">
+                        <mdicon name="plus" size="16" />
+                        Create store
+                    </button>
                 </div>
             </header>
+
+            <div class="stat-strip">
+                <div class="stat">
+                    <span class="stat-value">{{ storeCount }}</span>
+                    <span class="stat-label">Total stores</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-value stat-value--text">{{ currentStoreName }}</span>
+                    <span class="stat-label">Active store</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-value stat-value--text">{{ currentStoreRole }}</span>
+                    <span class="stat-label">Your role</span>
+                </div>
+            </div>
 
             <div class="store-content">
                 <section class="store-list-panel">
@@ -124,13 +135,13 @@
                             <h2>Your stores</h2>
                             <p>Tap a card to switch context instantly.</p>
                         </div>
-                        <button class="st-btn-primary" @click="openCreateModal">Create store</button>
                     </div>
 
-                    <div v-if="storeContext.isLoading" class="panel-state">Loading stores...</div>
-                    <div v-else-if="storeContext.stores.length === 0" class="panel-empty">
-                        <h3>No stores yet</h3>
-                        <p>{{ emptyMessage }}</p>
+                    <SkeletonLoader v-if="storeContext.isLoading" :rows="4" label="Loading stores…" />
+                    <div v-else-if="storeContext.stores.length === 0" class="empty-state">
+                        <mdicon name="storefront-outline" size="34" class="empty-icon" />
+                        <p class="empty-heading">No stores yet</p>
+                        <p class="empty-sub">{{ emptyMessage }}</p>
                     </div>
                     <div v-else class="store-grid">
                         <article
@@ -262,6 +273,8 @@ import { useRouter } from 'vue-router';
 import { onClickOutside } from '@vueuse/core';
 import { resendVerification } from '@/api/auth';
 import { createStore } from '@/api/stores';
+import PullToRefresh from '@/components/PullToRefresh.vue';
+import SkeletonLoader from '@/components/SkeletonLoader.vue';
 import { useStoreContextStore } from '@/stores/storeContext';
 import type { StoreSummary } from '@/stores/storeContext';
 import { useToast } from '@/composables/useToast';
@@ -649,6 +662,13 @@ const goToAccountPlan = () => {
     router.push('/account/plan');
 };
 
+const refreshStores = async () => {
+    await Promise.all([
+        storeContext.fetchStores(),
+        userContext.fetchMe(true),
+    ]);
+};
+
 onClickOutside(createModalRef, () => {
     if (!isCreating.value) closeCreateModal();
 });
@@ -707,8 +727,6 @@ watch(
 </script>
 
 <style scoped>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-
 /* ============================================================
    TOKENS
 ============================================================ */
@@ -719,11 +737,13 @@ watch(
     --c-accent-dark: #0f766e;
     --c-accent-soft: rgba(13, 148, 136, 0.1);
     --c-border: #e2e8f0;
+    --c-surface: #ffffff;
+    --c-bg: #f6f8f9;
     --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
     --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.08);
     min-height: 100vh;
     padding: 2rem 1.5rem 3rem;
-    background: #f8fafc;
+    background: var(--c-bg);
     color: var(--c-text);
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
@@ -780,45 +800,80 @@ watch(
     font-size: 0.9rem;
 }
 
-/* ============================================================
-   KPI CARDS
-============================================================ */
-.store-kpis {
+.header-actions {
     display: flex;
+    gap: 0.6rem;
+    align-items: center;
     flex-wrap: wrap;
-    gap: 0.75rem;
-    min-width: 0;
 }
 
-.kpi-card {
-    background: white;
+.primary-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.6rem 1.1rem;
+    border-radius: 9px;
+    border: none;
+    background: var(--c-accent);
+    color: #fff;
+    font-size: 0.875rem;
+    font-weight: 600;
+    font-family: 'Inter', -apple-system, sans-serif;
+    cursor: pointer;
+    transition: background 0.15s, box-shadow 0.15s, transform 0.15s;
+    box-shadow: 0 2px 8px rgba(13, 148, 136, 0.25);
+    white-space: nowrap;
+}
+
+.primary-button:hover:not(:disabled) { background: var(--c-accent-dark); transform: translateY(-1px); box-shadow: 0 4px 14px rgba(13, 148, 136, 0.35); }
+.primary-button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+/* ============================================================
+   STAT STRIP
+============================================================ */
+.stat-strip {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    background: var(--c-surface);
     border: 1px solid var(--c-border);
-    border-radius: 12px;
-    padding: 0.75rem 1.1rem;
+    border-radius: 14px;
+    overflow: hidden;
+}
+
+.stat {
     display: flex;
     flex-direction: column;
     gap: 0.2rem;
-    min-width: 130px;
-    box-shadow: var(--shadow-sm);
+    padding: 1rem 1.4rem;
+    border-left: 1px solid var(--c-border);
+    min-width: 0;
 }
 
-.kpi-label {
-    font-size: 0.68rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: var(--c-muted);
-}
+.stat:first-child { border-left: none; }
 
-.kpi-value {
-    font-size: 1.1rem;
-    font-weight: 700;
+.stat-value {
+    font-size: 1.5rem;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
     color: var(--c-text);
+    font-variant-numeric: tabular-nums;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
-.kpi-sub {
-    font-size: 0.75rem;
+.stat-value--text { font-size: 1.15rem; padding-top: 0.2rem; }
+
+.stat-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
     color: var(--c-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 /* ============================================================
@@ -864,29 +919,29 @@ watch(
 /* ============================================================
    EMPTY / STATE
 ============================================================ */
-.panel-state,
-.panel-empty {
-    padding: 1.5rem;
-    border-radius: 12px;
-    background: var(--c-accent-soft);
-    color: var(--c-accent-dark);
-    display: grid;
-    gap: 0.75rem;
-    font-size: 0.875rem;
-    line-height: 1.55;
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 2.5rem 1rem;
+    text-align: center;
 }
 
-.panel-empty h3 {
-    margin: 0 0 0.25rem;
-    font-size: 1rem;
+.empty-icon { color: #cbd5e1; margin-bottom: 0.35rem; }
+
+.empty-heading {
+    margin: 0;
+    font-size: 0.95rem;
     font-weight: 700;
     color: var(--c-text);
 }
 
-.panel-state-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
+.empty-sub {
+    margin: 0;
+    font-size: 0.82rem;
+    color: var(--c-muted);
+    max-width: 420px;
 }
 
 /* ============================================================
@@ -1407,5 +1462,21 @@ watch(
         margin-top: 0.5rem;
         justify-content: flex-start;
     }
+}
+
+@media (max-width: 640px) {
+    .store-page { padding: 1rem 0.875rem 2.5rem; }
+    .store-shell { gap: 1rem; }
+    .store-title h1 { font-size: 1.5rem; }
+
+    .header-actions { width: 100%; }
+    .header-actions .primary-button { flex: 1; justify-content: center; }
+
+    .stat { padding: 0.75rem 0.7rem; }
+    .stat-value { font-size: 1rem; }
+    .stat-value--text { font-size: 0.9rem; }
+    .stat-label { font-size: 0.6rem; }
+
+    .store-list-panel { padding: 1.25rem 1rem; }
 }
 </style>

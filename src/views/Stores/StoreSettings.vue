@@ -1,5 +1,6 @@
 <template>
     <section class="st-page">
+        <PullToRefresh :on-refresh="refreshSettings" :disabled="storeContext.isLoading || isTeamLoading" />
         <div class="st-shell">
 
             <!-- Page header -->
@@ -23,35 +24,35 @@
                     <div class="st-sidebar-group">
                         <span class="st-sidebar-group-label">Store</span>
                         <button class="st-sidebar-item" :class="{ 'is-active': activeSection === 'profile' }" @click="activeSection = 'profile'">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="18" rx="2"/><path d="M8 10h8M8 14h5"/></svg>
+                            <mdicon name="store-outline" size="16" />
                             Store profile
                         </button>
                         <button class="st-sidebar-item" :class="{ 'is-active': activeSection === 'payment' }" @click="activeSection = 'payment'">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2"/><path d="M1 10h22"/></svg>
+                            <mdicon name="credit-card-outline" size="16" />
                             Payment methods
                         </button>
                         <button class="st-sidebar-item" :class="{ 'is-active': activeSection === 'catalog' }" @click="activeSection = 'catalog'">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 10h16M4 14h10"/></svg>
+                            <mdicon name="format-list-bulleted" size="16" />
                             Catalog defaults
                         </button>
                         <button class="st-sidebar-item" :class="{ 'is-active': activeSection === 'team' }" @click="activeSection = 'team'">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                            <mdicon name="account-group-outline" size="16" />
                             Team &amp; roles
                             <span v-if="pendingInvites.length" class="st-sidebar-badge">{{ pendingInvites.length }}</span>
                         </button>
                         <button class="st-sidebar-item" :class="{ 'is-active': activeSection === 'plan' }" @click="activeSection = 'plan'">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+                            <mdicon name="crown-outline" size="16" />
                             Plan &amp; subscription
                         </button>
                         <button class="st-sidebar-item" :class="{ 'is-active': activeSection === 'ai' }" @click="activeSection = 'ai'">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a2 2 0 0 1 2 2v1a3 3 0 0 1 3 3 3 3 0 0 1 0 6 3 3 0 0 1-3 3v1a2 2 0 0 1-4 0v-1a3 3 0 0 1-3-3 3 3 0 0 1 0-6 3 3 0 0 1 3-3V4a2 2 0 0 1 2-2z"/><path d="M9 12h6"/></svg>
+                            <mdicon name="robot-outline" size="16" />
                             AI integration
                         </button>
                     </div>
 
                     <div class="st-sidebar-group">
                         <button class="st-sidebar-item st-sidebar-item--danger" :class="{ 'is-active': activeSection === 'danger' }" @click="activeSection = 'danger'">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                            <mdicon name="alert-outline" size="16" />
                             Danger zone
                         </button>
                     </div>
@@ -391,24 +392,24 @@
                                         </div>
                                         <div class="st-plan-limits">
                                             <div class="st-plan-limit">
-                                                <svg viewBox="0 0 20 20" fill="currentColor" width="13" height="13"><path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"/></svg>
+                                                <mdicon name="store-outline" size="13" />
                                                 {{ plan.maxStores }} {{ plan.maxStores === 1 ? 'store' : 'stores' }}
                                             </div>
                                             <div class="st-plan-limit">
-                                                <svg viewBox="0 0 20 20" fill="currentColor" width="13" height="13"><path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/></svg>
+                                                <mdicon name="account-group-outline" size="13" />
                                                 {{ plan.maxUsersPerStore }} members per store
                                             </div>
                                         </div>
                                         <div class="st-plan-features">
                                             <div class="st-plan-feature-group-label">Always included</div>
                                             <div v-for="f in coreFeatures" :key="f.key" class="st-plan-feature-row">
-                                                <svg class="st-plan-check st-plan-check--yes" viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                                                <mdicon name="check" size="14" class="st-plan-check st-plan-check--yes" />
                                                 {{ f.label }}
                                             </div>
                                             <div class="st-plan-feature-group-label" style="margin-top:0.5rem">Advanced features</div>
                                             <div v-for="f in advancedFeatures" :key="f.key" class="st-plan-feature-row" :class="{ 'st-plan-feature-row--locked': !plan.features[f.key] }">
-                                                <svg v-if="plan.features[f.key]" class="st-plan-check st-plan-check--yes" viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-                                                <svg v-else class="st-plan-check st-plan-check--no" viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+                                                <mdicon v-if="plan.features[f.key]" name="check" size="14" class="st-plan-check st-plan-check--yes" />
+                                                <mdicon v-else name="close" size="14" class="st-plan-check st-plan-check--no" />
                                                 {{ f.label }}
                                             </div>
                                         </div>
@@ -612,6 +613,7 @@ import { DEFAULT_CATEGORY_OPTIONS, DEFAULT_EXPENSE_CATEGORY_OPTIONS, DEFAULT_UNI
 import { getPlanConfig, planTierOrder, planConfigs, type PlanTier, type PlanFeature } from '@/utils/planAccess';
 import { getMe } from '@/api/auth';
 import ConfirmModal from '@/components/ConfirmModal.vue';
+import PullToRefresh from '@/components/PullToRefresh.vue';
 import {
     createStoreInvite,
     listStoreInvites,
@@ -1345,6 +1347,12 @@ const handlePlanAction = (plan: typeof allPlans.value[0]) => {
     showToast(`To switch to ${plan.label}, contact us at support@arshii.app.`, 'info');
 };
 
+// Pull-to-refresh: refetch stores/profile; the currentStore watcher below
+// resets the form and reloads the team section when the store data changes.
+const refreshSettings = async () => {
+    await Promise.all([storeContext.fetchStores(), userContext.fetchMe(true)]);
+};
+
 // ── Lifecycle ─────────────────────────────────────────────────
 onMounted(async () => {
     if (!storeContext.stores.length) {
@@ -1400,7 +1408,7 @@ watch(
     --c-accent-dark: #0f766e;
     --c-border: #e2e8f0;
     --c-surface: #ffffff;
-    --c-bg: #f8fafc;
+    --c-bg: #f6f8f9;
 }
 
 /* ── Page shell ── */
@@ -1547,6 +1555,12 @@ watch(
 
 .st-sidebar-item.is-active svg {
     color: var(--c-accent);
+}
+
+.st-sidebar-item .mdi,
+.st-plan-limit .mdi {
+    display: inline-flex;
+    flex-shrink: 0;
 }
 
 .st-sidebar-item--danger {
