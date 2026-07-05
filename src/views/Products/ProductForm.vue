@@ -1,211 +1,230 @@
 <template>
     <section class="product-page">
         <div class="product-shell">
-            <header class="product-header">
-                <div class="product-title">
-                    <span class="product-eyebrow">Catalog</span>
-                    <h1>{{ isEdit ? 'Edit product' : 'New product' }}</h1>
-                    <p>Define pricing, SKU, and stock behavior for {{ currentStoreLabel }}</p>
-                </div>
-                <div class="product-actions">
-                    <button type="button" class="ghost-button" @click="goBack">Back to products</button>
-                </div>
+            <header class="form-header">
+                <button type="button" class="back-link" @click="goBack">
+                    <mdicon name="arrow-left" size="15" />
+                    Products
+                </button>
+                <h1>{{ isEdit ? 'Edit product' : 'New product' }}</h1>
+                <p>Pricing, stock behavior, and recipes for {{ currentStoreLabel }}.</p>
             </header>
 
-            <div class="product-content">
-                <form class="product-form" @submit.prevent="save">
-                    <div v-if="formError" class="form-alert form-alert--error">{{ formError }}</div>
-                    <div v-if="form.type === 'RECIPE' && isRecipePlanLocked" class="form-alert form-alert--warning">
-                        Upgrade to Standard to build recipe products.
-                    </div>
-                    <div v-if="isRecipeMissing" class="form-alert form-alert--warning">
-                        Recipe products need at least one ingredient line before they can be activated.
-                    </div>
-                    <div v-if="isSaveBlocked" class="form-alert form-alert--warning">
-                        Finish or remove incomplete recipe lines before saving.
-                    </div>
-                    <div class="form-section">
-                        <div class="section-title">
-                            <h2>Basics</h2>
-                            <p>Identity and classification for POS + inventory.</p>
-                        </div>
-                        <div class="form-grid two-col">
-                            <label class="field">
-                                <span>Name</span>
-                                <input ref="productNameInputRef" v-model="form.name" type="text" required />
-                            </label>
-                            <label class="field">
-                                <span>Type</span>
-                                <select v-model="form.type">
-                                    <option value="READY_MADE">Ready-made</option>
-                                    <option :disabled="isRecipePlanLocked" value="RECIPE">Recipe</option>
-                                </select>
-                            </label>
-                        </div>
+            <form class="product-form" @submit.prevent="save">
+                <div v-if="form.type === 'RECIPE' && isRecipePlanLocked" class="form-alert form-alert--warning">
+                    Upgrade to Standard to build recipe products.
+                </div>
+                <div v-if="isRecipeMissing" class="form-alert form-alert--warning">
+                    Recipe products need at least one ingredient line before they can be activated.
+                </div>
+                <div v-if="isSaveBlocked" class="form-alert form-alert--warning">
+                    Finish or remove incomplete recipe lines before saving.
+                </div>
+
+                <!-- ── Details ── -->
+                <div class="form-card">
+                    <div class="card-title">
+                        <h2>Details</h2>
                     </div>
 
-                    <div class="form-section">
-                        <div class="section-title">
-                            <h2>Identifiers</h2>
-                            <p>Scanning, classification, and unit metadata.</p>
-                        </div>
-                        <div class="form-grid two-col">
-                            <label class="field">
-                                <span>SKU</span>
-                                <input v-model="form.sku" type="text" />
-                            </label>
-                            <label class="field">
-                                <span>Barcode</span>
-                                <input v-model="form.barcode" type="text" />
-                            </label>
-                            <label class="field">
-                                <span>Unit</span>
-                                <select v-model="form.unit" required>
-                                    <option v-for="unit in unitOptions" :key="unit" :value="unit">
-                                        {{ unit }}
-                                    </option>
-                                </select>
-                            </label>
-                            <label class="field">
-                                <span>Category</span>
-                                <select v-model="form.category">
-                                    <option value="">Uncategorized</option>
-                                    <option v-for="category in categoryOptions" :key="category" :value="category">
-                                        {{ category }}
-                                    </option>
-                                </select>
-                            </label>
-                        </div>
-                    </div>
+                    <label class="field">
+                        <span>Name</span>
+                        <input ref="productNameInputRef" v-model="form.name" type="text" required placeholder="e.g. Spanish Latte" />
+                    </label>
 
-                    <div class="form-section">
-                        <div class="section-title">
-                            <h2>Pricing</h2>
-                            <p>Define retail pricing and internal cost.</p>
-                        </div>
-                        <div class="form-grid two-col">
-                            <label class="field">
-                                <span>Price ({{ currencySymbol }})</span>
-                                <input v-model.number="form.price" type="number" step="0.01" />
-                            </label>
-                            <label class="field">
-                                <span>Cost ({{ currencySymbol }})</span>
-                                <input v-model.number="form.cost" type="number" step="0.01" />
-                            </label>
-                        </div>
-                    </div>
-
-                    <div class="form-section">
-                        <div class="section-title">
-                            <h2>Stock controls</h2>
-                            <p>Low stock alerts and availability for the POS.</p>
-                        </div>
-                        <div class="form-grid two-col">
-                            <label class="field">
-                                <span>Low stock threshold</span>
-                                <input v-model.number="form.lowStockThreshold" type="number" step="0.01" />
-                            </label>
-                            <label class="toggle-field">
-                                <span>Active</span>
-                                <input v-model="form.active" type="checkbox" :disabled="isRecipeMissing" />
-                                <span class="toggle-text">
-                                    {{ isRecipeMissing ? 'Needs recipe lines' : form.active ? 'Enabled' : 'Disabled' }}
+                    <div class="field">
+                        <span>Type</span>
+                        <div class="type-cards" role="group" aria-label="Product type">
+                            <button
+                                type="button"
+                                class="type-card"
+                                :class="{ 'type-card--selected': form.type === 'READY_MADE' }"
+                                :aria-pressed="form.type === 'READY_MADE'"
+                                @click="form.type = 'READY_MADE'"
+                            >
+                                <mdicon name="package-variant-closed" size="18" class="type-card-icon" />
+                                <span class="type-card-title">Ready-made</span>
+                                <span class="type-card-sub">Bought or premade, sold as-is</span>
+                            </button>
+                            <button
+                                type="button"
+                                class="type-card"
+                                :class="{ 'type-card--selected': form.type === 'RECIPE' }"
+                                :aria-pressed="form.type === 'RECIPE'"
+                                :disabled="isRecipePlanLocked"
+                                @click="form.type = 'RECIPE'"
+                            >
+                                <mdicon name="chef-hat" size="18" class="type-card-icon" />
+                                <span class="type-card-title">
+                                    Recipe
+                                    <mdicon v-if="isRecipePlanLocked" name="lock-outline" size="13" class="type-card-lock" />
                                 </span>
-                                <span v-if="isRecipeMissing" class="toggle-hint">Add recipe lines to enable.</span>
-                                <span v-if="hasLowStockIngredients" class="toggle-hint toggle-hint--warning">
-                                    Low stock ingredients: {{ lowStockLabel }}
-                                </span>
-                            </label>
+                                <span class="type-card-sub">Made from ingredients, deducted per sale</span>
+                            </button>
                         </div>
                     </div>
 
-                    <div v-if="form.type === 'RECIPE'" class="form-section">
-                        <div class="section-title-row">
-                            <div>
-                                <h2>Recipe lines</h2>
-                                <p>Map ingredients and usage per unit sold.</p>
+                    <div class="form-grid">
+                        <label class="field">
+                            <span>Category</span>
+                            <select v-model="form.category">
+                                <option value="">Uncategorized</option>
+                                <option v-for="category in categoryOptions" :key="category" :value="category">
+                                    {{ category }}
+                                </option>
+                            </select>
+                        </label>
+                        <label class="field">
+                            <span>Unit</span>
+                            <select v-model="form.unit" required>
+                                <option v-for="unit in unitOptions" :key="unit" :value="unit">
+                                    {{ unit }}
+                                </option>
+                            </select>
+                        </label>
+                        <label class="field">
+                            <span>SKU <em>optional</em></span>
+                            <input v-model="form.sku" type="text" />
+                        </label>
+                        <label class="field">
+                            <span>Barcode <em>optional</em></span>
+                            <input v-model="form.barcode" type="text" />
+                        </label>
+                    </div>
+                </div>
+
+                <!-- ── Pricing ── -->
+                <div class="form-card">
+                    <div class="card-title">
+                        <h2>Pricing</h2>
+                    </div>
+
+                    <div class="form-grid">
+                        <label class="field">
+                            <span>Selling price</span>
+                            <div class="money-input">
+                                <span class="money-prefix">{{ currencySymbol }}</span>
+                                <input v-model.number="form.price" type="number" step="0.01" min="0" />
                             </div>
-                            <span v-if="recipeSummary.ingredientCount > 0" class="recipe-total-badge">
-                                {{ formatMoney(recipeSummary.estimatedCost) }} / unit
+                        </label>
+                        <label class="field">
+                            <span>Cost <em>optional</em></span>
+                            <div class="money-input">
+                                <span class="money-prefix">{{ currencySymbol }}</span>
+                                <input v-model.number="form.cost" type="number" step="0.01" min="0" />
+                            </div>
+                        </label>
+                    </div>
+
+                    <div class="margin-readout" :class="marginToneClass">
+                        <template v-if="marginPct !== null">
+                            <mdicon :name="marginPct < 0 ? 'trending-down' : 'trending-up'" size="15" />
+                            <span>
+                                <strong>{{ marginPct.toFixed(1) }}% gross margin</strong>
+                                · {{ formatMoney(profitPerUnit ?? 0) }} profit per unit
+                                <template v-if="usesRecipeCost"> · based on recipe cost {{ formatMoney(recipeSummary.estimatedCost) }}</template>
                             </span>
+                        </template>
+                        <template v-else>
+                            <mdicon name="information-outline" size="15" />
+                            <span>Enter a price and cost to see your margin.</span>
+                        </template>
+                    </div>
+                    <p v-if="marginPct !== null && marginPct < 0" class="margin-note margin-note--bad">Cost exceeds selling price.</p>
+                    <p v-else-if="marginPct !== null && marginPct < 30" class="margin-note margin-note--warn">Below 30% — consider adjusting pricing.</p>
+                </div>
+
+                <!-- ── Recipe ── -->
+                <div v-if="form.type === 'RECIPE'" class="form-card">
+                    <div class="card-title card-title--row">
+                        <div>
+                            <h2>Recipe</h2>
+                            <p>Ingredients deducted each time one unit is sold.</p>
                         </div>
-                        <PlanGate
-                            v-if="isRecipePlanLocked"
-                            feature="recipes"
-                            title="Recipes are available on Standard."
-                            description="Upgrade to Standard to add ingredients and recipe lines."
-                        />
-                        <div v-else class="recipe-editor">
-                            <div v-if="recipeLoading" class="panel-state">Loading recipe lines...</div>
-                            <div v-else>
-                                <div v-if="recipeError" class="form-alert form-alert--error">{{ recipeError }}</div>
-                                <div v-if="recipeSuccess" class="form-alert form-alert--success">Recipe lines saved.</div>
-                                <div v-if="ingredientsLoading" class="panel-state panel-state--muted">Loading ingredients...</div>
+                        <span v-if="recipeSummary.ingredientCount > 0" class="recipe-total-badge">
+                            {{ formatMoney(recipeSummary.estimatedCost) }} / unit
+                        </span>
+                    </div>
+                    <PlanGate
+                        v-if="isRecipePlanLocked"
+                        feature="recipes"
+                        title="Recipes are available on Standard."
+                        description="Upgrade to Standard to add ingredients and recipe lines."
+                    />
+                    <div v-else class="recipe-editor">
+                        <div v-if="recipeLoading" class="panel-state">Loading recipe lines…</div>
+                        <div v-else>
+                            <div v-if="recipeError" class="form-alert form-alert--error">{{ recipeError }}</div>
+                            <div v-if="stockError" class="form-alert form-alert--error">{{ stockError }}</div>
+                            <div v-if="recipeSuccess" class="form-alert form-alert--success">Recipe lines saved.</div>
+                            <div v-if="ingredientsLoading" class="panel-state panel-state--muted">Loading ingredients…</div>
 
-                                <div v-if="recipeLines.length === 0" class="recipe-empty">
-                                    <p>No ingredients yet. Click <strong>Add ingredient</strong> to start building the recipe.</p>
-                                </div>
-                                <div v-else class="recipe-lines-list">
-                                    <div
-                                        v-for="(line, index) in recipeLines"
-                                        :key="line.key"
-                                        class="recipe-line-row"
-                                        :class="{ 'recipe-line-row--error': lineError(line) }"
-                                    >
-                                        <SearchableSelect
-                                            :ref="setSelectRef(line.key)"
-                                            v-model="line.ingredientId"
-                                            class="recipe-line-select"
-                                            :options="ingredientOptions(line)"
-                                            placeholder="Select ingredient…"
-                                            search-placeholder="Search ingredients…"
-                                        />
-                                        <div class="recipe-line-qty">
-                                            <input
-                                                v-model.number="line.qtyPerProductUnit"
-                                                type="number"
-                                                step="0.01"
-                                                min="0"
-                                                class="recipe-line-input"
-                                            />
-                                            <span class="unit-badge">{{ ingredientMap.get(line.ingredientId)?.unit || 'unit' }}</span>
-                                        </div>
-                                        <span class="recipe-line-cost">{{ formatMoney(lineCost(line)) }}</span>
-                                        <button
-                                            type="button"
-                                            class="recipe-line-remove"
-                                            @click="removeRecipeLine(index)"
-                                            title="Remove"
-                                        >×</button>
-                                    </div>
-                                </div>
-
-                                <div class="recipe-footer">
-                                    <button
-                                        type="button"
-                                        class="add-ingredient-btn"
-                                        :disabled="ingredients.length === 0"
-                                        @click="addRecipeLine"
-                                    >
-                                        + Add ingredient
-                                    </button>
-                                    <button
-                                        v-if="isEdit"
-                                        type="button"
-                                        class="primary-button"
-                                        :disabled="recipeSaving || isSaveBlocked"
-                                        @click="saveRecipeLines"
-                                    >
-                                        Save recipe lines
-                                    </button>
-                                </div>
-                                <p v-if="!isEdit" class="recipe-hint">
-                                    Recipe lines will be saved when you save the product.
-                                </p>
-                                <p v-else-if="ingredients.length === 0" class="recipe-hint">
-                                    Add at least one ingredient to build a recipe.
-                                </p>
+                            <div v-if="recipeLines.length === 0" class="recipe-empty">
+                                <p>No ingredients yet. Click <strong>Add ingredient</strong> to start building the recipe.</p>
                             </div>
+                            <div v-else class="recipe-lines-list">
+                                <div
+                                    v-for="(line, index) in recipeLines"
+                                    :key="line.key"
+                                    class="recipe-line-row"
+                                    :class="{ 'recipe-line-row--error': lineError(line) }"
+                                >
+                                    <SearchableSelect
+                                        :ref="setSelectRef(line.key)"
+                                        v-model="line.ingredientId"
+                                        class="recipe-line-select"
+                                        :options="ingredientOptions(line)"
+                                        placeholder="Select ingredient…"
+                                        search-placeholder="Search ingredients…"
+                                    />
+                                    <div class="recipe-line-qty">
+                                        <input
+                                            v-model.number="line.qtyPerProductUnit"
+                                            type="number"
+                                            step="0.01"
+                                            min="0"
+                                            class="recipe-line-input"
+                                        />
+                                        <span class="unit-badge">{{ ingredientMap.get(line.ingredientId)?.unit || 'unit' }}</span>
+                                    </div>
+                                    <span class="recipe-line-cost">
+                                        {{ formatMoney(lineCost(line)) }}
+                                        <span v-if="isLineLowStock(line.key)" class="line-low-chip">Low stock</span>
+                                    </span>
+                                    <button
+                                        type="button"
+                                        class="recipe-line-remove"
+                                        @click="removeRecipeLine(index)"
+                                        title="Remove"
+                                    >×</button>
+                                </div>
+                            </div>
+
+                            <div class="recipe-footer">
+                                <button
+                                    type="button"
+                                    class="add-ingredient-btn"
+                                    :disabled="ingredients.length === 0"
+                                    @click="addRecipeLine"
+                                >
+                                    + Add ingredient
+                                </button>
+                                <button
+                                    v-if="isEdit"
+                                    type="button"
+                                    class="primary-button primary-button--sm"
+                                    :disabled="recipeSaving || isSaveBlocked"
+                                    @click="saveRecipeLines"
+                                >
+                                    Save recipe lines
+                                </button>
+                            </div>
+                            <p v-if="!isEdit" class="recipe-hint">
+                                Recipe lines will be saved when you save the product.
+                            </p>
+                            <p v-else-if="ingredients.length === 0" class="recipe-hint">
+                                Add at least one ingredient to build a recipe.
+                            </p>
 
                             <div class="ingredient-create-link">
                                 <span>Ingredient not listed?</span>
@@ -219,176 +238,131 @@
                             </div>
                         </div>
                     </div>
+                </div>
 
-                    <div class="form-section">
-                        <div class="section-title-row">
-                            <div>
-                                <h2>Takeout packaging</h2>
-                                <p>Packaging deducted from inventory only when this product is sold as takeout.</p>
+                <!-- ── Takeout packaging ── -->
+                <div class="form-card">
+                    <div class="card-title">
+                        <h2>Takeout packaging</h2>
+                        <p>Deducted from inventory only when this product is sold as takeout.</p>
+                    </div>
+                    <PlanGate
+                        v-if="!canEditPackaging"
+                        feature="ingredients"
+                        title="Packaging tracking needs ingredients."
+                        description="Upgrade to track packaging items as ingredients deducted on takeout."
+                    />
+                    <div v-else-if="!isEdit" class="recipe-empty">
+                        <p>Save the product first, then add its takeout packaging here.</p>
+                    </div>
+                    <div v-else class="recipe-editor">
+                        <div v-if="packagingLoading" class="panel-state">Loading packaging lines…</div>
+                        <div v-else>
+                            <div v-if="packagingError" class="form-alert form-alert--error">{{ packagingError }}</div>
+                            <div v-if="packagingSuccess" class="form-alert form-alert--success">Packaging saved.</div>
+
+                            <div v-if="packagingIngredients.length === 0" class="recipe-empty">
+                                <p>No packaging ingredients yet. Create an ingredient in the <strong>Packaging</strong> category first.</p>
                             </div>
-                        </div>
-                        <PlanGate
-                            v-if="!canEditPackaging"
-                            feature="ingredients"
-                            title="Packaging tracking needs ingredients."
-                            description="Upgrade to track packaging items as ingredients deducted on takeout."
-                        />
-                        <div v-else-if="!isEdit" class="recipe-empty">
-                            <p>Save the product first, then add its takeout packaging here.</p>
-                        </div>
-                        <div v-else class="recipe-editor">
-                            <div v-if="packagingLoading" class="panel-state">Loading packaging lines...</div>
-                            <div v-else>
-                                <div v-if="packagingError" class="form-alert form-alert--error">{{ packagingError }}</div>
-                                <div v-if="packagingSuccess" class="form-alert form-alert--success">Packaging saved.</div>
-
-                                <div v-if="packagingIngredients.length === 0" class="recipe-empty">
-                                    <p>No packaging ingredients yet. Create an ingredient in the <strong>Packaging</strong> category first.</p>
+                            <template v-else>
+                                <div v-if="packagingLines.length === 0" class="recipe-empty">
+                                    <p>No packaging yet. Click <strong>Add packaging</strong> to deduct items on takeout.</p>
                                 </div>
-                                <template v-else>
-                                    <div v-if="packagingLines.length === 0" class="recipe-empty">
-                                        <p>No packaging yet. Click <strong>Add packaging</strong> to deduct items on takeout.</p>
-                                    </div>
-                                    <div v-else class="recipe-lines-list">
-                                        <div
-                                            v-for="(line, index) in packagingLines"
-                                            :key="line.key"
-                                            class="recipe-line-row"
-                                            :class="{ 'recipe-line-row--error': packagingLineError(line) }"
-                                        >
-                                            <SearchableSelect
-                                                :ref="setSelectRef(line.key)"
-                                                v-model="line.ingredientId"
-                                                class="recipe-line-select"
-                                                :options="packagingIngredientOptions(line)"
-                                                placeholder="Select packaging…"
-                                                search-placeholder="Search packaging…"
+                                <div v-else class="recipe-lines-list">
+                                    <div
+                                        v-for="(line, index) in packagingLines"
+                                        :key="line.key"
+                                        class="recipe-line-row"
+                                        :class="{ 'recipe-line-row--error': packagingLineError(line) }"
+                                    >
+                                        <SearchableSelect
+                                            :ref="setSelectRef(line.key)"
+                                            v-model="line.ingredientId"
+                                            class="recipe-line-select"
+                                            :options="packagingIngredientOptions(line)"
+                                            placeholder="Select packaging…"
+                                            search-placeholder="Search packaging…"
+                                        />
+                                        <div class="recipe-line-qty">
+                                            <input
+                                                v-model.number="line.qtyPerUnit"
+                                                type="number"
+                                                step="0.01"
+                                                min="0"
+                                                class="recipe-line-input"
                                             />
-                                            <div class="recipe-line-qty">
-                                                <input
-                                                    v-model.number="line.qtyPerUnit"
-                                                    type="number"
-                                                    step="0.01"
-                                                    min="0"
-                                                    class="recipe-line-input"
-                                                />
-                                                <span class="unit-badge">{{ ingredientMap.get(line.ingredientId)?.unit || 'unit' }} / item</span>
-                                            </div>
-                                            <button
-                                                type="button"
-                                                class="recipe-line-remove"
-                                                @click="removePackagingLine(index)"
-                                                title="Remove"
-                                            >×</button>
+                                            <span class="unit-badge">{{ ingredientMap.get(line.ingredientId)?.unit || 'unit' }} / item</span>
                                         </div>
+                                        <button
+                                            type="button"
+                                            class="recipe-line-remove"
+                                            @click="removePackagingLine(index)"
+                                            title="Remove"
+                                        >×</button>
                                     </div>
+                                </div>
 
-                                    <div class="recipe-footer">
-                                        <button
-                                            type="button"
-                                            class="add-ingredient-btn"
-                                            @click="addPackagingLine"
-                                        >
-                                            + Add packaging
-                                        </button>
-                                        <button
-                                            type="button"
-                                            class="primary-button"
-                                            :disabled="packagingSaving"
-                                            @click="savePackagingLines"
-                                        >
-                                            Save packaging
-                                        </button>
-                                    </div>
-                                </template>
-                            </div>
+                                <div class="recipe-footer">
+                                    <button
+                                        type="button"
+                                        class="add-ingredient-btn"
+                                        @click="addPackagingLine"
+                                    >
+                                        + Add packaging
+                                    </button>
+                                    <button
+                                        type="button"
+                                        class="primary-button primary-button--sm"
+                                        :disabled="packagingSaving"
+                                        @click="savePackagingLines"
+                                    >
+                                        Save packaging
+                                    </button>
+                                </div>
+                            </template>
                         </div>
                     </div>
+                </div>
 
-                    <div class="form-actions">
+                <!-- ── Availability ── -->
+                <div class="form-card">
+                    <div class="card-title">
+                        <h2>Availability</h2>
+                    </div>
+
+                    <div class="switch-field">
+                        <div class="switch-copy">
+                            <span class="switch-title">Active</span>
+                            <span class="switch-sub">
+                                {{ isRecipeMissing ? 'Add recipe lines to enable selling.' : 'Available for sale in the POS.' }}
+                            </span>
+                            <span v-if="hasLowStockIngredients" class="switch-warn">
+                                Low stock ingredients: {{ lowStockLabel }}
+                            </span>
+                        </div>
+                        <label class="switch" :class="{ 'switch--disabled': isRecipeMissing }">
+                            <input v-model="form.active" type="checkbox" :disabled="isRecipeMissing" />
+                            <span class="switch-track"><span class="switch-thumb"></span></span>
+                        </label>
+                    </div>
+
+                    <label class="field field--narrow">
+                        <span>Low stock threshold <em>alerts when stock falls to this level</em></span>
+                        <input v-model.number="form.lowStockThreshold" type="number" step="0.01" min="0" />
+                    </label>
+                </div>
+
+                <!-- ── Sticky actions ── -->
+                <div class="actions-bar">
+                    <span v-if="formError" class="actions-error">{{ formError }}</span>
+                    <div class="actions-buttons">
                         <button type="button" class="ghost-button" @click="goBack">Cancel</button>
-                        <button class="primary-button" type="submit" :disabled="saveDisabled">Save product</button>
+                        <button class="primary-button" type="submit" :disabled="saveDisabled">
+                            {{ isSaving ? 'Saving…' : isEdit ? 'Save changes' : 'Create product' }}
+                        </button>
                     </div>
-                </form>
-
-                <aside class="insight-panel">
-                    <div class="insight-card">
-                        <h3>Product preview</h3>
-                        <div class="summary-grid">
-                            <div>
-                                <span class="summary-label">Name</span>
-                                <span class="summary-value">{{ form.name || 'Untitled product' }}</span>
-                            </div>
-                            <div>
-                                <span class="summary-label">Type</span>
-                                <span class="summary-value">{{ formatProductType(form.type) }}</span>
-                            </div>
-                            <div>
-                                <span class="summary-label">Price</span>
-                                <span class="summary-value">{{ form.price ? formatMoney(form.price) : '—' }}</span>
-                            </div>
-                            <div>
-                                <span class="summary-label">Status</span>
-                                <span class="summary-value">{{ statusLabel }}</span>
-                            </div>
-                        </div>
-                    </div>
-                    <div v-if="form.type === 'RECIPE'" class="insight-card recipe-preview">
-                        <div class="preview-header">
-                            <h3>Recipe</h3>
-                            <span class="preview-total">{{ formatMoney(recipeSummary.estimatedCost) }}</span>
-                        </div>
-                        <div v-if="stockLoading" class="panel-state panel-state--muted">Loading...</div>
-                        <div v-else-if="stockError" class="form-alert form-alert--error">{{ stockError }}</div>
-                        <div v-else-if="recipePreviewLines.length === 0" class="panel-state panel-state--muted">
-                            No ingredients yet.
-                        </div>
-                        <ul v-else class="preview-list">
-                            <li
-                                v-for="line in recipePreviewLines"
-                                :key="line.key"
-                                :class="{ 'low-stock': line.isLowStock }"
-                            >
-                                <span class="item-name">{{ line.name }}</span>
-                                <span class="item-qty">{{ line.qtyLabel }}</span>
-                                <span class="item-cost">{{ formatMoney(line.lineCost) }}</span>
-                                <span v-if="line.isLowStock" class="item-badge low">Low</span>
-                            </li>
-                        </ul>
-                    </div>
-                    <div class="insight-card">
-                        <h3>Margin calculator</h3>
-                        <div class="margin-grid">
-                            <div class="margin-row">
-                                <span class="margin-label">Selling price</span>
-                                <span class="margin-value">{{ form.price ? formatMoney(form.price) : '—' }}</span>
-                            </div>
-                            <div class="margin-row">
-                                <span class="margin-label">Cost</span>
-                                <span class="margin-value">{{ form.cost ? formatMoney(form.cost) : '—' }}</span>
-                            </div>
-                            <div v-if="form.type === 'RECIPE' && recipeSummary.ingredientCount > 0" class="margin-row">
-                                <span class="margin-label">Recipe cost</span>
-                                <span class="margin-value">{{ formatMoney(recipeSummary.estimatedCost) }}</span>
-                            </div>
-                            <div class="margin-row margin-row--total">
-                                <span class="margin-label">Gross margin</span>
-                                <span
-                                    class="margin-value margin-pct"
-                                    :class="{
-                                        'margin-pct--good': marginPct !== null && marginPct >= 30,
-                                        'margin-pct--warn': marginPct !== null && marginPct >= 0 && marginPct < 30,
-                                        'margin-pct--bad': marginPct !== null && marginPct < 0,
-                                    }"
-                                >{{ marginPct !== null ? marginPct.toFixed(1) + '%' : '—' }}</span>
-                            </div>
-                        </div>
-                        <p v-if="marginPct !== null && marginPct < 0" class="margin-hint margin-hint--bad">Cost exceeds selling price.</p>
-                        <p v-else-if="marginPct !== null && marginPct < 30" class="margin-hint margin-hint--warn">Below 30% — consider adjusting pricing.</p>
-                        <p v-else-if="marginPct === null" class="margin-hint">Enter a price and cost to see your margin.</p>
-                    </div>
-                </aside>
-            </div>
+                </div>
+            </form>
         </div>
 
         <IngredientModal
@@ -478,7 +452,7 @@ const isRecipePlanLocked = computed(() => {
 const currentStoreLabel = computed(() => {
     const store = storeContext.currentStore;
     if (!store) return 'your store';
-    return `${store.name} · ${store.currency}`;
+    return store.name;
 });
 const productNameInputRef = ref<HTMLInputElement | null>(null);
 const formError = ref('');
@@ -561,19 +535,12 @@ const recipePreviewLines = computed(() => {
                 typeof lowStockThreshold === 'number' &&
                 lowStockThreshold > 0 &&
                 currentQty <= lowStockThreshold;
-            const unitSuffix = ingredient?.unit ? ` ${ingredient.unit}` : '';
-            const stockLabel =
-                typeof currentQty === 'number' ? `${currentQty}${unitSuffix}` : '—';
             return {
                 key: line.key,
                 ingredientId: line.ingredientId,
                 name: ingredient?.name ?? 'Unknown ingredient',
-                qty,
-                unit: ingredient?.unit ?? '',
                 lineCost,
                 isLowStock,
-                stockLabel,
-                qtyLabel: `${formatQty(qty)}${unitSuffix} per sale`,
             };
         });
 });
@@ -585,14 +552,27 @@ const recipeSummary = computed(() => {
         estimatedCost,
     };
 });
+// Recipes with lines are costed from ingredients; everything else uses the cost field.
+const usesRecipeCost = computed(
+    () => form.value.type === 'RECIPE' && recipeSummary.value.ingredientCount > 0
+);
+const effectiveCost = computed(() =>
+    usesRecipeCost.value ? recipeSummary.value.estimatedCost : form.value.cost
+);
 const marginPct = computed(() => {
     const price = form.value.price;
-    const effectiveCost =
-        form.value.type === 'RECIPE' && recipeSummary.value.ingredientCount > 0
-            ? recipeSummary.value.estimatedCost
-            : form.value.cost;
-    if (!price || !effectiveCost) return null;
-    return ((price - effectiveCost) / price) * 100;
+    if (!price || !effectiveCost.value) return null;
+    return ((price - effectiveCost.value) / price) * 100;
+});
+const profitPerUnit = computed(() => {
+    if (marginPct.value === null) return null;
+    return form.value.price - (effectiveCost.value || 0);
+});
+const marginToneClass = computed(() => {
+    if (marginPct.value === null) return 'margin-readout--empty';
+    if (marginPct.value < 0) return 'margin-readout--bad';
+    if (marginPct.value < 30) return 'margin-readout--warn';
+    return 'margin-readout--good';
 });
 
 const isSaveBlocked = computed(() => {
@@ -610,10 +590,8 @@ const lowStockLabel = computed(() => {
     if (names.length <= 2) return names.join(', ');
     return `${names.slice(0, 2).join(', ')} +${names.length - 2} more`;
 });
-const statusLabel = computed(() => {
-    if (isRecipeMissing.value) return 'Recipe missing';
-    return form.value.active ? 'Active' : 'Inactive';
-});
+const isLineLowStock = (key: string) =>
+    recipePreviewLines.value.find((line) => line.key === key)?.isLowStock ?? false;
 const saveDisabled = computed(() => {
     if (isSaving.value || isSaveBlocked.value) return true;
     if (form.value.type === 'RECIPE' && isRecipePlanLocked.value) return true;
@@ -640,12 +618,6 @@ const formatMoney = (value: number) => {
     }
 };
 
-const formatProductType = (type: string) => {
-    if (type === 'READY_MADE') return 'Ready-made';
-    if (type === 'RECIPE') return 'Recipe';
-    return type;
-};
-
 const currencySymbol = computed(() => {
     const currency = storeContext.currentStore?.currency || 'USD';
     try {
@@ -655,11 +627,6 @@ const currencySymbol = computed(() => {
         return '$';
     }
 });
-
-const formatQty = (value: number) => {
-    if (!Number.isFinite(value)) return '0';
-    return new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(value);
-};
 
 const normalizeOptions = (options: string[]) => {
     const normalized: string[] = [];
@@ -1182,97 +1149,9 @@ watch(
         await loadPackagingLines();
     }
 );
-
-watch(
-    () => productId.value,
-    async () => {
-        await loadProduct();
-        await loadRecipeLines();
-        await loadPackagingLines();
-    }
-);
 </script>
 
 <style scoped>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-
-/* ============================================================
-   TYPE-CHANGE CONFIRM MODAL (teleported to <body>)
-   Self-contained colors — CSS vars from .product-page don't reach here.
-============================================================ */
-.type-modal-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(15, 23, 42, 0.45);
-    backdrop-filter: blur(2px);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 2000;
-    padding: 1rem;
-}
-
-.type-modal {
-    width: 100%;
-    max-width: 420px;
-    background: #ffffff;
-    border-radius: 16px;
-    box-shadow: 0 24px 48px rgba(15, 23, 42, 0.25);
-    padding: 1.5rem;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-}
-
-.type-modal__title {
-    margin: 0 0 0.6rem;
-    font-size: 1.1rem;
-    font-weight: 700;
-    color: #0f172a;
-}
-
-.type-modal__body {
-    margin: 0 0 1.4rem;
-    font-size: 0.9rem;
-    line-height: 1.55;
-    color: #64748b;
-}
-
-.type-modal__actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 0.6rem;
-}
-
-.type-modal__cancel,
-.type-modal__confirm {
-    padding: 0.6rem 1.1rem;
-    border-radius: 8px;
-    font-size: 0.875rem;
-    font-weight: 600;
-    font-family: inherit;
-    cursor: pointer;
-    transition: all 0.15s;
-}
-
-.type-modal__cancel {
-    border: 1.5px solid #e2e8f0;
-    background: #ffffff;
-    color: #0f172a;
-}
-
-.type-modal__cancel:hover {
-    background: #f1f5f9;
-}
-
-.type-modal__confirm {
-    border: none;
-    background: #dc2626;
-    color: #ffffff;
-}
-
-.type-modal__confirm:hover {
-    background: #b91c1c;
-}
-
 /* ============================================================
    TOKENS
 ============================================================ */
@@ -1283,7 +1162,7 @@ watch(
     --c-accent-dark: #0f766e;
     --c-border: #e2e8f0;
     --c-surface: #ffffff;
-    --c-bg: #f8fafc;
+    --c-bg: #f6f8f9;
     min-height: 100vh;
     padding: 2rem 1.5rem 3rem;
     background: var(--c-bg);
@@ -1295,35 +1174,38 @@ watch(
    SHELL & HEADER
 ============================================================ */
 .product-shell {
-    max-width: 1200px;
+    max-width: 760px;
     margin: 0 auto;
     display: flex;
     flex-direction: column;
-    gap: 1.75rem;
-}
-
-.product-header {
-    display: flex;
-    flex-wrap: wrap;
     gap: 1.25rem;
+}
+
+.form-header {
+    display: flex;
+    flex-direction: column;
     align-items: flex-start;
-    justify-content: space-between;
 }
 
-.product-eyebrow {
-    display: inline-block;
-    font-size: 0.68rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-    color: var(--c-accent);
-    background: rgba(13, 148, 136, 0.08);
-    padding: 0.28rem 0.75rem;
-    border-radius: 999px;
-    margin-bottom: 0.6rem;
+.back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    border: none;
+    background: none;
+    padding: 0;
+    margin-bottom: 0.75rem;
+    font-size: 0.82rem;
+    font-weight: 600;
+    font-family: inherit;
+    color: var(--c-muted);
+    cursor: pointer;
+    transition: color 0.15s;
 }
 
-.product-title h1 {
+.back-link:hover { color: var(--c-accent-dark); }
+
+.form-header h1 {
     font-size: 1.9rem;
     font-weight: 800;
     letter-spacing: -0.03em;
@@ -1331,149 +1213,111 @@ watch(
     color: var(--c-text);
 }
 
-.product-title p {
+.form-header p {
     color: var(--c-muted);
-    max-width: 520px;
     line-height: 1.55;
     margin: 0;
     font-size: 0.92rem;
 }
 
-.product-actions {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    flex-shrink: 0;
-}
-
 /* ============================================================
-   LAYOUT
-============================================================ */
-.product-content {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 280px;
-    gap: 1.5rem;
-    align-items: start;
-}
-
-/* ============================================================
-   FORM PANEL
+   FORM & CARDS
 ============================================================ */
 .product-form {
-    background: var(--c-surface);
-    border: 1px solid var(--c-border);
-    border-radius: 16px;
-    padding: 1.75rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0;
-}
-
-/* ============================================================
-   ALERTS
-============================================================ */
-.form-alert {
-    border-radius: 8px;
-    padding: 0.75rem 1rem;
-    font-size: 0.84rem;
-    font-weight: 500;
-    margin-bottom: 1.25rem;
-    display: flex;
-    align-items: flex-start;
-    gap: 0.5rem;
-}
-
-.form-alert--error {
-    background: #fef2f2;
-    border: 1px solid #fecaca;
-    color: #b91c1c;
-}
-
-.form-alert--warning {
-    background: #fffbeb;
-    border: 1px solid #fde68a;
-    color: #92400e;
-}
-
-.form-alert--success {
-    background: #f0fdf4;
-    border: 1px solid #bbf7d0;
-    color: #166534;
-}
-
-/* ============================================================
-   FORM SECTIONS
-============================================================ */
-.form-section {
-    padding: 1.5rem 0;
-    border-bottom: 1px solid var(--c-border);
     display: flex;
     flex-direction: column;
     gap: 1rem;
 }
 
-.form-section:first-of-type {
-    padding-top: 0;
+.form-card {
+    background: var(--c-surface);
+    border: 1px solid var(--c-border);
+    border-radius: 16px;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
 }
 
-.form-section:last-of-type {
-    border-bottom: none;
-    padding-bottom: 0;
-}
-
-.section-title h2 {
-    font-size: 0.95rem;
+.card-title h2 {
+    font-size: 1rem;
     font-weight: 700;
     color: var(--c-text);
     margin: 0;
 }
 
-.section-title p {
+.card-title p {
     margin: 0.2rem 0 0;
     color: var(--c-muted);
     font-size: 0.82rem;
 }
 
+.card-title--row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.recipe-total-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.7rem;
+    border-radius: 999px;
+    background: rgba(13, 148, 136, 0.08);
+    color: var(--c-accent-dark);
+    font-size: 0.78rem;
+    font-weight: 700;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
 /* ============================================================
-   FORM GRID & FIELDS
+   FIELDS
 ============================================================ */
 .form-grid {
     display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 1rem;
-}
-
-.form-grid.two-col {
-    grid-template-columns: repeat(2, 1fr);
-}
-
-.form-grid.three-col {
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
 }
 
 .field {
     display: flex;
     flex-direction: column;
-    gap: 0.4rem;
+    gap: 0.35rem;
+    min-width: 0;
+}
+
+.field--narrow { max-width: 320px; }
+
+.field > span {
     font-size: 0.8rem;
     font-weight: 600;
     color: var(--c-text);
 }
 
+.field > span em {
+    font-style: normal;
+    font-weight: 400;
+    color: var(--c-muted);
+}
+
 .field input,
 .field select {
-    border-radius: 8px;
     border: 1.5px solid var(--c-border);
-    padding: 0.65rem 0.9rem;
-    font-size: 0.875rem;
+    border-radius: 9px;
+    padding: 0.6rem 0.875rem;
+    font-size: 0.9rem;
     font-family: 'Inter', -apple-system, sans-serif;
     color: var(--c-text);
     background: var(--c-surface);
     transition: border-color 0.15s, box-shadow 0.15s;
+    width: 100%;
+    box-sizing: border-box;
 }
 
-.field input::placeholder {
-    color: #94a3b8;
-}
+.field input::placeholder { color: #94a3b8; }
 
 .field input:focus,
 .field select:focus {
@@ -1482,61 +1326,166 @@ watch(
     box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.12);
 }
 
-.field.compact input,
-.field.compact select {
-    padding: 0.5rem 0.7rem;
-    font-size: 0.84rem;
+/* ── Money inputs ── */
+.money-input {
+    position: relative;
+}
+
+.money-prefix {
+    position: absolute;
+    left: 0.875rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--c-muted);
+    font-size: 0.9rem;
+    pointer-events: none;
+}
+
+.money-input input {
+    border: 1.5px solid var(--c-border);
+    border-radius: 9px;
+    padding: 0.6rem 0.875rem 0.6rem 2rem;
+    font-size: 0.9rem;
+    font-family: 'Inter', -apple-system, sans-serif;
+    color: var(--c-text);
+    background: var(--c-surface);
+    transition: border-color 0.15s, box-shadow 0.15s;
+    width: 100%;
+    box-sizing: border-box;
+    font-variant-numeric: tabular-nums;
+}
+
+.money-input input:focus {
+    outline: none;
+    border-color: var(--c-accent);
+    box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.12);
 }
 
 /* ============================================================
-   TOGGLE FIELD (Active)
+   TYPE CARDS
 ============================================================ */
-.toggle-field {
+.type-cards {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+}
+
+.type-card {
     display: flex;
-    align-items: center;
-    gap: 0.6rem;
-    font-size: 0.8rem;
-    font-weight: 600;
-    color: var(--c-text);
-    padding-top: 1.4rem;
-    flex-wrap: wrap;
-}
-
-.toggle-field input[type="checkbox"] {
-    width: 16px;
-    height: 16px;
-    accent-color: var(--c-accent);
+    flex-direction: column;
+    gap: 0.15rem;
+    padding: 0.85rem 1rem;
+    border: 1.5px solid var(--c-border);
+    border-radius: 12px;
+    background: var(--c-surface);
+    font-family: inherit;
+    text-align: left;
     cursor: pointer;
-    flex-shrink: 0;
+    transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+    min-width: 0;
 }
 
-.toggle-field input[type="checkbox"]:disabled {
+.type-card:hover:not(:disabled) { border-color: #cbd5e1; }
+
+.type-card--selected,
+.type-card--selected:hover:not(:disabled) {
+    border-color: var(--c-accent);
+    background: rgba(13, 148, 136, 0.05);
+    box-shadow: 0 0 0 1px var(--c-accent);
+}
+
+.type-card:disabled {
+    opacity: 0.55;
     cursor: not-allowed;
-    opacity: 0.5;
 }
 
-.toggle-text {
-    font-weight: 600;
-    color: var(--c-accent-dark);
+.type-card-icon {
+    color: var(--c-muted);
+    margin-bottom: 0.25rem;
 }
 
-.toggle-hint {
+.type-card--selected .type-card-icon { color: var(--c-accent-dark); }
+
+.type-card-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: var(--c-text);
+}
+
+.type-card-lock { color: var(--c-muted); }
+
+.type-card-sub {
     font-size: 0.75rem;
     color: var(--c-muted);
-    flex-basis: 100%;
-    margin-left: 1.6rem;
-}
-
-.toggle-hint--warning {
-    color: #b45309;
+    line-height: 1.4;
 }
 
 /* ============================================================
-   PANEL STATE
+   MARGIN READOUT
+============================================================ */
+.margin-readout {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.65rem 0.9rem;
+    border-radius: 10px;
+    font-size: 0.84rem;
+    line-height: 1.45;
+    font-variant-numeric: tabular-nums;
+}
+
+.margin-readout--empty { background: #f1f5f9; color: var(--c-muted); }
+.margin-readout--good { background: #ecfdf5; color: #047857; }
+.margin-readout--warn { background: #fffbeb; color: #b45309; }
+.margin-readout--bad { background: #fef2f2; color: #be123c; }
+
+.margin-note {
+    margin: -0.4rem 0 0;
+    font-size: 0.78rem;
+}
+
+.margin-note--warn { color: #b45309; }
+.margin-note--bad { color: #be123c; }
+
+/* ============================================================
+   ALERTS
+============================================================ */
+.form-alert {
+    border-radius: 10px;
+    padding: 0.7rem 1rem;
+    font-size: 0.85rem;
+    line-height: 1.5;
+}
+
+.form-alert--error {
+    background: #fef2f2;
+    border: 1px solid #fca5a5;
+    color: #b91c1c;
+}
+
+.form-alert--warning {
+    background: #fffbeb;
+    border: 1px solid #fcd34d;
+    color: #92400e;
+}
+
+.form-alert--success {
+    background: #f0fdf4;
+    border: 1px solid #86efac;
+    color: #15803d;
+}
+
+.recipe-editor .form-alert { margin-bottom: 0.75rem; }
+
+/* ============================================================
+   RECIPE / PACKAGING EDITOR
 ============================================================ */
 .panel-state {
-    padding: 1.25rem;
-    border-radius: 8px;
+    padding: 1.5rem;
+    border-radius: 10px;
     background: #f1f5f9;
     color: var(--c-muted);
     font-size: 0.875rem;
@@ -1544,63 +1493,24 @@ watch(
 }
 
 .panel-state--muted {
-    background: #f8fafc;
-    color: var(--c-muted);
-}
-
-/* ============================================================
-   RECIPE EDITOR
-============================================================ */
-.recipe-editor {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-}
-
-.section-title-row {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 1rem;
-}
-
-.section-title-row h2 {
-    font-size: 0.95rem;
-    font-weight: 700;
-    color: var(--c-text);
-    margin: 0;
-}
-
-.section-title-row p {
-    margin: 0.2rem 0 0;
-    color: var(--c-muted);
+    background: transparent;
+    padding: 0.75rem 0;
+    text-align: left;
     font-size: 0.82rem;
 }
 
-.recipe-total-badge {
-    flex-shrink: 0;
-    font-size: 0.8rem;
-    font-weight: 700;
-    color: var(--c-accent-dark);
-    background: rgba(13, 148, 136, 0.08);
-    border: 1px solid rgba(13, 148, 136, 0.2);
-    border-radius: 999px;
-    padding: 0.25rem 0.75rem;
-    white-space: nowrap;
-}
-
 .recipe-empty {
-    padding: 1.5rem 1rem;
-    text-align: center;
-    color: var(--c-muted);
-    font-size: 0.84rem;
-    background: #f8fafc;
+    padding: 1.25rem 1rem;
     border: 1.5px dashed var(--c-border);
     border-radius: 10px;
+    text-align: center;
 }
 
 .recipe-empty p {
     margin: 0;
+    font-size: 0.84rem;
+    color: var(--c-muted);
+    line-height: 1.5;
 }
 
 .recipe-lines-list {
@@ -1611,90 +1521,104 @@ watch(
 
 .recipe-line-row {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto auto auto;
-    gap: 0.5rem;
+    grid-template-columns: minmax(0, 1fr) 150px auto 28px;
     align-items: center;
-    padding: 0.6rem 0.75rem;
-    border: 1.5px solid var(--c-border);
-    border-radius: 8px;
-    background: var(--c-surface);
-    transition: border-color 0.15s;
+    gap: 0.6rem;
+    padding: 0.5rem 0.6rem;
+    background: #f8fafc;
+    border: 1px solid var(--c-border);
+    border-radius: 10px;
 }
 
 .recipe-line-row--error {
     border-color: #fca5a5;
-    background: #fef2f2;
+    background: #fef7f7;
 }
 
-.recipe-line-select {
-    width: 100%;
-    min-width: 0;
-}
+.recipe-line-select { min-width: 0; }
 
 .recipe-line-qty {
     display: flex;
     align-items: center;
-    gap: 0.35rem;
+    gap: 0.4rem;
 }
 
 .recipe-line-input {
-    width: 70px;
-    padding: 0.45rem 0.5rem;
-    border-radius: 6px;
     border: 1.5px solid var(--c-border);
-    font-size: 0.84rem;
+    border-radius: 8px;
+    padding: 0.45rem 0.6rem;
+    font-size: 0.875rem;
     font-family: 'Inter', -apple-system, sans-serif;
     color: var(--c-text);
+    background: var(--c-surface);
     text-align: right;
-    transition: border-color 0.15s;
+    width: 80px;
+    box-sizing: border-box;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    font-variant-numeric: tabular-nums;
 }
 
 .recipe-line-input:focus {
     outline: none;
     border-color: var(--c-accent);
-    box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
+    box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.12);
 }
 
 .unit-badge {
     font-size: 0.72rem;
-    font-weight: 600;
     color: var(--c-muted);
-    background: #f1f5f9;
-    border: 1px solid var(--c-border);
-    border-radius: 4px;
-    padding: 0.2rem 0.45rem;
     white-space: nowrap;
 }
 
 .recipe-line-cost {
-    font-size: 0.84rem;
+    font-size: 0.82rem;
     font-weight: 600;
-    color: var(--c-accent-dark);
+    color: var(--c-text);
     white-space: nowrap;
-    min-width: 4.5rem;
     text-align: right;
+    font-variant-numeric: tabular-nums;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    justify-content: flex-end;
+}
+
+.line-low-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.08rem 0.45rem;
+    border-radius: 999px;
+    background: #fef3c7;
+    color: #b45309;
+    font-size: 0.64rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
 }
 
 .recipe-line-remove {
-    background: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 7px;
     border: none;
+    background: transparent;
+    color: var(--c-muted);
     font-size: 1.1rem;
-    color: #94a3b8;
-    cursor: pointer;
-    padding: 0.2rem 0.4rem;
-    border-radius: 4px;
     line-height: 1;
-    transition: all 0.15s;
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s;
 }
 
-.recipe-line-remove:hover {
-    color: #ef4444;
-    background: #fef2f2;
-}
+.recipe-line-remove:hover { background: #fef2f2; color: #dc2626; }
 
 .recipe-footer {
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: 0.75rem;
     flex-wrap: wrap;
     margin-top: 0.75rem;
@@ -1705,15 +1629,15 @@ watch(
     align-items: center;
     gap: 0.3rem;
     padding: 0.5rem 0.9rem;
-    border-radius: 7px;
+    border-radius: 9px;
     border: 1.5px dashed var(--c-border);
     background: transparent;
     color: var(--c-accent-dark);
     font-size: 0.84rem;
     font-weight: 600;
-    font-family: 'Inter', -apple-system, sans-serif;
+    font-family: inherit;
     cursor: pointer;
-    transition: all 0.15s;
+    transition: border-color 0.15s, background 0.15s;
 }
 
 .add-ingredient-btn:hover:not(:disabled) {
@@ -1721,66 +1645,156 @@ watch(
     background: rgba(13, 148, 136, 0.05);
 }
 
-.add-ingredient-btn:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-}
+.add-ingredient-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .recipe-hint {
-    margin: 0.5rem 0 0;
+    margin: 0.6rem 0 0;
+    font-size: 0.78rem;
     color: var(--c-muted);
-    font-size: 0.8rem;
 }
 
 .ingredient-create-link {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    padding: 0.75rem 1rem;
-    border-radius: 8px;
-    background: #f8fafc;
-    border: 1px solid var(--c-border);
-    font-size: 0.84rem;
-    color: var(--c-muted);
+    gap: 0.4rem;
     flex-wrap: wrap;
-}
-
-.link-sep {
-    color: var(--c-border);
-    font-weight: 400;
-    user-select: none;
+    margin-top: 1rem;
+    padding-top: 0.85rem;
+    border-top: 1px solid #f1f5f9;
+    font-size: 0.8rem;
+    color: var(--c-muted);
 }
 
 .link-button {
-    background: none;
     border: none;
+    background: none;
     padding: 0;
-    font-size: 0.84rem;
+    font: inherit;
     font-weight: 600;
-    font-family: 'Inter', -apple-system, sans-serif;
-    color: var(--c-accent);
+    color: var(--c-accent-dark);
     cursor: pointer;
-    text-decoration: underline;
-    text-underline-offset: 2px;
-    text-decoration-color: transparent;
-    transition: text-decoration-color 0.15s, color 0.15s;
 }
 
-.link-button:hover {
-    color: var(--c-accent-dark);
-    text-decoration-color: var(--c-accent);
-}
+.link-button:hover { text-decoration: underline; }
+
+.link-sep { color: #cbd5e1; }
 
 /* ============================================================
-   FORM ACTIONS
+   AVAILABILITY
 ============================================================ */
-.form-actions {
+.switch-field {
     display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.85rem 1rem;
+    background: #f8fafc;
+    border: 1px solid var(--c-border);
+    border-radius: 12px;
+}
+
+.switch-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    min-width: 0;
+}
+
+.switch-title {
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: var(--c-text);
+}
+
+.switch-sub {
+    font-size: 0.78rem;
+    color: var(--c-muted);
+}
+
+.switch-warn {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #b45309;
+}
+
+.switch {
+    position: relative;
+    display: inline-flex;
+    flex-shrink: 0;
+    cursor: pointer;
+}
+
+.switch--disabled { cursor: not-allowed; opacity: 0.55; }
+
+.switch input {
+    position: absolute;
+    opacity: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    cursor: inherit;
+}
+
+.switch-track {
+    display: inline-flex;
+    align-items: center;
+    width: 42px;
+    height: 24px;
+    border-radius: 999px;
+    background: #cbd5e1;
+    padding: 3px;
+    box-sizing: border-box;
+    transition: background 0.18s;
+}
+
+.switch input:checked + .switch-track { background: var(--c-accent); }
+
+.switch input:focus-visible + .switch-track {
+    box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.25);
+}
+
+.switch-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.25);
+    transition: transform 0.18s;
+}
+
+.switch input:checked + .switch-track .switch-thumb { transform: translateX(18px); }
+
+/* ============================================================
+   ACTIONS BAR
+============================================================ */
+.actions-bar {
+    position: sticky;
+    bottom: 0;
+    z-index: 20;
+    display: flex;
+    align-items: center;
     justify-content: flex-end;
-    gap: 0.75rem;
-    padding-top: 1.5rem;
-    margin-top: 0.5rem;
+    gap: 1rem;
+    flex-wrap: wrap;
+    padding: 0.85rem 0;
+    margin-top: 0.25rem;
+    background: color-mix(in srgb, var(--c-bg) 90%, transparent);
+    backdrop-filter: blur(8px);
     border-top: 1px solid var(--c-border);
+}
+
+.actions-error {
+    flex: 1;
+    min-width: 200px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #b91c1c;
+}
+
+.actions-buttons {
+    display: flex;
+    gap: 0.6rem;
+    align-items: center;
 }
 
 /* ============================================================
@@ -1790,8 +1804,8 @@ watch(
     display: inline-flex;
     align-items: center;
     gap: 0.4rem;
-    padding: 0.65rem 1.25rem;
-    border-radius: 8px;
+    padding: 0.6rem 1.2rem;
+    border-radius: 9px;
     border: none;
     background: var(--c-accent);
     color: #ffffff;
@@ -1799,27 +1813,32 @@ watch(
     font-weight: 600;
     font-family: 'Inter', -apple-system, sans-serif;
     cursor: pointer;
-    transition: background 0.15s;
+    transition: background 0.15s, box-shadow 0.15s, transform 0.15s;
+    box-shadow: 0 2px 8px rgba(13, 148, 136, 0.25);
     white-space: nowrap;
 }
 
 .primary-button:hover:not(:disabled) {
     background: var(--c-accent-dark);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 14px rgba(13, 148, 136, 0.35);
 }
 
-.primary-button:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
+.primary-button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+.primary-button--sm {
+    padding: 0.5rem 0.9rem;
+    font-size: 0.82rem;
 }
 
 .ghost-button {
     display: inline-flex;
     align-items: center;
-    gap: 0.35rem;
-    padding: 0.6rem 1rem;
-    border-radius: 8px;
+    gap: 0.4rem;
+    padding: 0.58rem 1.1rem;
+    border-radius: 9px;
     border: 1.5px solid var(--c-border);
-    background: transparent;
+    background: var(--c-surface);
     color: var(--c-text);
     font-size: 0.875rem;
     font-weight: 600;
@@ -1829,330 +1848,120 @@ watch(
     white-space: nowrap;
 }
 
-.ghost-button:hover:not(:disabled) {
-    border-color: var(--c-accent);
-    color: var(--c-accent-dark);
-    background: rgba(13, 148, 136, 0.05);
-}
-
-.ghost-button:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-}
-
-.secondary-button {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    padding: 0.55rem 0.9rem;
-    border-radius: 8px;
-    border: 1.5px solid var(--c-border);
-    background: transparent;
-    color: var(--c-text);
-    font-size: 0.84rem;
-    font-weight: 600;
-    font-family: 'Inter', -apple-system, sans-serif;
-    cursor: pointer;
-    transition: all 0.15s;
-    white-space: nowrap;
-    text-align: left;
-}
-
-.secondary-button:hover:not(:disabled) {
-    border-color: var(--c-accent);
-    color: var(--c-accent-dark);
-    background: rgba(13, 148, 136, 0.05);
-}
-
-.secondary-button:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-}
+.ghost-button:hover:not(:disabled) { border-color: var(--c-accent); color: var(--c-accent-dark); background: rgba(13, 148, 136, 0.05); }
+.ghost-button:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* ============================================================
-   INSIGHT PANEL (ASIDE)
+   TYPE CHANGE MODAL
 ============================================================ */
-.insight-panel {
+.type-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.45);
+    backdrop-filter: blur(4px);
     display: flex;
-    flex-direction: column;
-    gap: 1rem;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    padding: 1rem;
 }
 
-.insight-card {
-    background: var(--c-surface);
-    border: 1px solid var(--c-border);
+.type-modal {
+    background: #ffffff;
     border-radius: 16px;
-    padding: 1.25rem 1.4rem;
+    box-shadow: 0 24px 60px rgba(15, 23, 42, 0.18);
+    width: 100%;
+    max-width: 420px;
+    padding: 1.5rem 1.75rem;
 }
 
-.insight-card h3 {
-    font-size: 0.875rem;
+.type-modal__title {
+    font-size: 1.05rem;
     font-weight: 700;
     color: var(--c-text);
-    margin: 0 0 0.75rem;
+    margin: 0 0 0.6rem;
 }
 
-.insight-card p {
-    font-size: 0.82rem;
+.type-modal__body {
+    font-size: 0.875rem;
     color: var(--c-muted);
     line-height: 1.55;
-    margin: 0 0 0.75rem;
+    margin: 0 0 1.25rem;
 }
 
-.insight-card.highlight {
-    background: rgba(13, 148, 136, 0.04);
-    border-color: rgba(13, 148, 136, 0.2);
-}
-
-.insight-card.highlight .secondary-button {
-    width: 100%;
-}
-
-/* ============================================================
-   SUMMARY GRID (product preview)
-============================================================ */
-.summary-grid {
+.type-modal__actions {
     display: flex;
-    flex-direction: column;
+    justify-content: flex-end;
     gap: 0.6rem;
+    flex-wrap: wrap;
 }
 
-.summary-grid > div {
-    display: flex;
-    justify-content: space-between;
+.type-modal__cancel {
+    display: inline-flex;
     align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem 0;
-    border-bottom: 1px solid var(--c-border);
-}
-
-.summary-grid > div:last-child {
-    border-bottom: none;
-}
-
-.summary-label {
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.07em;
-    color: var(--c-muted);
-}
-
-.summary-value {
-    font-size: 0.875rem;
-    font-weight: 600;
+    padding: 0.55rem 1rem;
+    border-radius: 9px;
+    border: 1.5px solid var(--c-border);
+    background: var(--c-surface);
     color: var(--c-text);
-    text-align: right;
+    font-size: 0.85rem;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.15s;
 }
 
-/* ============================================================
-   RECIPE PREVIEW (aside card)
-============================================================ */
-.recipe-preview {
-    padding: 1.25rem 1.4rem;
-}
+.type-modal__cancel:hover { border-color: var(--c-accent); color: var(--c-accent-dark); }
 
-.preview-header {
-    display: flex;
-    justify-content: space-between;
+.type-modal__confirm {
+    display: inline-flex;
     align-items: center;
-    margin-bottom: 0.75rem;
-}
-
-.preview-header h3 {
-    margin: 0;
-}
-
-.preview-total {
-    font-weight: 700;
-    font-size: 0.9rem;
-    color: var(--c-accent-dark);
-}
-
-.preview-list {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-}
-
-.preview-list li {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto auto;
-    align-items: center;
-    column-gap: 0.45rem;
-    row-gap: 0.15rem;
-    padding: 0.45rem 0;
-    border-bottom: 1px solid var(--c-border);
-    font-size: 0.8rem;
-    min-width: 0;
-}
-
-.preview-list li:last-child {
-    border-bottom: none;
-}
-
-.preview-list li.low-stock .item-name {
-    color: #dc2626;
-}
-
-.item-name {
-    grid-column: 1;
-    font-weight: 500;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    color: var(--c-text);
-    min-width: 0;
-}
-
-.item-qty {
-    grid-column: 1;
-    color: var(--c-muted);
-    font-size: 0.72rem;
-    min-width: 0;
-    overflow-wrap: anywhere;
-}
-
-.item-cost {
-    grid-column: 2;
-    grid-row: 1 / span 2;
+    padding: 0.55rem 1rem;
+    border-radius: 9px;
+    border: none;
+    background: #dc2626;
+    color: #fff;
+    font-size: 0.85rem;
     font-weight: 600;
-    color: var(--c-text);
-    white-space: nowrap;
-    align-self: center;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.15s;
 }
 
-.item-badge {
-    grid-column: 3;
-    grid-row: 1 / span 2;
-    align-self: center;
-    font-size: 0.58rem;
-    text-transform: uppercase;
-    padding: 0.15rem 0.4rem;
-    border-radius: 999px;
-    font-weight: 700;
-    letter-spacing: 0.06em;
-}
-
-.item-badge.low {
-    background: #fef2f2;
-    color: #b91c1c;
-}
-
-/* ============================================================
-   MARGIN CALCULATOR
-============================================================ */
-.margin-grid {
-    display: flex;
-    flex-direction: column;
-    gap: 0;
-}
-
-.margin-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.5rem 0;
-    border-bottom: 1px solid var(--c-border);
-    font-size: 0.82rem;
-}
-
-.margin-row:last-child {
-    border-bottom: none;
-}
-
-.margin-row--total {
-    padding-top: 0.6rem;
-    margin-top: 0.1rem;
-}
-
-.margin-label {
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.07em;
-    color: var(--c-muted);
-}
-
-.margin-value {
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: var(--c-text);
-}
-
-.margin-pct {
-    font-size: 1rem;
-    font-weight: 700;
-}
-
-.margin-pct--good { color: #0d9488; }
-.margin-pct--warn { color: #b45309; }
-.margin-pct--bad  { color: #dc2626; }
-
-.margin-hint {
-    margin: 0.65rem 0 0;
-    font-size: 0.78rem;
-    color: var(--c-muted);
-    line-height: 1.45;
-}
-
-.margin-hint--warn { color: #b45309; }
-.margin-hint--bad  { color: #dc2626; }
-
-/* ============================================================
-   ACCESSIBILITY
-============================================================ */
-.sr-only {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    white-space: nowrap;
-    border: 0;
-}
+.type-modal__confirm:hover { background: #b91c1c; }
 
 /* ============================================================
    RESPONSIVE
 ============================================================ */
-@media (max-width: 960px) {
-    .product-content {
-        grid-template-columns: 1fr;
-    }
-
-    .product-actions {
-        width: 100%;
-        justify-content: flex-start;
-    }
-
-    .form-actions {
-        flex-direction: column-reverse;
-        align-items: stretch;
-    }
-
-    .form-actions .primary-button,
-    .form-actions .ghost-button {
-        width: 100%;
-        justify-content: center;
-    }
-
-}
-
 @media (max-width: 640px) {
-    .product-page {
-        padding: 1.25rem 1rem 2.5rem;
-    }
+    .product-page { padding: 1rem 0.875rem 2.5rem; }
+    .product-shell { gap: 1rem; }
+    .form-header h1 { font-size: 1.5rem; }
 
-    .product-title h1 {
-        font-size: 1.5rem;
-    }
+    .form-card { padding: 1.1rem; border-radius: 12px; }
+    .form-grid { grid-template-columns: 1fr; }
+    .type-cards { grid-template-columns: 1fr; }
+    .field--narrow { max-width: none; }
 
-    .form-grid.two-col {
-        grid-template-columns: 1fr;
+    .recipe-line-row {
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-rows: auto auto;
+        row-gap: 0.5rem;
     }
+    .recipe-line-select { grid-column: 1; grid-row: 1; }
+    .recipe-line-remove { grid-column: 2; grid-row: 1; justify-self: end; }
+    .recipe-line-qty { grid-column: 1; grid-row: 2; }
+    .recipe-line-cost { grid-column: 2; grid-row: 2; }
+
+    /* The app's fixed bottom nav sits over a sticky bar on mobile,
+       so let the actions flow at the end of the form instead. */
+    .actions-bar {
+        position: static;
+        backdrop-filter: none;
+        background: transparent;
+    }
+    .actions-buttons { width: 100%; }
+    .actions-buttons .ghost-button,
+    .actions-buttons .primary-button { flex: 1; justify-content: center; }
 }
 </style>
