@@ -1,15 +1,13 @@
 <template>
     <section class="po-form-page">
         <div class="po-form-shell">
-            <header class="po-form-header">
-                <div class="po-form-title">
-                    <span class="po-form-eyebrow">Purchasing</span>
-                    <h1>New purchase order</h1>
-                    <p>Select a supplier, add line items, and set an expected delivery date for {{ currentStoreLabel }}.</p>
-                </div>
-                <div class="po-form-actions">
-                    <button type="button" class="ghost-button" @click="goBack">Back to orders</button>
-                </div>
+            <header class="form-header">
+                <button type="button" class="back-link" @click="goBack">
+                    <mdicon name="arrow-left" size="15" />
+                    Purchase orders
+                </button>
+                <h1>New purchase order</h1>
+                <p>Select a supplier, add line items, and set an expected delivery date for {{ currentStoreLabel }}.</p>
             </header>
 
             <PlanGate
@@ -19,114 +17,99 @@
                 description="Upgrade to Standard to create purchase orders and receive inventory."
             />
 
-            <div v-else class="po-form-content">
-                <form class="po-form" @submit.prevent="createOrder">
-                    <!-- ALERTS -->
-                    <div v-if="formError" class="form-alert form-alert--error">{{ formError }}</div>
-
-                    <!-- SUPPLIER SECTION -->
-                    <div class="form-section">
-                        <div class="section-title">
-                            <h2>Supplier</h2>
-                            <p>Who are you ordering from?</p>
-                        </div>
-                        <div class="form-grid two-col">
-                            <label class="field">
-                                Supplier
-                                <div class="supplier-row">
-                                    <SearchableSelect
-                                        v-model="supplierSelection"
-                                        :options="supplierOptions"
-                                        :disabled="!canWrite"
-                                        placeholder="No supplier"
-                                        search-placeholder="Search suppliers…"
-                                    />
-                                    <button
-                                        type="button"
-                                        class="ghost-button"
-                                        :disabled="!canWrite"
-                                        @click="toggleSupplierForm"
-                                    >
-                                        {{ showSupplierForm ? 'Cancel' : '+ New supplier' }}
-                                    </button>
-                                </div>
-                            </label>
-                            <label v-if="supplierSelection === 'CUSTOM'" class="field">
-                                Supplier name
-                                <input
-                                    v-model="formState.supplierName"
-                                    type="text"
-                                    placeholder="Fresh Supplier Co"
-                                    :disabled="!canWrite"
-                                />
-                            </label>
-                            <label class="field">
-                                Expected delivery date
-                                <input v-model="formState.expectedDate" type="date" :disabled="!canWrite" />
-                            </label>
-                        </div>
-
-                        <!-- Inline new supplier form -->
-                        <div v-if="showSupplierForm" class="supplier-inline-form">
-                            <div class="supplier-inline-title">New supplier</div>
-                            <div class="form-grid three-col">
-                                <label class="field">
-                                    Name <span class="required">*</span>
-                                    <input v-model="supplierForm.name" type="text" placeholder="Supplier name" />
-                                </label>
-                                <label class="field">
-                                    Email
-                                    <input v-model="supplierForm.email" type="email" placeholder="ops@supplier.com" />
-                                </label>
-                                <label class="field">
-                                    Phone
-                                    <input v-model="supplierForm.phone" type="tel" placeholder="+1 555 000 0000" />
-                                </label>
-                            </div>
-                            <div class="supplier-inline-actions">
-                                <span v-if="supplierFormError" class="form-error">{{ supplierFormError }}</span>
-                                <button
-                                    type="button"
-                                    class="primary-button primary-button--sm"
-                                    :disabled="isCreatingSupplier"
-                                    @click="createSupplierFromForm"
-                                >
-                                    {{ isCreatingSupplier ? 'Saving...' : 'Save supplier' }}
-                                </button>
-                            </div>
-                        </div>
+            <form v-else class="po-form" @submit.prevent="createOrder">
+                <!-- ── Supplier & delivery ── -->
+                <div class="form-card">
+                    <div class="card-title">
+                        <h2>Supplier &amp; delivery</h2>
                     </div>
 
-                    <!-- LINE ITEMS SECTION -->
-                    <div class="form-section">
-                        <div class="section-title-row">
-                            <div class="section-title">
-                                <h2>Line items</h2>
-                                <p>Add products or ingredients to this order.</p>
+                    <div class="form-grid">
+                        <label class="field">
+                            <span>Supplier</span>
+                            <div class="supplier-row">
+                                <SearchableSelect
+                                    v-model="supplierSelection"
+                                    :options="supplierOptions"
+                                    :disabled="!canWrite"
+                                    placeholder="No supplier"
+                                    search-placeholder="Search suppliers…"
+                                />
+                                <button
+                                    type="button"
+                                    class="ghost-button"
+                                    :disabled="!canWrite"
+                                    @click="toggleSupplierForm"
+                                >
+                                    {{ showSupplierForm ? 'Cancel' : 'New supplier' }}
+                                </button>
                             </div>
+                        </label>
+                        <label class="field">
+                            <span>Expected delivery date</span>
+                            <input v-model="formState.expectedDate" type="date" :disabled="!canWrite" />
+                        </label>
+                        <label v-if="supplierSelection === 'CUSTOM'" class="field">
+                            <span>Supplier name</span>
+                            <input
+                                v-model="formState.supplierName"
+                                type="text"
+                                placeholder="Fresh Supplier Co"
+                                :disabled="!canWrite"
+                            />
+                        </label>
+                    </div>
+
+                    <!-- Inline new supplier form -->
+                    <div v-if="showSupplierForm" class="supplier-form">
+                        <label class="field">
+                            <span>Name</span>
+                            <input v-model="supplierForm.name" type="text" placeholder="Supplier name" />
+                        </label>
+                        <label class="field">
+                            <span>Email <em>optional</em></span>
+                            <input v-model="supplierForm.email" type="email" placeholder="ops@supplier.com" />
+                        </label>
+                        <label class="field">
+                            <span>Phone <em>optional</em></span>
+                            <input v-model="supplierForm.phone" type="tel" placeholder="+63 900 000 0000" />
+                        </label>
+                        <div class="supplier-actions">
+                            <span v-if="supplierFormError" class="form-error">{{ supplierFormError }}</span>
                             <button
                                 type="button"
                                 class="ghost-button"
-                                :disabled="!canWrite"
-                                @click="addLine"
+                                :disabled="isCreatingSupplier"
+                                @click="createSupplierFromForm"
                             >
-                                + Add item
+                                {{ isCreatingSupplier ? 'Saving…' : 'Save supplier' }}
                             </button>
                         </div>
+                    </div>
+                </div>
 
-                        <div v-if="!canWrite" class="panel-state">You have view-only access.</div>
-                        <div v-else-if="lineItems.length === 0" class="panel-state">
-                            No items yet. Click <strong>+ Add item</strong> to begin.
-                        </div>
-                        <div v-else class="line-items-table-wrap">
+                <!-- ── Items ── -->
+                <div class="form-card">
+                    <div class="card-title">
+                        <h2>Items</h2>
+                        <p>Unit costs auto-fill from your product and ingredient records — override them per order.</p>
+                    </div>
+
+                    <div v-if="!canWrite" class="panel-state">You have view-only access.</div>
+                    <div v-else-if="lineItems.length === 0" class="items-empty">
+                        <p>No items yet.</p>
+                        <button type="button" class="add-line-btn" @click="addLine">+ Add item</button>
+                    </div>
+                    <template v-else>
+                        <div class="table-wrap">
                             <table class="line-items-table">
                                 <thead>
                                     <tr>
                                         <th>Type</th>
                                         <th>Item</th>
-                                        <th class="align-right">Qty ordered</th>
-                                        <th class="align-right">Cost / unit</th>
-                                        <th class="align-right">Line total</th>
+                                        <th class="num">Qty ordered</th>
+                                        <th class="num">Cost / unit</th>
+                                        <th class="num">Total</th>
                                         <th></th>
                                     </tr>
                                 </thead>
@@ -136,7 +119,7 @@
                                         :key="line.key"
                                         :class="{ 'row-incomplete': !line.itemType || !line.itemId }"
                                     >
-                                        <td>
+                                        <td class="col-type">
                                             <select
                                                 v-model="line.itemType"
                                                 class="line-select"
@@ -148,7 +131,7 @@
                                                 <option value="INGREDIENT">Ingredient</option>
                                             </select>
                                         </td>
-                                        <td>
+                                        <td class="col-item">
                                             <SearchableSelect
                                                 :ref="(el) => setItemRef(el, index)"
                                                 :model-value="line.itemId"
@@ -159,7 +142,7 @@
                                                 @update:model-value="(val) => onLineItemSelected(line, index, val)"
                                             />
                                         </td>
-                                        <td class="td-qty">
+                                        <td class="col-qty">
                                             <div class="line-unit-wrap">
                                                 <input
                                                     :ref="(el) => setQtyRef(el, index)"
@@ -167,125 +150,73 @@
                                                     type="number"
                                                     min="0"
                                                     step="0.01"
-                                                    class="line-input line-input--num"
+                                                    class="line-input"
                                                     :disabled="!canWrite"
                                                 />
                                                 <span v-if="line.purchaseUnit" class="line-unit-tag">{{ line.purchaseUnit }}</span>
                                             </div>
-                                            <div v-if="line.purchaseUnit && line.qtyOrdered > 0" class="line-conversion-hint">
+                                            <div v-if="line.purchaseUnit && line.qtyOrdered > 0" class="line-hint">
                                                 = {{ formatQty(lineBaseQty(line)) }} {{ ingredientBaseUnit(line) }}
                                             </div>
                                         </td>
-                                        <td class="td-cost">
-                                            <div class="line-unit-wrap">
-                                                <input
-                                                    v-model.number="line.unitCost"
-                                                    type="number"
-                                                    min="0"
-                                                    step="0.01"
-                                                    class="line-input line-input--num"
-                                                    :disabled="!canWrite"
-                                                />
-                                            </div>
-                                            <div v-if="line.purchaseUnit" class="line-conversion-hint">per {{ line.purchaseUnit }}</div>
+                                        <td class="col-cost">
+                                            <input
+                                                v-model.number="line.unitCost"
+                                                type="number"
+                                                min="0"
+                                                step="0.01"
+                                                class="line-input"
+                                                :disabled="!canWrite"
+                                            />
+                                            <div v-if="line.purchaseUnit" class="line-hint">per {{ line.purchaseUnit }}</div>
                                         </td>
-                                        <td class="line-total">
-                                            {{ formatMoney(lineTotal(line)) }}
-                                        </td>
-                                        <td>
+                                        <td class="col-total">{{ formatMoney(lineTotal(line)) }}</td>
+                                        <td class="col-remove">
                                             <button
                                                 type="button"
                                                 class="remove-btn"
                                                 :disabled="!canWrite"
                                                 @click="removeLine(index)"
                                                 title="Remove line"
-                                            >&times;</button>
+                                            >
+                                                <mdicon name="close" size="16" />
+                                            </button>
                                         </td>
                                     </tr>
                                 </tbody>
                                 <tfoot>
                                     <tr>
-                                        <td colspan="6">
+                                        <td colspan="2" class="tfoot-add">
                                             <button
                                                 type="button"
-                                                class="line-add-row-button"
+                                                class="add-line-btn"
                                                 :disabled="!canWrite"
                                                 @click="addLine"
                                             >
                                                 + Add item
                                             </button>
                                         </td>
+                                        <td colspan="2" class="tfoot-label">Order total</td>
+                                        <td class="col-total tfoot-total">{{ formatMoney(orderTotal) }}</td>
+                                        <td></td>
                                     </tr>
                                 </tfoot>
                             </table>
                         </div>
+                    </template>
+                </div>
 
-                        <!-- Order total summary -->
-                        <div v-if="lineItems.length > 0" class="order-summary">
-                            <div class="order-summary-row">
-                                <span>{{ lineItems.length }} item{{ lineItems.length !== 1 ? 's' : '' }}</span>
-                                <div class="order-total">
-                                    <span class="order-total-label">Order total</span>
-                                    <span class="order-total-value">{{ formatMoney(orderTotal) }}</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- FORM ACTIONS -->
-                    <div class="form-actions">
+                <!-- ── Sticky actions ── -->
+                <div class="actions-bar">
+                    <span v-if="formError" class="actions-error">{{ formError }}</span>
+                    <div class="actions-buttons">
                         <button type="button" class="ghost-button" @click="goBack">Cancel</button>
                         <button class="primary-button" type="submit" :disabled="isCreateDisabled">
-                            {{ isSubmitting ? 'Creating...' : 'Create purchase order' }}
+                            {{ isSubmitting ? 'Creating…' : 'Create purchase order' }}
                         </button>
                     </div>
-                </form>
-
-                <!-- ASIDE: tips + supplier quick view -->
-                <aside class="po-form-aside">
-                    <div class="aside-card">
-                        <h3>Order checklist</h3>
-                        <ul class="checklist">
-                            <li :class="{ done: supplierSelection || formState.supplierName }">
-                                <span class="check-icon">{{ (supplierSelection || formState.supplierName) ? '✓' : '○' }}</span>
-                                Supplier selected
-                            </li>
-                            <li :class="{ done: formState.expectedDate }">
-                                <span class="check-icon">{{ formState.expectedDate ? '✓' : '○' }}</span>
-                                Expected date set
-                            </li>
-                            <li :class="{ done: lineItems.length > 0 }">
-                                <span class="check-icon">{{ lineItems.length > 0 ? '✓' : '○' }}</span>
-                                At least one item
-                            </li>
-                            <li :class="{ done: lineItems.length > 0 && !hasIncompleteLines }">
-                                <span class="check-icon">{{ (lineItems.length > 0 && !hasIncompleteLines) ? '✓' : '○' }}</span>
-                                All lines complete
-                            </li>
-                        </ul>
-                    </div>
-                    <div class="aside-card">
-                        <h3>Supplier list</h3>
-                        <div v-if="suppliers.length === 0" class="aside-empty">No suppliers yet.</div>
-                        <ul v-else class="supplier-list">
-                            <li v-for="s in suppliers.slice(0, 5)" :key="s.id">
-                                <span class="supplier-dot"></span>
-                                {{ s.name }}
-                            </li>
-                            <li v-if="suppliers.length > 5" class="supplier-more">
-                                +{{ suppliers.length - 5 }} more
-                            </li>
-                        </ul>
-                        <button type="button" class="aside-link" @click="goToSuppliers">
-                            Manage suppliers →
-                        </button>
-                    </div>
-                    <div class="aside-card aside-card--teal">
-                        <h3>Tip</h3>
-                        <p>Unit costs auto-fill from product/ingredient records. You can override them here per order.</p>
-                    </div>
-                </aside>
-            </div>
+                </div>
+            </form>
         </div>
     </section>
 </template>
@@ -351,7 +282,7 @@ const isPlanLocked = computed(
 const currentStoreLabel = computed(() => {
     const store = storeContext.currentStore;
     if (!store) return 'your store';
-    return `${store.name} · ${store.currency}`;
+    return store.name;
 });
 
 // Options for the searchable supplier dropdown (keeps the "No supplier" and
@@ -587,11 +518,6 @@ const goBack = () => {
     if (storeId) router.push(`/stores/${storeId}/purchase-orders`);
 };
 
-const goToSuppliers = () => {
-    const storeId = storeContext.currentStoreId;
-    if (storeId) router.push(`/stores/${storeId}/suppliers`);
-};
-
 onMounted(async () => {
     await storeContext.fetchStores();
     const routeStoreId = route.params.storeId as string | undefined;
@@ -603,8 +529,9 @@ watch(() => supplierSelection.value, (v) => { if (v !== 'CUSTOM') formState.supp
 </script>
 
 <style scoped>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-
+/* ============================================================
+   TOKENS
+============================================================ */
 .po-form-page {
     --c-text: #0f172a;
     --c-muted: #64748b;
@@ -612,7 +539,7 @@ watch(() => supplierSelection.value, (v) => { if (v !== 'CUSTOM') formState.supp
     --c-accent-dark: #0f766e;
     --c-border: #e2e8f0;
     --c-surface: #ffffff;
-    --c-bg: #f8fafc;
+    --c-bg: #f6f8f9;
     min-height: 100vh;
     padding: 2rem 1.5rem 3rem;
     background: var(--c-bg);
@@ -620,363 +547,258 @@ watch(() => supplierSelection.value, (v) => { if (v !== 'CUSTOM') formState.supp
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
+/* ============================================================
+   SHELL & HEADER
+============================================================ */
 .po-form-shell {
-    max-width: 1200px;
+    max-width: 760px;
     margin: 0 auto;
     display: flex;
     flex-direction: column;
-    gap: 1.75rem;
-}
-
-/* HEADER */
-.po-form-header {
-    display: flex;
-    flex-wrap: wrap;
     gap: 1.25rem;
+}
+
+.form-header {
+    display: flex;
+    flex-direction: column;
     align-items: flex-start;
-    justify-content: space-between;
 }
 
-.po-form-eyebrow {
-    display: inline-block;
-    font-size: 0.68rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-    color: var(--c-accent);
-    background: rgba(13, 148, 136, 0.08);
-    padding: 0.28rem 0.75rem;
-    border-radius: 999px;
-    margin-bottom: 0.6rem;
+.back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    border: none;
+    background: none;
+    padding: 0;
+    margin-bottom: 0.75rem;
+    font-size: 0.82rem;
+    font-weight: 600;
+    font-family: inherit;
+    color: var(--c-muted);
+    cursor: pointer;
+    transition: color 0.15s;
 }
 
-.po-form-title h1 {
+.back-link:hover { color: var(--c-accent-dark); }
+
+.form-header h1 {
     font-size: 1.9rem;
     font-weight: 800;
     letter-spacing: -0.03em;
     margin: 0 0 0.35rem;
+    color: var(--c-text);
 }
 
-.po-form-title p {
+.form-header p {
     color: var(--c-muted);
-    font-size: 0.92rem;
-    margin: 0;
     line-height: 1.55;
+    margin: 0;
+    font-size: 0.92rem;
 }
 
-.po-form-actions {
-    flex-shrink: 0;
-}
-
-/* LAYOUT */
-.po-form-content {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 280px;
-    gap: 1.5rem;
-    align-items: start;
-}
-
-/* MAIN FORM */
+/* ============================================================
+   FORM & CARDS
+============================================================ */
 .po-form {
-    background: var(--c-surface);
-    border: 1px solid var(--c-border);
-    border-radius: 16px;
-    padding: 1.75rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0;
-}
-
-.form-alert {
-    border-radius: 8px;
-    padding: 0.75rem 1rem;
-    font-size: 0.84rem;
-    font-weight: 500;
-    margin-bottom: 1.25rem;
-    border: 1px solid #fecaca;
-    background: #fef2f2;
-    color: #b91c1c;
-}
-
-.form-alert--error { border-color: #fecaca; background: #fef2f2; color: #b91c1c; }
-
-/* SECTIONS */
-.form-section {
-    padding: 1.5rem 0;
-    border-bottom: 1px solid var(--c-border);
     display: flex;
     flex-direction: column;
     gap: 1rem;
-    min-width: 0;
 }
 
-.form-section:last-of-type {
-    border-bottom: none;
-    padding-bottom: 0;
+.form-card {
+    background: var(--c-surface);
+    border: 1px solid var(--c-border);
+    border-radius: 16px;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
 }
 
-.section-title h2 {
-    font-size: 0.95rem;
+.card-title h2 {
+    font-size: 1rem;
     font-weight: 700;
     color: var(--c-text);
     margin: 0;
 }
 
-.section-title p {
+.card-title p {
     margin: 0.2rem 0 0;
     color: var(--c-muted);
     font-size: 0.82rem;
 }
 
-.section-title-row {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 1rem;
-}
-
-/* GRID */
-.form-grid { display: grid; gap: 1rem; }
-.form-grid.two-col { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
-.form-grid.three-col { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
-
-/* FIELDS */
-.field {
-    display: flex;
-    flex-direction: column;
-    gap: 0.4rem;
-    font-size: 0.8rem;
-    font-weight: 600;
-    color: var(--c-text);
-}
-
-.required { color: #ef4444; }
-
-.field input,
-.field select {
-    border-radius: 8px;
-    border: 1.5px solid var(--c-border);
-    padding: 0.65rem 0.9rem;
-    font-size: 0.875rem;
-    font-family: 'Inter', -apple-system, sans-serif;
-    color: var(--c-text);
-    background: var(--c-surface);
-    transition: border-color 0.15s, box-shadow 0.15s;
-}
-
-.field input:focus,
-.field select:focus {
-    outline: none;
-    border-color: var(--c-accent);
-    box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.12);
-}
-
-.field input:disabled,
-.field select:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-    background: #f8fafc;
-}
-
-.supplier-row {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 0.6rem;
-    align-items: center;
-}
-
-/* SUPPLIER INLINE FORM */
-.supplier-inline-form {
-    padding: 1rem 1.25rem;
-    border-radius: 10px;
-    border: 1.5px dashed rgba(13, 148, 136, 0.3);
-    background: rgba(13, 148, 136, 0.03);
-    display: flex;
-    flex-direction: column;
-    gap: 0.85rem;
-}
-
-.supplier-inline-title {
-    font-size: 0.8rem;
-    font-weight: 700;
-    color: var(--c-accent-dark);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-}
-
-.supplier-inline-actions {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 0.75rem;
-}
-
-.form-error { font-size: 0.8rem; color: #b91c1c; font-weight: 600; }
-
-/* PANEL STATE */
 .panel-state {
     padding: 1.5rem;
-    border-radius: 8px;
+    border-radius: 10px;
     background: #f1f5f9;
     color: var(--c-muted);
     font-size: 0.875rem;
     text-align: center;
 }
 
-/* LINE ITEMS TABLE */
-.line-items-table-wrap {
-    border-radius: 10px;
-    border: 1px solid var(--c-border);
-    overflow: hidden;
-    overflow-x: auto;
+/* ============================================================
+   FIELDS
+============================================================ */
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+}
+
+.field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
     min-width: 0;
 }
+
+.field > span {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--c-text);
+}
+
+.field > span em {
+    font-style: normal;
+    font-weight: 400;
+    color: var(--c-muted);
+}
+
+.field input {
+    border: 1.5px solid var(--c-border);
+    border-radius: 9px;
+    padding: 0.55rem 0.85rem;
+    font-size: 0.875rem;
+    font-family: 'Inter', -apple-system, sans-serif;
+    color: var(--c-text);
+    background: var(--c-surface);
+    transition: border-color 0.15s, box-shadow 0.15s;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.field input::placeholder { color: #94a3b8; }
+
+.field input:focus {
+    outline: none;
+    border-color: var(--c-accent);
+    box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.12);
+}
+
+.field input:disabled { background: #f1f5f9; color: #94a3b8; }
+
+.supplier-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.supplier-row > :first-child { flex: 1; min-width: 0; }
+
+.supplier-form {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1rem;
+    padding: 1rem;
+    background: #f8fafc;
+    border: 1px solid var(--c-border);
+    border-radius: 12px;
+}
+
+.supplier-actions {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.form-error {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #b91c1c;
+}
+
+/* ============================================================
+   LINE ITEMS
+============================================================ */
+.items-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1.75rem 1rem;
+    border: 1.5px dashed var(--c-border);
+    border-radius: 12px;
+}
+
+.items-empty p {
+    margin: 0;
+    font-size: 0.875rem;
+    color: var(--c-muted);
+}
+
+.table-wrap { overflow-x: auto; min-width: 0; }
 
 .line-items-table {
     width: 100%;
     border-collapse: collapse;
     font-size: 0.875rem;
+    min-width: 620px;
 }
 
 .line-items-table thead th {
-    padding: 0.6rem 0.9rem;
+    padding: 0.5rem 0.6rem;
     text-align: left;
-    font-size: 0.68rem;
+    font-size: 0.66rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.07em;
     color: var(--c-muted);
     border-bottom: 1.5px solid var(--c-border);
-    background: #f8fafc;
     white-space: nowrap;
 }
 
-.line-items-table thead th.align-right { text-align: right; }
-.line-items-table thead th:last-child { width: 36px; }
+.line-items-table thead th.num { text-align: right; }
 
 .line-items-table tbody tr {
-    border-bottom: 1px solid var(--c-border);
-    transition: background 0.1s;
+    border-bottom: 1px solid #f1f5f9;
 }
 
-.line-items-table tbody tr:last-child { border-bottom: none; }
-.line-items-table tbody tr:hover { background: #f8fafc; }
-.line-items-table tbody tr.row-incomplete { background: #fffbeb; }
+.line-items-table tbody tr.row-incomplete { background: #fffdf5; }
 
 .line-items-table tbody td {
-    padding: 0.65rem 0.9rem;
-    vertical-align: middle;
+    padding: 0.6rem 0.6rem;
+    vertical-align: top;
 }
 
-.line-items-table tfoot td {
-    padding: 0.7rem 0.9rem;
-    background: #f8fafc;
-    border-top: 1.5px solid var(--c-border);
-}
-
-.line-add-row-button {
-    width: 100%;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 2.4rem;
-    border: 1.5px dashed var(--c-border);
-    border-radius: 7px;
-    background: var(--c-surface);
-    color: var(--c-accent-dark);
-    font-family: 'Inter', -apple-system, sans-serif;
-    font-size: 0.84rem;
-    font-weight: 700;
-    cursor: pointer;
-    transition: border-color 0.15s, background 0.15s, color 0.15s;
-}
-
-.line-add-row-button:hover:not(:disabled) {
-    border-color: var(--c-accent);
-    background: rgba(13, 148, 136, 0.05);
-}
-
-.line-add-row-button:disabled {
-    opacity: 0.45;
-    cursor: not-allowed;
-}
+.col-type { width: 132px; }
 
 .line-select {
     border: 1.5px solid var(--c-border);
-    border-radius: 6px;
-    padding: 0.4rem 0.5rem;
-    font-size: 0.84rem;
+    border-radius: 8px;
+    padding: 0.5rem 0.5rem;
+    font-size: 0.82rem;
     font-family: 'Inter', -apple-system, sans-serif;
     color: var(--c-text);
     background: var(--c-surface);
-    min-width: 90px;
-    transition: border-color 0.15s;
+    width: 100%;
+    box-sizing: border-box;
+    transition: border-color 0.15s, box-shadow 0.15s;
 }
-
-.line-select--wide { min-width: 160px; }
 
 .line-select:focus {
     outline: none;
     border-color: var(--c-accent);
-    box-shadow: 0 0 0 2px rgba(13, 148, 136, 0.12);
+    box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.12);
 }
 
-.line-select:disabled { opacity: 0.5; cursor: not-allowed; }
+.col-item { min-width: 180px; }
 
-.line-input {
-    border: 1.5px solid var(--c-border);
-    border-radius: 6px;
-    padding: 0.4rem 0.5rem;
-    font-size: 0.84rem;
-    font-family: 'Inter', -apple-system, sans-serif;
-    color: var(--c-text);
-    background: var(--c-surface);
-    transition: border-color 0.15s;
-    display: block;
-    margin-left: auto;
-}
-
-.line-input--num {
-    width: 90px;
-    text-align: right;
-}
-
-.line-input:focus {
-    outline: none;
-    border-color: var(--c-accent);
-    box-shadow: 0 0 0 2px rgba(13, 148, 136, 0.12);
-}
-
-.line-input:disabled { opacity: 0.5; cursor: not-allowed; }
-
-.line-total {
-    font-weight: 700;
-    text-align: right;
-    color: var(--c-text);
-    white-space: nowrap;
-}
-
-.remove-btn {
-    background: none;
-    border: none;
-    font-size: 1rem;
-    color: #94a3b8;
-    cursor: pointer;
-    padding: 0.2rem 0.35rem;
-    border-radius: 4px;
-    line-height: 1;
-    transition: all 0.15s;
-}
-
-.remove-btn:hover:not(:disabled) { color: #ef4444; background: #fef2f2; }
-.remove-btn:disabled { opacity: 0.35; cursor: not-allowed; }
-
-/* PURCHASE UNIT INPUTS */
-.td-qty,
-.td-cost {
-    vertical-align: top;
-    padding-top: 0.55rem;
-}
+.col-qty, .col-cost { width: 120px; }
 
 .line-unit-wrap {
     display: flex;
@@ -984,84 +806,160 @@ watch(() => supplierSelection.value, (v) => { if (v !== 'CUSTOM') formState.supp
     gap: 0.35rem;
 }
 
-.line-unit-tag {
-    font-size: 0.72rem;
-    font-weight: 600;
-    color: #0f766e;
-    background: rgba(13, 148, 136, 0.08);
-    border: 1px solid rgba(13, 148, 136, 0.2);
-    border-radius: 4px;
-    padding: 0.18rem 0.45rem;
-    white-space: nowrap;
-    flex-shrink: 0;
+.line-input {
+    border: 1.5px solid var(--c-border);
+    border-radius: 8px;
+    padding: 0.5rem 0.55rem;
+    font-size: 0.875rem;
+    font-family: 'Inter', -apple-system, sans-serif;
+    color: var(--c-text);
+    background: var(--c-surface);
+    text-align: right;
+    width: 100%;
+    box-sizing: border-box;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    font-variant-numeric: tabular-nums;
 }
 
-.line-conversion-hint {
+.line-input:focus {
+    outline: none;
+    border-color: var(--c-accent);
+    box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.12);
+}
+
+.line-input:disabled { background: #f1f5f9; color: #94a3b8; }
+
+.line-unit-tag {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--c-muted);
+    white-space: nowrap;
+}
+
+.line-hint {
     margin-top: 0.25rem;
     font-size: 0.7rem;
-    color: #94a3b8;
-    white-space: nowrap;
+    color: var(--c-muted);
     text-align: right;
+    white-space: nowrap;
 }
 
-/* ORDER SUMMARY */
-.order-summary {
-    padding: 0.85rem 1rem;
-    background: #f8fafc;
-    border: 1px solid var(--c-border);
-    border-radius: 8px;
-}
-
-.order-summary-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-size: 0.85rem;
-    color: var(--c-muted);
-}
-
-.order-total {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-}
-
-.order-total-label {
-    font-size: 0.8rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.07em;
-    color: var(--c-muted);
-}
-
-.order-total-value {
-    font-size: 1.15rem;
-    font-weight: 800;
+.col-total {
+    text-align: right;
+    font-weight: 700;
     color: var(--c-text);
-    letter-spacing: -0.02em;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+    width: 110px;
+    padding-top: 1.1rem !important;
 }
 
-/* FORM ACTIONS */
-.form-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 0.75rem;
-    padding-top: 1.5rem;
-    margin-top: 0.25rem;
-    border-top: 1px solid var(--c-border);
-}
+.col-remove { width: 34px; text-align: right; }
 
-/* BUTTONS */
-.primary-button {
+.remove-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+    border: none;
+    background: transparent;
+    color: var(--c-muted);
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s;
+    margin-top: 0.3rem;
+}
+
+.remove-btn:hover:not(:disabled) { background: #fef2f2; color: #dc2626; }
+.remove-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.line-items-table tfoot td {
+    padding: 0.75rem 0.6rem 0;
+    border-top: 1.5px solid var(--c-border);
+    vertical-align: middle;
+}
+
+.tfoot-label {
+    text-align: right;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--c-muted);
+    white-space: nowrap;
+}
+
+.tfoot-total { padding-top: 0.75rem !important; }
+
+.add-line-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.5rem 0.9rem;
+    border-radius: 9px;
+    border: 1.5px dashed var(--c-border);
+    background: transparent;
+    color: var(--c-accent-dark);
+    font-size: 0.84rem;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+}
+
+.add-line-btn:hover:not(:disabled) {
+    border-color: var(--c-accent);
+    background: rgba(13, 148, 136, 0.05);
+}
+
+.add-line-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ============================================================
+   ACTIONS BAR
+============================================================ */
+.actions-bar {
+    position: sticky;
+    bottom: 0;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 1rem;
+    flex-wrap: wrap;
+    padding: 0.85rem 0;
+    margin-top: 0.25rem;
+    background: color-mix(in srgb, var(--c-bg) 90%, transparent);
+    backdrop-filter: blur(8px);
+    border-top: 1px solid var(--c-border);
+}
+
+.actions-error {
+    flex: 1;
+    min-width: 200px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #b91c1c;
+}
+
+.actions-buttons {
+    display: flex;
+    gap: 0.6rem;
+    align-items: center;
+}
+
+/* ============================================================
+   BUTTONS
+============================================================ */
+.primary-button {
+    display: inline-flex;
+    align-items: center;
     gap: 0.4rem;
-    padding: 0.65rem 1.5rem;
-    border-radius: 8px;
+    padding: 0.6rem 1.2rem;
+    border-radius: 9px;
     border: none;
     background: var(--c-accent);
-    color: #fff;
+    color: #ffffff;
     font-size: 0.875rem;
     font-weight: 600;
     font-family: 'Inter', -apple-system, sans-serif;
@@ -1079,19 +977,14 @@ watch(() => supplierSelection.value, (v) => { if (v !== 'CUSTOM') formState.supp
 
 .primary-button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 
-.primary-button--sm {
-    padding: 0.5rem 1rem;
-    font-size: 0.82rem;
-}
-
 .ghost-button {
     display: inline-flex;
     align-items: center;
-    gap: 0.35rem;
-    padding: 0.6rem 1rem;
-    border-radius: 8px;
+    gap: 0.4rem;
+    padding: 0.55rem 1rem;
+    border-radius: 9px;
     border: 1.5px solid var(--c-border);
-    background: transparent;
+    background: var(--c-surface);
     color: var(--c-text);
     font-size: 0.875rem;
     font-weight: 600;
@@ -1101,151 +994,92 @@ watch(() => supplierSelection.value, (v) => { if (v !== 'CUSTOM') formState.supp
     white-space: nowrap;
 }
 
-.ghost-button:hover:not(:disabled) {
-    border-color: var(--c-accent);
-    color: var(--c-accent-dark);
-    background: rgba(13, 148, 136, 0.05);
-}
-
+.ghost-button:hover:not(:disabled) { border-color: var(--c-accent); color: var(--c-accent-dark); background: rgba(13, 148, 136, 0.05); }
 .ghost-button:disabled { opacity: 0.4; cursor: not-allowed; }
 
-/* ASIDE */
-.po-form-aside {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-}
-
-.aside-card {
-    background: var(--c-surface);
-    border: 1px solid var(--c-border);
-    border-radius: 16px;
-    padding: 1.25rem 1.4rem;
-}
-
-.aside-card h3 {
-    font-size: 0.875rem;
-    font-weight: 700;
-    color: var(--c-text);
-    margin: 0 0 0.75rem;
-}
-
-.aside-card p {
-    font-size: 0.82rem;
-    color: var(--c-muted);
-    line-height: 1.55;
-    margin: 0;
-}
-
-.aside-card--teal {
-    background: rgba(13, 148, 136, 0.04);
-    border-color: rgba(13, 148, 136, 0.2);
-}
-
-/* CHECKLIST */
-.checklist {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-}
-
-.checklist li {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 0.82rem;
-    color: var(--c-muted);
-}
-
-.checklist li.done { color: var(--c-accent-dark); }
-
-.check-icon {
-    font-size: 0.75rem;
-    font-weight: 700;
-    width: 18px;
-    height: 18px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: #f1f5f9;
-    color: var(--c-muted);
-    flex-shrink: 0;
-}
-
-.checklist li.done .check-icon {
-    background: rgba(13, 148, 136, 0.12);
-    color: var(--c-accent-dark);
-}
-
-/* SUPPLIER LIST */
-.supplier-list {
-    list-style: none;
-    padding: 0;
-    margin: 0 0 0.75rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0.4rem;
-}
-
-.supplier-list li {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 0.82rem;
-    color: var(--c-text);
-}
-
-.supplier-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--c-accent);
-    flex-shrink: 0;
-}
-
-.supplier-more {
-    font-size: 0.78rem;
-    color: var(--c-muted);
-}
-
-.aside-empty {
-    font-size: 0.82rem;
-    color: var(--c-muted);
-    margin-bottom: 0.75rem;
-}
-
-.aside-link {
-    background: none;
-    border: none;
-    padding: 0;
-    font-size: 0.82rem;
-    font-weight: 600;
-    font-family: 'Inter', -apple-system, sans-serif;
-    color: var(--c-accent);
-    cursor: pointer;
-    transition: color 0.15s;
-}
-
-.aside-link:hover { color: var(--c-accent-dark); }
-
-/* RESPONSIVE */
-@media (max-width: 960px) {
-    .po-form-content { grid-template-columns: minmax(0, 1fr); }
-    .po-form { min-width: 0; }
-    .form-actions { flex-direction: column-reverse; }
-    .form-actions .primary-button,
-    .form-actions .ghost-button { width: 100%; justify-content: center; }
-    .line-items-table { font-size: 0.8rem; }
-}
-
+/* ============================================================
+   RESPONSIVE
+============================================================ */
 @media (max-width: 640px) {
-    .po-form-page { padding: 1.25rem 1rem 2.5rem; }
-    .po-form-title h1 { font-size: 1.5rem; }
-    .form-grid.three-col { grid-template-columns: 1fr; }
-    .section-title-row { flex-direction: column; align-items: flex-start; }
+    .po-form-page { padding: 1rem 0.875rem 2.5rem; }
+    .po-form-shell { gap: 1rem; }
+    .form-header h1 { font-size: 1.5rem; }
+
+    .form-card { padding: 1.1rem; border-radius: 12px; }
+    .form-grid { grid-template-columns: 1fr; }
+    .supplier-form { grid-template-columns: 1fr; }
+
+    /* ── Line items table → card rows ── */
+    .line-items-table { min-width: 0; }
+    .line-items-table thead { display: none; }
+    .line-items-table,
+    .line-items-table tbody,
+    .line-items-table tfoot { display: block; }
+
+    .line-items-table tbody tr {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 0.5rem 0.625rem;
+        padding: 0.85rem 0;
+        border-bottom: 1px solid var(--c-border);
+    }
+
+    .line-items-table tbody td {
+        padding: 0;
+        border: none;
+        width: auto;
+    }
+
+    .line-items-table tbody td.col-type { grid-column: 1; grid-row: 1; }
+    .line-items-table tbody td.col-remove {
+        grid-column: 2;
+        grid-row: 1;
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+    }
+    .remove-btn { margin-top: 0; }
+    .line-items-table tbody td.col-item { grid-column: 1 / -1; grid-row: 2; }
+    .line-items-table tbody td.col-qty { grid-column: 1; grid-row: 3; }
+    .line-items-table tbody td.col-cost { grid-column: 2; grid-row: 3; }
+    .line-items-table tbody td.col-total {
+        grid-column: 1 / -1;
+        grid-row: 4;
+        padding-top: 0 !important;
+        text-align: right;
+        font-size: 0.875rem;
+    }
+    .line-items-table tbody td.col-total::before {
+        content: 'Total';
+        margin-right: 0.5rem;
+        font-size: 0.66rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--c-muted);
+    }
+
+    .line-items-table tfoot tr {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+        padding-top: 0.85rem;
+    }
+    .line-items-table tfoot td { padding: 0; border: none; }
+    .line-items-table tfoot td:last-child { display: none; }
+    .tfoot-total { padding-top: 0 !important; }
+
+    /* The app's fixed bottom nav sits over a sticky bar on mobile,
+       so let the actions flow at the end of the form instead. */
+    .actions-bar {
+        position: static;
+        backdrop-filter: none;
+        background: transparent;
+    }
+    .actions-buttons { width: 100%; }
+    .actions-buttons .ghost-button,
+    .actions-buttons .primary-button { flex: 1; justify-content: center; }
 }
 </style>

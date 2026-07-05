@@ -11,19 +11,19 @@
                     <h1>Purchase orders</h1>
                     <p>Plan inbound stock and track receiving for {{ currentStoreLabel }}.</p>
                 </div>
-                <div class="po-kpis">
-                    <div class="kpi-card">
-                        <span class="kpi-label">Open POs</span>
-                        <span class="kpi-value">{{ openCount }}</span>
-                    </div>
-                    <div class="kpi-card">
-                        <span class="kpi-label">Received</span>
-                        <span class="kpi-value">{{ receivedCount }}</span>
-                    </div>
-                    <div class="kpi-card">
-                        <span class="kpi-label">Total orders</span>
-                        <span class="kpi-value">{{ totalCount }}</span>
-                    </div>
+                <div class="header-actions">
+                    <button class="ghost-button" :disabled="!storeContext.currentStoreId" @click="goToReceipts">
+                        <mdicon name="receipt-text-outline" size="16" />
+                        Receipts
+                    </button>
+                    <button class="ghost-button" :disabled="!storeContext.currentStoreId" @click="goToSuppliers">
+                        <mdicon name="truck-outline" size="16" />
+                        Suppliers
+                    </button>
+                    <button class="primary-button" :disabled="!storeContext.currentStoreId" @click="createOrder">
+                        <mdicon name="plus" size="16" />
+                        New purchase order
+                    </button>
                 </div>
             </header>
 
@@ -34,146 +34,157 @@
                 description="Upgrade to Standard to manage suppliers, draft purchase orders, and receive inventory."
             />
 
+            <div v-else-if="!storeContext.currentStoreId && !isLoading" class="panel-state">
+                Select or create a store to manage purchase orders.
+            </div>
+
             <template v-else>
-                <!-- TOOLBAR -->
-                <div class="po-toolbar">
-                    <div class="toolbar-left">
-                        <input
-                            v-model="searchQuery"
-                            type="text"
-                            class="search-input"
-                            placeholder="Search supplier or reference..."
-                        />
-                        <div class="filter-pills">
-                            <button
-                                v-for="opt in statusOptions"
-                                :key="opt.value"
-                                class="filter-pill"
-                                :class="{ active: statusFilter === opt.value }"
-                                type="button"
-                                @click="statusFilter = opt.value"
-                            >{{ opt.label }}</button>
+                <!-- STAT STRIP -->
+                <div class="stat-strip">
+                    <div class="stat">
+                        <span class="stat-value">{{ totalCount }}</span>
+                        <span class="stat-label">Orders</span>
+                    </div>
+                    <div class="stat" :class="{ 'stat--flagged': openCount > 0 }">
+                        <span class="stat-value">{{ openCount }}</span>
+                        <span class="stat-label">Open</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-value">{{ receivedCount }}</span>
+                        <span class="stat-label">Received</span>
+                    </div>
+                </div>
+
+                <!-- TABLE PANEL -->
+                <section class="po-panel">
+                    <div class="panel-toolbar">
+                        <div class="search-wrap">
+                            <mdicon name="magnify" size="17" class="search-icon" />
+                            <input
+                                v-model="searchQuery"
+                                type="text"
+                                class="search-input"
+                                placeholder="Search supplier or reference…"
+                            />
                         </div>
-                    </div>
-                    <div class="toolbar-right">
-                        <button class="ghost-button" @click="goToReceipts">Receipts</button>
-                        <button class="ghost-button" @click="goToSuppliers">Suppliers</button>
-                        <button class="primary-button" :disabled="!storeContext.currentStoreId" @click="createOrder">
-                            + New purchase order
-                        </button>
-                    </div>
-                </div>
-
-                <!-- DATE RANGE -->
-                <div class="date-row">
-                    <label class="date-field">
-                        <span>From</span>
-                        <input v-model="fromDate" type="date" class="date-input" />
-                    </label>
-                    <label class="date-field">
-                        <span>To</span>
-                        <input v-model="toDate" type="date" class="date-input" />
-                    </label>
-                    <select v-model="supplierFilter" class="supplier-select">
-                        <option value="">All suppliers</option>
-                        <option value="UNASSIGNED">Unassigned</option>
-                        <option v-for="supplier in suppliers" :key="supplier.id" :value="supplier.id">
-                            {{ supplier.name }}
-                        </option>
-                    </select>
-                </div>
-
-                <!-- TABLE -->
-                <div class="po-panel">
-                    <div v-if="!storeContext.currentStoreId" class="panel-state">
-                        Select or create a store to manage purchase orders.
-                    </div>
-                    <SkeletonLoader v-else-if="isLoading" :rows="6" label="Loading purchase orders…" />
-                    <div v-else class="table-wrap">
-                        <table class="po-table">
-                            <thead>
-                                <tr>
-                                    <th>Supplier</th>
-                                    <th>Status</th>
-                                    <th>Receiving progress</th>
-                                    <th>Expected</th>
-                                    <th>Created</th>
-                                    <th class="align-right">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr
-                                    v-for="order in paginatedOrders"
-                                    :key="order.id"
-                                    :class="{ 'row-overdue': isOverdue(order) }"
-                                >
-                                    <td>
-                                        <div class="supplier-name">{{ order.supplierName || 'Unassigned' }}</div>
-                                        <div v-if="order.latestInvoiceNumber && (order.status === 'RECEIVED' || order.status === 'PARTIALLY_RECEIVED')" class="invoice-tag">
-                                            <mdicon name="file-document-outline" size="11" />
-                                            {{ order.latestInvoiceNumber }}
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <span class="status-pill" :class="statusClass(order.status)">
-                                            {{ formatStatus(order.status) }}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <div class="progress-cell">
-                                            <div class="progress-bar-wrap">
-                                                <div
-                                                    class="progress-bar-fill"
-                                                    :style="{ width: receiveProgress(order) + '%' }"
-                                                    :class="{ 'progress-bar-fill--done': receiveProgress(order) >= 100 }"
-                                                ></div>
-                                            </div>
-                                            <span class="progress-label">{{ formatQty(order.qtyReceived) }} / {{ formatQty(order.qtyOrdered) }}</span>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <span
-                                            v-if="order.expectedDate"
-                                            :class="{ 'date-overdue': isOverdue(order), 'date-soon': isSoon(order) }"
-                                        >
-                                            {{ formatDate(order.expectedDate) }}
-                                        </span>
-                                        <span v-else class="date-anytime">Anytime</span>
-                                    </td>
-                                    <td class="date-muted">{{ formatDate(order.createdAt) }}</td>
-                                    <td class="table-actions">
-                                        <button class="ghost-button ghost-button--sm" @click="openOrder(order.id)">View</button>
-                                    </td>
-                                </tr>
-                                <tr v-if="purchaseOrders.length === 0">
-                                    <td colspan="6" class="empty-state">No purchase orders match your filters.</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <!-- PAGINATION -->
-                    <div class="pagination">
-                        <div class="pagination-info">
-                            <span>{{ totalCount }} order{{ totalCount !== 1 ? 's' : '' }}</span>
-                            <label class="pagination-size">
-                                <span>Show</span>
-                                <select v-model.number="pageSize">
-                                    <option v-for="size in pageSizeOptions" :key="size" :value="size">{{ size }}</option>
-                                </select>
+                        <select v-model="supplierFilter" class="supplier-select">
+                            <option value="">All suppliers</option>
+                            <option value="UNASSIGNED">Unassigned</option>
+                            <option v-for="supplier in suppliers" :key="supplier.id" :value="supplier.id">
+                                {{ supplier.name }}
+                            </option>
+                        </select>
+                        <div class="date-range">
+                            <label class="date-field">
+                                <span>From</span>
+                                <input v-model="fromDate" type="date" class="date-input" />
+                            </label>
+                            <label class="date-field">
+                                <span>To</span>
+                                <input v-model="toDate" type="date" class="date-input" />
                             </label>
                         </div>
-                        <div v-if="totalPages > 1" class="pagination-controls">
-                            <button class="page-btn" :disabled="page === 1" @click="changePage(page - 1)">
-                                <mdicon name="chevron-left" size="18" />
-                            </button>
-                            <span class="page-indicator">{{ page }} / {{ totalPages }}</span>
-                            <button class="page-btn" :disabled="page === totalPages" @click="changePage(page + 1)">
-                                <mdicon name="chevron-right" size="18" />
-                            </button>
-                        </div>
                     </div>
-                </div>
+
+                    <div class="filter-pills">
+                        <button
+                            v-for="opt in statusOptions"
+                            :key="opt.value"
+                            class="filter-pill"
+                            :class="{ active: statusFilter === opt.value }"
+                            type="button"
+                            @click="statusFilter = opt.value"
+                        >{{ opt.label }}</button>
+                    </div>
+
+                    <SkeletonLoader v-if="isLoading" :rows="6" label="Loading purchase orders…" />
+                    <template v-else>
+                        <div class="table-wrap">
+                            <table class="po-table">
+                                <thead>
+                                    <tr>
+                                        <th>Supplier</th>
+                                        <th>Status</th>
+                                        <th>Receiving progress</th>
+                                        <th>Expected</th>
+                                        <th>Created</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr
+                                        v-for="order in paginatedOrders"
+                                        :key="order.id"
+                                        class="row-clickable"
+                                        @click="openOrder(order.id)"
+                                    >
+                                        <td class="col-supplier">
+                                            <div class="supplier-name">{{ order.supplierName || 'Unassigned' }}</div>
+                                            <div v-if="order.latestInvoiceNumber && (order.status === 'RECEIVED' || order.status === 'PARTIALLY_RECEIVED')" class="invoice-tag">
+                                                <mdicon name="file-document-outline" size="11" />
+                                                {{ order.latestInvoiceNumber }}
+                                            </div>
+                                        </td>
+                                        <td class="col-status">
+                                            <span class="status-pill" :class="statusClass(order.status)">
+                                                {{ formatStatus(order.status) }}
+                                            </span>
+                                        </td>
+                                        <td class="col-progress">
+                                            <div class="progress-cell">
+                                                <div class="progress-bar-wrap">
+                                                    <div
+                                                        class="progress-bar-fill"
+                                                        :style="{ width: receiveProgress(order) + '%' }"
+                                                        :class="{ 'progress-bar-fill--done': receiveProgress(order) >= 100 }"
+                                                    ></div>
+                                                </div>
+                                                <span class="progress-label">{{ formatQty(order.qtyReceived) }} / {{ formatQty(order.qtyOrdered) }}</span>
+                                            </div>
+                                        </td>
+                                        <td class="col-expected">
+                                            <template v-if="order.expectedDate">
+                                                <span class="expected-date">{{ formatDate(order.expectedDate) }}</span>
+                                                <span v-if="isOverdue(order)" class="due-chip due-chip--overdue">Overdue</span>
+                                                <span v-else-if="isSoon(order)" class="due-chip due-chip--soon">Due soon</span>
+                                            </template>
+                                            <span v-else class="date-anytime">Anytime</span>
+                                        </td>
+                                        <td class="col-created date-muted">{{ formatDate(order.createdAt) }}</td>
+                                        <td class="col-open">
+                                            <mdicon name="chevron-right" size="18" class="row-chevron" />
+                                        </td>
+                                    </tr>
+                                    <tr v-if="purchaseOrders.length === 0">
+                                        <td colspan="6" class="empty-state">{{ emptyMessage }}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- PAGINATION -->
+                        <div class="pagination">
+                            <div class="pagination-info">
+                                <span>{{ totalCount }} order{{ totalCount !== 1 ? 's' : '' }}</span>
+                                <label class="pagination-size">
+                                    <span>Show</span>
+                                    <select v-model.number="pageSize">
+                                        <option v-for="size in pageSizeOptions" :key="size" :value="size">{{ size }}</option>
+                                    </select>
+                                </label>
+                            </div>
+                            <div v-if="totalPages > 1" class="pagination-controls">
+                                <button class="page-btn" :disabled="page === 1" @click="changePage(page - 1)">
+                                    <mdicon name="chevron-left" size="18" />
+                                </button>
+                                <span class="page-indicator">{{ page }} / {{ totalPages }}</span>
+                                <button class="page-btn" :disabled="page === totalPages" @click="changePage(page + 1)">
+                                    <mdicon name="chevron-right" size="18" />
+                                </button>
+                            </div>
+                        </div>
+                    </template>
+                </section>
             </template>
 
         </div>
@@ -239,9 +250,19 @@ const receivedCount = computed(() => receivedCountValue.value);
 
 const currentStoreLabel = computed(() => {
     const store = storeContext.currentStore;
-    if (!store) return 'Select a store to get started.';
-    return `${store.name} · ${store.currency}`;
+    if (!store) return 'your store';
+    return store.name;
 });
+
+const hasActiveFilters = computed(() =>
+    Boolean(searchQuery.value.trim() || statusFilter.value !== 'ALL' || supplierFilter.value || fromDate.value || toDate.value)
+);
+
+const emptyMessage = computed(() =>
+    hasActiveFilters.value
+        ? 'No purchase orders match your filters.'
+        : 'No purchase orders yet. Create one to plan inbound stock.'
+);
 
 const loadOrders = async () => {
     if (isPlanLocked.value) { purchaseOrders.value = []; totalCount.value = 0; openCountValue.value = 0; receivedCountValue.value = 0; return; }
@@ -414,8 +435,9 @@ watch(() => totalCount.value, async () => {
 </script>
 
 <style scoped>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-
+/* ============================================================
+   TOKENS
+============================================================ */
 .po-page {
     --c-text: #0f172a;
     --c-muted: #64748b;
@@ -423,7 +445,7 @@ watch(() => totalCount.value, async () => {
     --c-accent-dark: #0f766e;
     --c-border: #e2e8f0;
     --c-surface: #ffffff;
-    --c-bg: #f8fafc;
+    --c-bg: #f6f8f9;
     min-height: 100vh;
     padding: 2rem 1.5rem 3rem;
     background: var(--c-bg);
@@ -431,15 +453,17 @@ watch(() => totalCount.value, async () => {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
+/* ============================================================
+   SHELL & HEADER
+============================================================ */
 .po-shell {
-    max-width: 1200px;
+    max-width: 1100px;
     margin: 0 auto;
     display: flex;
     flex-direction: column;
-    gap: 1.5rem;
+    gap: 1.25rem;
 }
 
-/* HEADER */
 .po-header {
     display: flex;
     flex-wrap: wrap;
@@ -476,73 +500,102 @@ watch(() => totalCount.value, async () => {
     font-size: 0.92rem;
 }
 
-/* KPI CARDS */
-.po-kpis {
+.header-actions {
     display: flex;
+    gap: 0.6rem;
+    align-items: center;
     flex-wrap: wrap;
-    gap: 0.75rem;
 }
 
-.kpi-card {
+/* ============================================================
+   STAT STRIP
+============================================================ */
+.stat-strip {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    background: var(--c-surface);
+    border: 1px solid var(--c-border);
+    border-radius: 14px;
+    overflow: hidden;
+}
+
+.stat {
     display: flex;
     flex-direction: column;
     gap: 0.2rem;
-    padding: 0.9rem 1.25rem;
-    background: var(--c-surface);
-    border: 1px solid var(--c-border);
-    border-radius: 12px;
-    min-width: 120px;
+    padding: 1rem 1.4rem;
+    border-left: 1px solid var(--c-border);
+    min-width: 0;
 }
 
-.kpi-label {
+.stat:first-child { border-left: none; }
+
+.stat-value {
+    font-size: 1.5rem;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+    color: var(--c-text);
+    font-variant-numeric: tabular-nums;
+}
+
+.stat-label {
     font-size: 0.7rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.08em;
     color: var(--c-muted);
+    white-space: nowrap;
 }
 
-.kpi-value {
-    font-size: 1.6rem;
-    font-weight: 800;
-    letter-spacing: -0.03em;
-    color: var(--c-text);
-    line-height: 1;
+.stat--flagged .stat-value { color: #b45309; }
+
+/* ============================================================
+   PANEL & TOOLBAR
+============================================================ */
+.po-panel {
+    background: var(--c-surface);
+    border: 1px solid var(--c-border);
+    border-radius: 16px;
+    padding: 1.25rem 1.5rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    min-width: 0;
 }
 
-/* TOOLBAR */
-.po-toolbar {
+.panel-toolbar {
     display: flex;
     gap: 0.75rem;
-    align-items: center;
-    justify-content: space-between;
+    align-items: flex-end;
     flex-wrap: wrap;
 }
 
-.toolbar-left {
-    display: flex;
-    gap: 0.65rem;
-    align-items: center;
-    flex-wrap: wrap;
+.search-wrap {
+    position: relative;
     flex: 1;
+    min-width: 200px;
 }
 
-.toolbar-right {
-    display: flex;
-    gap: 0.65rem;
-    align-items: center;
-    flex-shrink: 0;
+.search-icon {
+    position: absolute;
+    left: 0.7rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #94a3b8;
+    pointer-events: none;
 }
 
 .search-input {
+    border-radius: 9px;
     border: 1.5px solid var(--c-border);
-    border-radius: 8px;
-    padding: 0.58rem 0.9rem;
+    padding: 0.55rem 0.9rem 0.55rem 2.3rem;
+    width: 100%;
+    box-sizing: border-box;
     font-size: 0.875rem;
     font-family: 'Inter', -apple-system, sans-serif;
     color: var(--c-text);
     background: var(--c-surface);
-    min-width: 220px;
     transition: border-color 0.15s, box-shadow 0.15s;
 }
 
@@ -554,21 +607,77 @@ watch(() => totalCount.value, async () => {
     box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.12);
 }
 
-/* STATUS FILTER PILLS */
+.supplier-select {
+    border: 1.5px solid var(--c-border);
+    border-radius: 9px;
+    padding: 0.55rem 0.85rem;
+    font-size: 0.875rem;
+    font-family: 'Inter', -apple-system, sans-serif;
+    color: var(--c-text);
+    background: var(--c-surface);
+    transition: border-color 0.15s, box-shadow 0.15s;
+    min-width: 170px;
+}
+
+.supplier-select:focus {
+    outline: none;
+    border-color: var(--c-accent);
+    box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.12);
+}
+
+.date-range {
+    display: flex;
+    gap: 0.5rem;
+    align-items: flex-end;
+}
+
+.date-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    font-size: 0.62rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--c-muted);
+}
+
+.date-input {
+    border: 1.5px solid var(--c-border);
+    border-radius: 9px;
+    padding: 0.5rem 0.7rem;
+    font-size: 0.84rem;
+    font-family: 'Inter', -apple-system, sans-serif;
+    color: var(--c-text);
+    background: var(--c-surface);
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.date-input:focus {
+    outline: none;
+    border-color: var(--c-accent);
+    box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.12);
+}
+
+/* ── Status pills ── */
 .filter-pills {
     display: inline-flex;
     background: #f1f5f9;
-    border-radius: 8px;
+    border-radius: 9px;
     padding: 0.2rem;
     gap: 0.15rem;
     border: 1px solid var(--c-border);
+    width: fit-content;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
 }
 
 .filter-pill {
     border: none;
     background: transparent;
-    padding: 0.32rem 0.75rem;
-    border-radius: 6px;
+    padding: 0.35rem 0.85rem;
+    border-radius: 7px;
     font-size: 0.78rem;
     font-weight: 600;
     font-family: 'Inter', -apple-system, sans-serif;
@@ -586,60 +695,6 @@ watch(() => totalCount.value, async () => {
     box-shadow: 0 1px 4px rgba(15, 23, 42, 0.1);
 }
 
-/* DATE ROW */
-.date-row {
-    display: flex;
-    gap: 0.75rem;
-    align-items: flex-end;
-    flex-wrap: wrap;
-}
-
-.date-field {
-    display: flex;
-    flex-direction: column;
-    gap: 0.28rem;
-    font-size: 0.68rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: var(--c-muted);
-}
-
-.date-input,
-.supplier-select {
-    border: 1.5px solid var(--c-border);
-    border-radius: 8px;
-    padding: 0.55rem 0.85rem;
-    font-size: 0.875rem;
-    font-family: 'Inter', -apple-system, sans-serif;
-    color: var(--c-text);
-    background: var(--c-surface);
-    transition: border-color 0.15s, box-shadow 0.15s;
-}
-
-.date-input:focus,
-.supplier-select:focus {
-    outline: none;
-    border-color: var(--c-accent);
-    box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.12);
-}
-
-.supplier-select {
-    min-width: 180px;
-    align-self: flex-end;
-}
-
-/* MAIN PANEL */
-.po-panel {
-    background: var(--c-surface);
-    border: 1px solid var(--c-border);
-    border-radius: 16px;
-    padding: 1.5rem;
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-}
-
 .panel-state {
     padding: 2rem;
     border-radius: 10px;
@@ -649,8 +704,10 @@ watch(() => totalCount.value, async () => {
     text-align: center;
 }
 
-/* TABLE */
-.table-wrap { overflow-x: auto; }
+/* ============================================================
+   TABLE
+============================================================ */
+.table-wrap { overflow-x: auto; min-width: 0; }
 
 .po-table {
     width: 100%;
@@ -667,11 +724,8 @@ watch(() => totalCount.value, async () => {
     letter-spacing: 0.07em;
     color: var(--c-muted);
     border-bottom: 1.5px solid var(--c-border);
-    background: #f8fafc;
     white-space: nowrap;
 }
-
-.po-table thead th.align-right { text-align: right; }
 
 .po-table tbody tr {
     border-bottom: 1px solid var(--c-border);
@@ -680,12 +734,7 @@ watch(() => totalCount.value, async () => {
 
 .po-table tbody tr:last-child { border-bottom: none; }
 .po-table tbody tr:hover { background: #f8fafc; }
-
-.po-table tbody tr.row-overdue {
-    background: #fff8f8;
-}
-
-.po-table tbody tr.row-overdue:hover { background: #fef2f2; }
+.po-table tbody tr.row-clickable { cursor: pointer; }
 
 .po-table tbody td {
     padding: 0.85rem 0.9rem;
@@ -710,7 +759,7 @@ watch(() => totalCount.value, async () => {
     margin-top: 0.25rem;
 }
 
-/* STATUS PILLS */
+/* ── Status pills ── */
 .status-pill {
     display: inline-flex;
     align-items: center;
@@ -722,6 +771,7 @@ watch(() => totalCount.value, async () => {
     letter-spacing: 0.07em;
     background: rgba(148, 163, 184, 0.15);
     color: var(--c-muted);
+    white-space: nowrap;
 }
 
 .status-pill--active { background: rgba(13, 148, 136, 0.1); color: var(--c-accent-dark); }
@@ -729,18 +779,19 @@ watch(() => totalCount.value, async () => {
 .status-pill--warning { background: rgba(245, 158, 11, 0.12); color: #92400e; }
 .status-pill--draft { background: rgba(99, 102, 241, 0.1); color: #4338ca; }
 
-/* PROGRESS BAR */
+/* ── Progress ── */
 .progress-cell {
     display: flex;
     align-items: center;
     gap: 0.6rem;
-    min-width: 140px;
+    min-width: 150px;
 }
 
 .progress-bar-wrap {
     flex: 1;
+    max-width: 130px;
     height: 6px;
-    background: #e2e8f0;
+    background: #eef2f5;
     border-radius: 999px;
     overflow: hidden;
 }
@@ -750,36 +801,50 @@ watch(() => totalCount.value, async () => {
     background: var(--c-accent);
     border-radius: 999px;
     transition: width 0.3s ease;
+    min-width: 2px;
 }
 
 .progress-bar-fill--done { background: #059669; }
 
 .progress-label {
-    font-size: 0.75rem;
+    font-size: 0.78rem;
     font-weight: 600;
     color: var(--c-muted);
     white-space: nowrap;
-    min-width: 60px;
+    font-variant-numeric: tabular-nums;
 }
 
-/* DATE CELLS */
-.date-overdue {
-    font-weight: 600;
-    color: #dc2626;
+/* ── Dates ── */
+.col-expected { white-space: nowrap; }
+
+.expected-date {
+    font-variant-numeric: tabular-nums;
 }
 
-.date-soon {
-    font-weight: 600;
-    color: #d97706;
+.due-chip {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 0.45rem;
+    padding: 0.1rem 0.5rem;
+    border-radius: 999px;
+    font-size: 0.64rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    white-space: nowrap;
 }
+
+.due-chip--overdue { background: #ffe4e6; color: #be123c; }
+.due-chip--soon { background: #fef3c7; color: #b45309; }
 
 .date-anytime { color: var(--c-muted); }
-.date-muted { color: var(--c-muted); font-size: 0.82rem; }
+.date-muted { color: var(--c-muted); font-size: 0.82rem; font-variant-numeric: tabular-nums; }
 
-.table-actions {
-    display: flex;
-    justify-content: flex-end;
-}
+.col-open { text-align: right; width: 34px; }
+
+.row-chevron { color: #cbd5e1; }
+
+.po-table tbody tr:hover .row-chevron { color: var(--c-accent-dark); }
 
 .empty-state {
     text-align: center;
@@ -788,7 +853,9 @@ watch(() => totalCount.value, async () => {
     font-size: 0.875rem;
 }
 
-/* PAGINATION */
+/* ============================================================
+   PAGINATION
+============================================================ */
 .pagination {
     display: flex;
     align-items: center;
@@ -825,6 +892,11 @@ watch(() => totalCount.value, async () => {
     cursor: pointer;
 }
 
+.pagination-size select:focus {
+    outline: none;
+    border-color: var(--c-accent);
+}
+
 .pagination-controls {
     display: flex;
     align-items: center;
@@ -854,14 +926,16 @@ watch(() => totalCount.value, async () => {
 .page-btn:hover:not(:disabled) { border-color: var(--c-accent); color: var(--c-accent-dark); background: rgba(13, 148, 136, 0.05); }
 .page-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 
-/* BUTTONS */
+/* ============================================================
+   BUTTONS
+============================================================ */
 .primary-button {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 0.4rem;
-    padding: 0.58rem 1.1rem;
-    border-radius: 8px;
+    padding: 0.6rem 1.1rem;
+    border-radius: 9px;
     border: none;
     background: var(--c-accent);
     color: #fff;
@@ -880,11 +954,11 @@ watch(() => totalCount.value, async () => {
 .ghost-button {
     display: inline-flex;
     align-items: center;
-    gap: 0.35rem;
-    padding: 0.55rem 0.9rem;
-    border-radius: 8px;
+    gap: 0.4rem;
+    padding: 0.58rem 1rem;
+    border-radius: 9px;
     border: 1.5px solid var(--c-border);
-    background: transparent;
+    background: var(--c-surface);
     color: var(--c-text);
     font-size: 0.875rem;
     font-weight: 600;
@@ -897,24 +971,108 @@ watch(() => totalCount.value, async () => {
 .ghost-button:hover:not(:disabled) { border-color: var(--c-accent); color: var(--c-accent-dark); background: rgba(13, 148, 136, 0.05); }
 .ghost-button:disabled { opacity: 0.4; cursor: not-allowed; }
 
-.ghost-button--sm {
-    padding: 0.38rem 0.75rem;
-    font-size: 0.8rem;
-}
-
-/* RESPONSIVE */
+/* ============================================================
+   RESPONSIVE
+============================================================ */
 @media (max-width: 768px) {
-    .po-toolbar { flex-direction: column; align-items: flex-start; }
-    .toolbar-right { width: 100%; flex-wrap: wrap; }
-    .toolbar-right .ghost-button { flex: 1 1 auto; justify-content: center; }
-    .toolbar-right .primary-button { flex: 1 1 100%; justify-content: center; }
-    .search-input { min-width: 0; width: 100%; }
-    .progress-cell { min-width: 100px; }
+    .panel-toolbar { flex-direction: column; align-items: stretch; }
+    .search-wrap { min-width: 0; }
+    .supplier-select { min-width: 0; width: 100%; }
+    .date-range { width: 100%; }
+    .date-field { flex: 1; }
+    .date-input { width: 100%; box-sizing: border-box; }
+    .filter-pills { width: 100%; }
+    .filter-pill { flex: 1; text-align: center; }
 }
 
 @media (max-width: 640px) {
-    .po-page { padding: 1.25rem 1rem 2.5rem; }
+    .po-page { padding: 1rem 0.875rem 2.5rem; }
+    .po-shell { gap: 1rem; }
+    .po-header { flex-direction: column; gap: 0.875rem; }
     .po-title h1 { font-size: 1.5rem; }
-    .filter-pills { flex-wrap: wrap; }
+
+    .header-actions {
+        width: 100%;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.5rem;
+    }
+    .header-actions .ghost-button,
+    .header-actions .primary-button {
+        width: 100%;
+        justify-content: center;
+    }
+    .header-actions .primary-button { grid-column: 1 / -1; }
+
+    .stat { padding: 0.75rem 0.9rem; }
+    .stat-value { font-size: 1.2rem; }
+    .stat-label { font-size: 0.62rem; }
+
+    .po-panel { padding: 1rem 0 0.75rem; border-radius: 12px; }
+    .panel-toolbar { padding: 0 1rem; }
+    .filter-pills { margin: 0 1rem; width: calc(100% - 2rem); }
+    .pagination { padding: 1rem 1rem 0; flex-direction: column; align-items: flex-start; gap: 0.5rem; }
+
+    /* ── Table → card view ── */
+    .po-table thead { display: none; }
+    .po-table,
+    .po-table tbody { display: block; }
+
+    .po-table tbody tr {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        grid-template-rows: auto auto auto;
+        padding: 0.875rem 1rem;
+        gap: 0.15rem 0.625rem;
+        border-bottom: 1px solid var(--c-border);
+    }
+    .po-table tbody tr:last-child { border-bottom: none; }
+
+    .po-table tbody td {
+        padding: 0;
+        border: none;
+        vertical-align: top;
+    }
+
+    /* Supplier + invoice */
+    .po-table tbody td.col-supplier { grid-column: 1; grid-row: 1; }
+
+    /* Status — top right */
+    .po-table tbody td.col-status {
+        grid-column: 2;
+        grid-row: 1;
+        display: flex;
+        justify-content: flex-end;
+        align-items: flex-start;
+    }
+
+    /* Progress — full width */
+    .po-table tbody td.col-progress {
+        grid-column: 1 / -1;
+        grid-row: 2;
+        padding-top: 0.5rem;
+    }
+    .po-table tbody td.col-progress .progress-bar-wrap { max-width: none; }
+
+    /* Expected + created on one line */
+    .po-table tbody td.col-expected {
+        grid-column: 1;
+        grid-row: 3;
+        padding-top: 0.35rem;
+        font-size: 0.78rem;
+        white-space: normal;
+    }
+    .po-table tbody td.col-created {
+        grid-column: 2;
+        grid-row: 3;
+        padding-top: 0.35rem;
+        text-align: right;
+        font-size: 0.75rem;
+    }
+
+    /* Chevron hidden — tap the row */
+    .po-table tbody td.col-open { display: none; }
+
+    .po-table tbody td.empty-state { grid-column: 1 / -1; padding: 2.5rem 1rem; }
 }
 </style>
