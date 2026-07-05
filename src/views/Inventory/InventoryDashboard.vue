@@ -9,121 +9,115 @@
                 <div class="inventory-title">
                     <span class="inventory-eyebrow">Inventory</span>
                     <h1>Stock overview</h1>
-                    <p>Monitor current stock for products and ingredients across {{ currentStoreLabel }}.</p>
+                    <p>Current stock for products and ingredients at {{ currentStoreLabel }}.</p>
                 </div>
-                <div class="inventory-kpis">
-                    <div class="kpi-card">
-                        <span class="kpi-label">Tracked items</span>
-                        <span class="kpi-value">{{ totalItems }}</span>
-                    </div>
-                    <div class="kpi-card" :class="{ 'kpi-card--warn': lowStockCount > 0 }">
-                        <span class="kpi-label">
-                            <span v-if="lowStockCount > 0" class="kpi-dot kpi-dot--warn"></span>
-                            Low stock
-                        </span>
-                        <span class="kpi-value">{{ lowStockCount }}</span>
-                        <span class="kpi-sub">Needs attention</span>
-                    </div>
-                    <div class="kpi-card" :class="{ 'kpi-card--danger': outOfStockCount > 0 }">
-                        <span class="kpi-label">
-                            <span v-if="outOfStockCount > 0" class="kpi-dot kpi-dot--danger"></span>
-                            Out of stock
-                        </span>
-                        <span class="kpi-value">{{ outOfStockCount }}</span>
-                        <span class="kpi-sub">Needs restocking</span>
-                    </div>
-                    <div class="kpi-card">
-                        <span class="kpi-label">Active</span>
-                        <span class="kpi-value">{{ activeCount }}</span>
-                        <span class="kpi-sub">Ready for sale</span>
-                    </div>
+                <div class="header-actions">
+                    <button class="ghost-button" :disabled="!storeContext.currentStoreId" @click="goToMovements">
+                        <mdicon name="history" size="16" />
+                        History
+                    </button>
+                    <button
+                        v-if="otherStores.length > 0 && canAdjust"
+                        class="ghost-button"
+                        :disabled="!storeContext.currentStoreId"
+                        @click="openTransferModal"
+                    >
+                        <mdicon name="swap-horizontal" size="16" />
+                        Transfer
+                    </button>
+                    <button class="primary-button" :disabled="!storeContext.currentStoreId || !canAdjust" @click="goToAdjustments">
+                        <mdicon name="plus" size="16" />
+                        Stock adjustment
+                    </button>
                 </div>
             </header>
 
-            <div class="inventory-content">
+            <div v-if="!storeContext.currentStoreId && !isLoading" class="panel-state">
+                Select or create a store to view inventory.
+            </div>
 
-                <!-- MAIN COLUMN -->
-                <div class="inventory-main">
+            <template v-else>
+                <!-- STAT STRIP (doubles as status filter) -->
+                <div class="stat-strip" role="group" aria-label="Filter by stock status">
+                    <button
+                        type="button"
+                        class="stat"
+                        :class="{ 'stat--active': statusFilter === 'ALL' }"
+                        :aria-pressed="statusFilter === 'ALL'"
+                        @click="statusFilter = 'ALL'"
+                    >
+                        <span class="stat-value">{{ totalItems }}</span>
+                        <span class="stat-label">Tracked items</span>
+                    </button>
+                    <button
+                        type="button"
+                        class="stat stat--warn"
+                        :class="{ 'stat--active': statusFilter === 'LOW', 'stat--flagged': lowStockCount > 0 }"
+                        :aria-pressed="statusFilter === 'LOW'"
+                        @click="toggleStatus('LOW')"
+                    >
+                        <span class="stat-value">{{ lowStockCount }}</span>
+                        <span class="stat-label">Low stock</span>
+                    </button>
+                    <button
+                        type="button"
+                        class="stat stat--danger"
+                        :class="{ 'stat--active': statusFilter === 'OUT', 'stat--flagged': outOfStockCount > 0 }"
+                        :aria-pressed="statusFilter === 'OUT'"
+                        @click="toggleStatus('OUT')"
+                    >
+                        <span class="stat-value">{{ outOfStockCount }}</span>
+                        <span class="stat-label">Out of stock</span>
+                    </button>
+                </div>
 
-                    <!-- TOOLBAR -->
-                    <div class="inv-toolbar">
-                        <div class="toolbar-left">
-                            <div class="filter-pills">
-                                <button class="pill" :class="{ active: filterType === 'ALL' }" @click="filterType = 'ALL'">All</button>
-                                <button class="pill" :class="{ active: filterType === 'LOW_STOCK' }" @click="filterType = 'LOW_STOCK'">
-                                    <span v-if="lowStockCount + outOfStockCount > 0" class="pill-alert-dot"></span>
-                                    Low stock
-                                </button>
-                                <button class="pill" :class="{ active: filterType === 'PRODUCT' }" @click="filterType = 'PRODUCT'">Products</button>
-                                <button
-                                    v-if="showIngredients"
-                                    class="pill"
-                                    :class="{ active: filterType === 'INGREDIENT' }"
-                                    @click="filterType = 'INGREDIENT'"
-                                >
-                                    Ingredients
-                                </button>
-                            </div>
+                <!-- TABLE PANEL -->
+                <section class="inventory-panel">
+                    <div class="panel-toolbar">
+                        <div class="search-wrap">
+                            <mdicon name="magnify" size="17" class="search-icon" />
                             <input
                                 v-model="searchQuery"
                                 type="text"
                                 class="search-input"
-                                placeholder="Search items..."
+                                placeholder="Search by name, SKU, or category…"
                             />
                         </div>
-                        <div class="toolbar-right">
-                            <button class="ghost-button" :disabled="!storeContext.currentStoreId" @click="goToMovements">
-                                Movement history
-                            </button>
+                        <div class="filter-pills">
+                            <button class="pill" :class="{ active: typeFilter === 'ALL' }" @click="typeFilter = 'ALL'">All</button>
+                            <button class="pill" :class="{ active: typeFilter === 'PRODUCT' }" @click="typeFilter = 'PRODUCT'">Products</button>
                             <button
-                                v-if="otherStores.length > 0 && canAdjust"
-                                class="ghost-button ghost-button--transfer"
-                                :disabled="!storeContext.currentStoreId"
-                                @click="openTransferModal"
+                                v-if="showIngredients"
+                                class="pill"
+                                :class="{ active: typeFilter === 'INGREDIENT' }"
+                                @click="typeFilter = 'INGREDIENT'"
                             >
-                                Transfer stock
-                            </button>
-                            <button class="primary-button" :disabled="!storeContext.currentStoreId || !canAdjust" @click="goToAdjustments">
-                                Stock adjustment
+                                Ingredients
                             </button>
                         </div>
                     </div>
 
-                    <!-- TABLE PANEL -->
-                    <section class="inventory-panel">
-                        <div v-if="!storeContext.currentStoreId" class="panel-state">
-                            Select or create a store to view inventory.
-                        </div>
-                        <SkeletonLoader v-else-if="isLoading" :rows="8" label="Loading inventory…" />
-                        <div v-else class="table-wrap">
+                    <SkeletonLoader v-if="isLoading" :rows="8" label="Loading inventory…" />
+                    <template v-else>
+                        <div class="table-wrap">
                             <table class="inventory-table">
                                 <thead>
                                     <tr>
                                         <th>Item</th>
-                                        <th>Type</th>
-                                        <th>Unit</th>
                                         <th>Stock level</th>
                                         <th>Status</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <tr
-                                        v-for="item in paginatedStock"
-                                        :key="`${item.itemType}-${item.itemId}`"
-                                        :class="{
-                                            'row-out-of-stock': isOutOfStock(item),
-                                            'row-low-stock': !isOutOfStock(item) && isLowStock(item),
-                                        }"
-                                    >
+                                    <tr v-for="item in paginatedStock" :key="`${item.itemType}-${item.itemId}`">
                                         <td>
                                             <div class="item-name">{{ item.name }}</div>
                                             <div class="item-meta">
                                                 <span v-if="item.sku">SKU {{ item.sku }}</span>
                                                 <span v-if="item.category">{{ item.category }}</span>
+                                                <span>{{ formatSubType(item.subType) }}</span>
                                             </div>
                                         </td>
-                                        <td class="item-type">{{ formatSubType(item.subType) }}</td>
-                                        <td class="item-unit">{{ item.unit }}</td>
                                         <td>
                                             <div class="stock-bar-cell">
                                                 <div class="stock-bar-wrap">
@@ -133,7 +127,7 @@
                                                         :style="{ width: stockBarWidth(item) + '%' }"
                                                     ></div>
                                                 </div>
-                                                <span class="stock-bar-label">{{ formatQty(item.currentQty) }}</span>
+                                                <span class="stock-bar-label">{{ formatQty(item.currentQty) }} {{ item.unit }}</span>
                                             </div>
                                         </td>
                                         <td>
@@ -143,8 +137,8 @@
                                         </td>
                                     </tr>
                                     <tr v-if="filteredStock.length === 0">
-                                        <td colspan="5" class="empty-state">
-                                            No inventory items match your filters.
+                                        <td colspan="3" class="empty-state">
+                                            {{ emptyMessage }}
                                         </td>
                                     </tr>
                                 </tbody>
@@ -171,52 +165,9 @@
                                 </button>
                             </div>
                         </div>
-                    </section>
-                </div>
-
-                <!-- ASIDE -->
-                <aside class="insight-panel">
-                    <div class="insight-card" :class="{ 'insight-card--alert': lowStockItems.length > 0 }">
-                        <h3>
-                            <span v-if="lowStockItems.length > 0" class="alert-dot"></span>
-                            Low stock alerts
-                        </h3>
-                        <div v-if="lowStockItems.length === 0" class="insight-empty">
-                            All items are sufficiently stocked.
-                        </div>
-                        <ul v-else class="low-stock-list">
-                            <li
-                                v-for="item in lowStockItems.slice(0, 8)"
-                                :key="`${item.itemType}-${item.itemId}`"
-                                class="low-stock-item"
-                            >
-                                <div class="low-stock-name">{{ item.name }}</div>
-                                <div class="low-stock-qty" :class="{ 'qty-zero': isOutOfStock(item) }">
-                                    {{ isOutOfStock(item) ? 'Out' : formatQty(item.currentQty) + ' ' + item.unit }}
-                                </div>
-                            </li>
-                        </ul>
-                        <div v-if="lowStockItems.length > 8" class="insight-more">
-                            +{{ lowStockItems.length - 8 }} more items
-                        </div>
-                    </div>
-
-                    <div class="insight-card insight-card--actions">
-                        <h3>Quick actions</h3>
-                        <button class="secondary-button" :disabled="!canAdjust" @click="goToAdjustments">New adjustment</button>
-                        <button
-                            v-if="otherStores.length > 0 && canAdjust"
-                            class="secondary-button"
-                            @click="openTransferModal"
-                        >
-                            Transfer stock
-                        </button>
-                        <button class="secondary-button" @click="goToMovements">Movement history</button>
-                        <button class="secondary-button" @click="goToProducts">Manage products</button>
-                        <button v-if="showIngredients" class="secondary-button" @click="goToIngredients">Manage ingredients</button>
-                    </div>
-                </aside>
-            </div>
+                    </template>
+                </section>
+            </template>
         </div>
     </section>
 
@@ -353,7 +304,8 @@ const storeContext = useStoreContextStore();
 const stockItems = ref<StockItem[]>([]);
 const isLoading = ref(false);
 const searchQuery = ref('');
-const filterType = ref<'ALL' | 'PRODUCT' | 'INGREDIENT' | 'LOW_STOCK'>('ALL');
+const statusFilter = ref<'ALL' | 'LOW' | 'OUT'>('ALL');
+const typeFilter = ref<'ALL' | 'PRODUCT' | 'INGREDIENT'>('ALL');
 const page = ref(1);
 const pageSize = ref(10);
 const pageSizeOptions = [10, 20, 50];
@@ -395,16 +347,29 @@ const stockBarClass = (item: StockItem) => {
     return 'stock-bar-fill--healthy';
 };
 
+const toggleStatus = (status: 'LOW' | 'OUT') => {
+    statusFilter.value = statusFilter.value === status ? 'ALL' : status;
+};
+
 const filteredStock = computed(() => {
     const query = searchQuery.value.trim().toLowerCase();
-    const type = filterType.value;
     return stockItems.value.filter((item) => {
-        if (type === 'LOW_STOCK' && !isLowStock(item) && !isOutOfStock(item)) return false;
-        if (type === 'PRODUCT' && item.itemType !== 'PRODUCT') return false;
-        if (type === 'INGREDIENT' && item.itemType !== 'INGREDIENT') return false;
+        if (statusFilter.value === 'LOW' && !isLowStock(item)) return false;
+        if (statusFilter.value === 'OUT' && !isOutOfStock(item)) return false;
+        if (typeFilter.value === 'PRODUCT' && item.itemType !== 'PRODUCT') return false;
+        if (typeFilter.value === 'INGREDIENT' && item.itemType !== 'INGREDIENT') return false;
         if (query && !item.name.toLowerCase().includes(query) && !(item.sku || '').toLowerCase().includes(query) && !(item.category || '').toLowerCase().includes(query)) return false;
         return true;
     });
+});
+
+const emptyMessage = computed(() => {
+    if (searchQuery.value.trim()) return 'No items match your search.';
+    if (statusFilter.value === 'LOW') return 'No items are running low right now.';
+    if (statusFilter.value === 'OUT') return 'Nothing is out of stock right now.';
+    if (typeFilter.value === 'PRODUCT') return 'No products tracked yet. Add products to start tracking stock.';
+    if (typeFilter.value === 'INGREDIENT') return 'No ingredients tracked yet. Add ingredients to start tracking stock.';
+    return 'No inventory items yet. Add products or ingredients to start tracking stock.';
 });
 
 const totalPages = computed(() => {
@@ -423,15 +388,13 @@ const changePage = (nextPage: number) => {
 };
 
 const totalItems = computed(() => stockItems.value.length);
-const activeCount = computed(() => stockItems.value.filter((item) => item.active).length);
 const lowStockCount = computed(() => stockItems.value.filter((item) => isLowStock(item)).length);
 const outOfStockCount = computed(() => stockItems.value.filter((item) => isOutOfStock(item)).length);
-const lowStockItems = computed(() => stockItems.value.filter((item) => isOutOfStock(item) || isLowStock(item)));
 
 const currentStoreLabel = computed(() => {
     const store = storeContext.currentStore;
-    if (!store) return 'Select a store to get started.';
-    return `${store.name} · ${store.currency}`;
+    if (!store) return 'your store';
+    return store.name;
 });
 
 const canAdjust = computed(() => canAccess(storeContext.currentStore?.role, 'inventoryAdjustments'));
@@ -576,7 +539,7 @@ const formatQty = (value: number) => {
 const formatSubType = (subType: string) => {
     switch (subType) {
         case 'READY_MADE': return 'Ready-made';
-        case 'RAW_MATERIAL': return 'Raw Material';
+        case 'RAW_MATERIAL': return 'Raw material';
         case 'PACKAGING': return 'Packaging';
         default: return subType;
     }
@@ -585,16 +548,6 @@ const formatSubType = (subType: string) => {
 const goToAdjustments = () => {
     if (!storeContext.currentStoreId) return;
     router.push(`/stores/${storeContext.currentStoreId}/inventory/adjustments`);
-};
-
-const goToProducts = () => {
-    if (!storeContext.currentStoreId) return;
-    router.push(`/stores/${storeContext.currentStoreId}/products`);
-};
-
-const goToIngredients = () => {
-    if (!storeContext.currentStoreId) return;
-    router.push(`/stores/${storeContext.currentStoreId}/ingredients`);
 };
 
 const goToMovements = () => {
@@ -625,18 +578,18 @@ watch(
 );
 
 watch(() => searchQuery.value, () => { page.value = 1; });
-watch(() => filterType.value, () => { page.value = 1; });
+watch(() => statusFilter.value, () => { page.value = 1; });
+watch(() => typeFilter.value, () => { page.value = 1; });
+watch(() => pageSize.value, () => { page.value = 1; });
 
 watch(
     () => canUseIngredients.value,
     (allowed) => {
-        if (!allowed && filterType.value === 'INGREDIENT') {
-            filterType.value = 'PRODUCT';
+        if (!allowed && typeFilter.value === 'INGREDIENT') {
+            typeFilter.value = 'PRODUCT';
         }
     }
 );
-
-watch(() => pageSize.value, () => { page.value = 1; });
 
 watch(
     () => filteredStock.value.length,
@@ -659,8 +612,6 @@ watch(
 </script>
 
 <style scoped>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-
 /* ============================================================
    TOKENS
 ============================================================ */
@@ -671,7 +622,7 @@ watch(
     --c-accent-dark: #0f766e;
     --c-border: #e2e8f0;
     --c-surface: #ffffff;
-    --c-bg: #f8fafc;
+    --c-bg: #f6f8f9;
     min-height: 100vh;
     padding: 2rem 1.5rem 3rem;
     background: var(--c-bg);
@@ -680,19 +631,16 @@ watch(
 }
 
 /* ============================================================
-   SHELL
+   SHELL & HEADER
 ============================================================ */
 .inventory-shell {
-    max-width: 1200px;
+    max-width: 1100px;
     margin: 0 auto;
     display: flex;
     flex-direction: column;
-    gap: 1.75rem;
+    gap: 1.25rem;
 }
 
-/* ============================================================
-   HEADER
-============================================================ */
 .inventory-header {
     display: flex;
     flex-wrap: wrap;
@@ -730,97 +678,92 @@ watch(
     font-size: 0.92rem;
 }
 
-/* ============================================================
-   KPI CARDS
-============================================================ */
-.inventory-kpis {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 0.75rem;
-    align-items: stretch;
-    flex: 1 1 340px;
-    min-width: 0;
+.header-actions {
+    display: flex;
+    gap: 0.6rem;
+    align-items: center;
+    flex-wrap: wrap;
 }
 
-.kpi-card {
+/* ============================================================
+   STAT STRIP (clickable status filters)
+============================================================ */
+.stat-strip {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    background: var(--c-surface);
+    border: 1px solid var(--c-border);
+    border-radius: 14px;
+    overflow: hidden;
+}
+
+.stat {
     display: flex;
     flex-direction: column;
     gap: 0.2rem;
-    padding: 0.9rem 1.25rem;
-    background: var(--c-surface);
-    border: 1px solid var(--c-border);
-    border-radius: 12px;
+    padding: 1rem 1.4rem;
+    border: none;
+    border-left: 1px solid var(--c-border);
+    background: transparent;
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.15s, box-shadow 0.15s;
     min-width: 0;
-    transition: border-color 0.15s;
 }
 
-.kpi-card--warn {
-    border-color: #fbbf24;
-    background: #fffbeb;
+.stat:first-child { border-left: none; }
+
+.stat:hover { background: #f8fafc; }
+
+.stat--active {
+    background: rgba(13, 148, 136, 0.06);
+    box-shadow: inset 0 -2px 0 var(--c-accent);
 }
 
-.kpi-card--danger {
-    border-color: #fca5a5;
-    background: #fef2f2;
+.stat--active:hover { background: rgba(13, 148, 136, 0.08); }
+
+.stat-value {
+    font-size: 1.5rem;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+    color: var(--c-text);
+    font-variant-numeric: tabular-nums;
 }
 
-.kpi-label {
-    display: flex;
-    align-items: center;
-    gap: 0.35rem;
+.stat-label {
     font-size: 0.7rem;
-    font-weight: 600;
+    font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.08em;
     color: var(--c-muted);
+    white-space: nowrap;
 }
 
-.kpi-dot {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    flex-shrink: 0;
-}
+.stat--warn.stat--flagged .stat-value { color: #b45309; }
+.stat--warn.stat--active { box-shadow: inset 0 -2px 0 #f59e0b; background: #fffbeb; }
+.stat--warn.stat--active:hover { background: #fef3c7; }
 
-.kpi-dot--warn { background: #f59e0b; }
-.kpi-dot--danger { background: #ef4444; }
-
-.kpi-value {
-    font-size: 1.6rem;
-    font-weight: 800;
-    letter-spacing: -0.03em;
-    color: var(--c-text);
-    line-height: 1;
-}
-
-.kpi-card--warn .kpi-value { color: #92400e; }
-.kpi-card--danger .kpi-value { color: #b91c1c; }
-
-.kpi-sub {
-    font-size: 0.72rem;
-    color: var(--c-muted);
-}
+.stat--danger.stat--flagged .stat-value { color: #b91c1c; }
+.stat--danger.stat--active { box-shadow: inset 0 -2px 0 #ef4444; background: #fef2f2; }
+.stat--danger.stat--active:hover { background: #fee2e2; }
 
 /* ============================================================
-   LAYOUT
+   PANEL & TOOLBAR
 ============================================================ */
-.inventory-content {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 280px;
-    gap: 1.5rem;
-    align-items: start;
-}
-
-.inventory-main {
+.inventory-panel {
+    background: var(--c-surface);
+    border: 1px solid var(--c-border);
+    border-radius: 16px;
+    padding: 1.25rem 1.5rem 1.5rem;
     display: flex;
     flex-direction: column;
     gap: 1rem;
+    min-width: 0;
 }
 
-/* ============================================================
-   TOOLBAR
-============================================================ */
-.inv-toolbar {
+.panel-toolbar {
     display: flex;
     gap: 0.75rem;
     align-items: center;
@@ -828,74 +771,28 @@ watch(
     flex-wrap: wrap;
 }
 
-.toolbar-left {
-    display: flex;
-    gap: 0.65rem;
-    align-items: center;
-    flex-wrap: wrap;
-    flex: 1;
-}
-
-.toolbar-right {
-    display: flex;
-    gap: 0.65rem;
-    align-items: center;
-    flex-shrink: 0;
-}
-
-/* ============================================================
-   FILTER PILLS
-============================================================ */
-.filter-pills {
-    display: inline-flex;
-    background: #f1f5f9;
-    border-radius: 8px;
-    padding: 0.2rem;
-    gap: 0.15rem;
-    border: 1px solid var(--c-border);
-}
-
-.pill {
+.search-wrap {
     position: relative;
-    border: none;
-    background: transparent;
-    padding: 0.35rem 0.8rem;
-    border-radius: 6px;
-    font-size: 0.78rem;
-    font-weight: 600;
-    font-family: 'Inter', -apple-system, sans-serif;
-    color: var(--c-muted);
-    cursor: pointer;
-    transition: all 0.15s;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
+    flex: 1;
+    min-width: 220px;
+    max-width: 380px;
 }
 
-.pill:hover { color: var(--c-text); }
-
-.pill.active {
-    background: var(--c-surface);
-    color: var(--c-accent-dark);
-    box-shadow: 0 1px 4px rgba(15, 23, 42, 0.1);
+.search-icon {
+    position: absolute;
+    left: 0.7rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #94a3b8;
+    pointer-events: none;
 }
 
-.pill-alert-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: #f59e0b;
-    flex-shrink: 0;
-}
-
-/* ============================================================
-   SEARCH INPUT
-============================================================ */
 .search-input {
-    border-radius: 8px;
+    border-radius: 9px;
     border: 1.5px solid var(--c-border);
-    padding: 0.6rem 0.9rem;
-    min-width: 200px;
+    padding: 0.55rem 0.9rem 0.55rem 2.3rem;
+    width: 100%;
+    box-sizing: border-box;
     font-size: 0.875rem;
     font-family: 'Inter', -apple-system, sans-serif;
     color: var(--c-text);
@@ -911,18 +808,36 @@ watch(
     box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.12);
 }
 
-/* ============================================================
-   MAIN PANEL
-============================================================ */
-.inventory-panel {
-    background: var(--c-surface);
+.filter-pills {
+    display: inline-flex;
+    background: #f1f5f9;
+    border-radius: 9px;
+    padding: 0.2rem;
+    gap: 0.15rem;
     border: 1px solid var(--c-border);
-    border-radius: 16px;
-    padding: 1.5rem;
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-    min-width: 0;
+    flex-shrink: 0;
+}
+
+.pill {
+    border: none;
+    background: transparent;
+    padding: 0.35rem 0.85rem;
+    border-radius: 7px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    font-family: 'Inter', -apple-system, sans-serif;
+    color: var(--c-muted);
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+}
+
+.pill:hover { color: var(--c-text); }
+
+.pill.active {
+    background: var(--c-surface);
+    color: var(--c-accent-dark);
+    box-shadow: 0 1px 4px rgba(15, 23, 42, 0.1);
 }
 
 .panel-state {
@@ -954,7 +869,6 @@ watch(
     letter-spacing: 0.07em;
     color: var(--c-muted);
     border-bottom: 1.5px solid var(--c-border);
-    background: #f8fafc;
     white-space: nowrap;
 }
 
@@ -965,11 +879,6 @@ watch(
 
 .inventory-table tbody tr:last-child { border-bottom: none; }
 .inventory-table tbody tr:hover { background: #f8fafc; }
-
-.inventory-table tbody tr.row-out-of-stock { background: #fff8f8; }
-.inventory-table tbody tr.row-out-of-stock:hover { background: #fef2f2; }
-.inventory-table tbody tr.row-low-stock { background: #fffdf0; }
-.inventory-table tbody tr.row-low-stock:hover { background: #fefce8; }
 
 .inventory-table tbody td {
     padding: 0.85rem 0.9rem;
@@ -985,20 +894,15 @@ watch(
     font-size: 0.75rem;
     color: var(--c-muted);
     display: flex;
-    gap: 0.75rem;
+    gap: 0.35rem;
     flex-wrap: wrap;
     margin-top: 0.1rem;
 }
 
-.item-type {
-    font-size: 0.8rem;
-    font-weight: 600;
-    color: var(--c-accent-dark);
-}
-
-.item-unit {
-    color: var(--c-muted);
-    font-size: 0.85rem;
+.item-meta span + span::before {
+    content: '·';
+    margin-right: 0.35rem;
+    color: #cbd5e1;
 }
 
 /* ============================================================
@@ -1007,14 +911,15 @@ watch(
 .stock-bar-cell {
     display: flex;
     align-items: center;
-    gap: 0.6rem;
-    min-width: 130px;
+    gap: 0.7rem;
+    min-width: 170px;
 }
 
 .stock-bar-wrap {
     flex: 1;
+    max-width: 140px;
     height: 6px;
-    background: #e2e8f0;
+    background: #eef2f5;
     border-radius: 999px;
     overflow: hidden;
 }
@@ -1030,12 +935,11 @@ watch(
 .stock-bar-fill--danger { background: #ef4444; width: 0 !important; }
 
 .stock-bar-label {
-    font-size: 0.8rem;
+    font-size: 0.82rem;
     font-weight: 600;
     color: var(--c-text);
     white-space: nowrap;
-    min-width: 32px;
-    text-align: right;
+    font-variant-numeric: tabular-nums;
 }
 
 /* ============================================================
@@ -1145,7 +1049,7 @@ watch(
     align-items: center;
     gap: 0.4rem;
     padding: 0.6rem 1.1rem;
-    border-radius: 8px;
+    border-radius: 9px;
     border: none;
     background: var(--c-accent);
     color: #ffffff;
@@ -1169,11 +1073,11 @@ watch(
 .ghost-button {
     display: inline-flex;
     align-items: center;
-    gap: 0.3rem;
+    gap: 0.4rem;
     padding: 0.58rem 1rem;
-    border-radius: 8px;
+    border-radius: 9px;
     border: 1.5px solid var(--c-border);
-    background: transparent;
+    background: var(--c-surface);
     color: var(--c-text);
     font-size: 0.875rem;
     font-weight: 600;
@@ -1186,161 +1090,43 @@ watch(
 .ghost-button:hover:not(:disabled) { border-color: var(--c-accent); color: var(--c-accent-dark); background: rgba(13, 148, 136, 0.05); }
 .ghost-button:disabled { opacity: 0.4; cursor: not-allowed; }
 
-.secondary-button {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    padding: 0.55rem 1rem;
-    border-radius: 8px;
-    border: 1.5px solid var(--c-border);
-    background: transparent;
-    color: var(--c-text);
-    font-size: 0.85rem;
-    font-weight: 600;
-    font-family: 'Inter', -apple-system, sans-serif;
-    cursor: pointer;
-    transition: all 0.15s;
-    width: 100%;
-    text-align: left;
-}
-
-.secondary-button:hover:not(:disabled) { border-color: var(--c-accent); color: var(--c-accent-dark); background: rgba(13, 148, 136, 0.05); }
-.secondary-button:disabled { opacity: 0.4; cursor: not-allowed; }
-
-/* ============================================================
-   INSIGHT ASIDE
-============================================================ */
-.insight-panel {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-}
-
-.insight-card {
-    background: var(--c-surface);
-    border: 1px solid var(--c-border);
-    border-radius: 16px;
-    padding: 1.25rem 1.4rem;
-}
-
-.insight-card--alert {
-    border-color: #fbbf24;
-    background: #fffbeb;
-}
-
-.insight-card--actions {
-    background: rgba(13, 148, 136, 0.04);
-    border-color: rgba(13, 148, 136, 0.2);
-    display: flex;
-    flex-direction: column;
-    gap: 0.6rem;
-}
-
-.insight-card h3 {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 0.875rem;
-    font-weight: 700;
-    color: var(--c-text);
-    margin: 0 0 0.85rem;
-}
-
-.alert-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: #f59e0b;
-    flex-shrink: 0;
-}
-
-/* LOW STOCK LIST */
-.low-stock-list {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 0;
-}
-
-.low-stock-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
-    padding: 0.5rem 0;
-    border-bottom: 1px solid rgba(226, 232, 240, 0.6);
-    font-size: 0.82rem;
-}
-
-.low-stock-item:last-child { border-bottom: none; }
-
-.low-stock-name {
-    font-weight: 600;
-    color: var(--c-text);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    flex: 1;
-    min-width: 0;
-}
-
-.low-stock-qty {
-    font-size: 0.78rem;
-    font-weight: 600;
-    color: #92400e;
-    white-space: nowrap;
-    flex-shrink: 0;
-}
-
-.low-stock-qty.qty-zero {
-    color: #b91c1c;
-}
-
-.insight-empty {
-    font-size: 0.82rem;
-    color: var(--c-muted);
-    line-height: 1.5;
-}
-
-.insight-more {
-    margin-top: 0.6rem;
-    font-size: 0.75rem;
-    font-weight: 600;
-    color: var(--c-accent-dark);
-    cursor: pointer;
-}
-
 /* ============================================================
    RESPONSIVE
 ============================================================ */
-@media (max-width: 960px) {
-    .inventory-content { grid-template-columns: 1fr; }
+@media (max-width: 768px) {
+    .panel-toolbar { flex-direction: column; align-items: stretch; }
+    .search-wrap { max-width: none; }
+    .filter-pills { width: 100%; }
+    .filter-pills .pill { flex: 1; text-align: center; justify-content: center; }
 }
 
-@media (max-width: 768px) {
-    .inv-toolbar { flex-direction: column; align-items: stretch; }
-    .toolbar-left { flex-direction: column; align-items: stretch; }
-    .toolbar-right {
+@media (max-width: 640px) {
+    .inventory-page { padding: 1rem 0.875rem 2.5rem; }
+    .inventory-shell { gap: 1rem; }
+    .inventory-header { flex-direction: column; gap: 0.875rem; }
+    .inventory-title h1 { font-size: 1.5rem; }
+
+    .header-actions {
         width: 100%;
         display: grid;
         grid-template-columns: 1fr 1fr;
         gap: 0.5rem;
     }
-    .toolbar-right .ghost-button,
-    .toolbar-right .primary-button {
+    .header-actions .ghost-button,
+    .header-actions .primary-button {
         width: 100%;
         justify-content: center;
     }
-    .search-input { min-width: 0; width: 100%; }
-    .filter-pills { width: 100%; }
-}
+    /* Primary action spans the full row beneath the two ghosts. */
+    .header-actions .primary-button { grid-column: 1 / -1; }
 
-@media (max-width: 640px) {
-    .inventory-page { padding: 1rem 0.875rem 2.5rem; }
-    .inventory-title h1 { font-size: 1.5rem; }
-    .inventory-panel { padding: 0 0 1rem; border-radius: 12px; }
+    .stat { padding: 0.75rem 0.9rem; }
+    .stat-value { font-size: 1.2rem; }
+    .stat-label { font-size: 0.62rem; }
+
+    .inventory-panel { padding: 1rem 0 0.75rem; border-radius: 12px; }
+    .panel-toolbar { padding: 0 1rem; }
+    .pagination { padding: 1rem 1rem 0; flex-direction: column; align-items: flex-start; gap: 0.5rem; }
 
     /* ── Table → card view ── */
     .inventory-table thead { display: none; }
@@ -1350,14 +1136,12 @@ watch(
     .inventory-table tbody tr {
         display: grid;
         grid-template-columns: 1fr auto;
-        grid-template-rows: auto auto auto;
+        grid-template-rows: auto auto;
         padding: 0.875rem 1rem;
-        gap: 0.1rem 0.625rem;
+        gap: 0.15rem 0.625rem;
         border-bottom: 1px solid var(--c-border);
     }
     .inventory-table tbody tr:last-child { border-bottom: none; }
-    .inventory-table tbody tr.row-low-stock { background: rgba(251, 191, 36, 0.04); }
-    .inventory-table tbody tr.row-out-of-stock { background: rgba(239, 68, 68, 0.04); }
 
     .inventory-table tbody td {
         padding: 0;
@@ -1365,32 +1149,19 @@ watch(
         vertical-align: top;
     }
 
-    /* Item name */
+    /* Item name + meta */
     .inventory-table tbody td:nth-child(1) { grid-column: 1; grid-row: 1; }
 
-    /* Type — shown inline */
-    .inventory-table tbody td:nth-child(2) {
-        grid-column: 1;
-        grid-row: 2;
-        font-size: 0.72rem;
-        color: var(--c-muted);
-        font-weight: 500;
-        padding-top: 0.1rem;
-    }
-
-    /* Unit — hide (shown in stock label) */
-    .inventory-table tbody td:nth-child(3) { display: none; }
-
     /* Stock bar — full width below name */
-    .inventory-table tbody td:nth-child(4) {
+    .inventory-table tbody td:nth-child(2) {
         grid-column: 1 / -1;
-        grid-row: 3;
+        grid-row: 2;
         padding-top: 0.5rem;
     }
-    .inventory-table tbody td:nth-child(4) .stock-bar-wrap { max-width: none; }
+    .inventory-table tbody td:nth-child(2) .stock-bar-wrap { max-width: none; }
 
-    /* Status */
-    .inventory-table tbody td:nth-child(5) {
+    /* Status — top right */
+    .inventory-table tbody td:nth-child(3) {
         grid-column: 2;
         grid-row: 1;
         display: flex;
@@ -1398,24 +1169,7 @@ watch(
         align-items: flex-start;
     }
 
-    /* Empty state */
-    .inventory-table tbody td.empty-state { grid-column: 1 / -1; }
-
-    /* Pagination tighter */
-    .pagination { flex-direction: column; align-items: flex-start; gap: 0.5rem; }
-}
-
-/* ============================================================
-   TRANSFER BUTTON VARIANT
-============================================================ */
-.ghost-button--transfer {
-    border-color: #6366f1;
-    color: #4338ca;
-}
-.ghost-button--transfer:hover:not(:disabled) {
-    border-color: #4338ca;
-    background: rgba(99, 102, 241, 0.06);
-    color: #3730a3;
+    .inventory-table tbody td.empty-state { grid-column: 1 / -1; padding: 2.5rem 1rem; }
 }
 
 /* ============================================================
@@ -1534,12 +1288,6 @@ watch(
 }
 
 .form-textarea { resize: vertical; }
-
-.field-hint {
-    font-size: 0.78rem;
-    color: var(--c-muted);
-    margin: 0;
-}
 
 .search-select-wrap {
     position: relative;
