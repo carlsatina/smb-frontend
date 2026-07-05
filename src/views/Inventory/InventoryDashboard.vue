@@ -375,7 +375,7 @@ const loadStock = async () => {
     }
 };
 
-const isOutOfStock = (item: StockItem) => item.currentQty === 0;
+const isOutOfStock = (item: StockItem) => item.currentQty <= 0;
 
 const isLowStock = (item: StockItem) => {
     if (!item.lowStockThreshold) return false;
@@ -383,7 +383,7 @@ const isLowStock = (item: StockItem) => {
 };
 
 const stockBarWidth = (item: StockItem) => {
-    if (item.currentQty === 0) return 0;
+    if (item.currentQty <= 0) return 0;
     if (!item.lowStockThreshold || item.lowStockThreshold === 0) return 100;
     const max = item.lowStockThreshold * 2;
     return Math.min(100, Math.round((item.currentQty / max) * 100));
