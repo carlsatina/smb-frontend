@@ -7,10 +7,9 @@
                 <div class="reports-title">
                     <span class="reports-eyebrow">Insights</span>
                     <h1>Reports</h1>
-                    <p>Track sales momentum, top performers, and inventory risks for {{ currentStoreLabel }}.</p>
+                    <p>How {{ currentStoreLabel }} is performing — sales, profit, and stock at a glance.</p>
                 </div>
                 <div class="reports-controls">
-                    <!-- Date range nav -->
                     <div class="range-nav">
                         <button
                             type="button"
@@ -96,132 +95,8 @@
                             <mdicon name="chevron-right" size="16" />
                         </button>
                     </div>
-
-                    <div ref="cardSettingsRef" class="card-settings-wrap">
-                        <button
-                            class="icon-button"
-                            :class="{ active: showCardSettings }"
-                            type="button"
-                            title="Customize cards"
-                            @click="showCardSettings = !showCardSettings"
-                        >
-                            <mdicon name="cog-outline" size="18" />
-                        </button>
-                        <div v-if="showCardSettings" class="card-settings-dropdown">
-                            <div class="card-settings-header">KPI cards</div>
-                            <label
-                                v-for="card in KPI_CARDS"
-                                :key="card.id"
-                                class="card-settings-row"
-                            >
-                                <input type="checkbox" v-model="visibleCards[card.id]" />
-                                <span>{{ card.label }}</span>
-                            </label>
-                            <div class="card-settings-header">Visible cards</div>
-                            <label
-                                v-for="card in availableCards"
-                                :key="card.id"
-                                class="card-settings-row"
-                            >
-                                <input type="checkbox" v-model="visibleCards[card.id]" />
-                                <span>{{ card.label }}</span>
-                            </label>
-                        </div>
-                    </div>
                 </div>
             </header>
-
-            <div
-                v-if="storeContext.currentStoreId && canViewReports && !hasLoaded"
-                class="reports-kpis reports-kpis--loading"
-                aria-hidden="true"
-            >
-                <div v-for="n in 6" :key="`kpi-skel-${n}`" class="kpi-card kpi-card--skeleton">
-                    <SkeletonLoader :rows="2" />
-                </div>
-            </div>
-
-            <div v-if="storeContext.currentStoreId && canViewReports && hasLoaded" :key="`kpis-${revealKey}`" class="reports-kpis reports-reveal">
-                <div class="kpi-card kpi-card--sales">
-                    <div class="kpi-head">
-                        <span class="kpi-icon"><mdicon name="cash-multiple" size="18" /></span>
-                        <span class="kpi-label">Net sales</span>
-                    </div>
-                    <span class="kpi-value">{{ formatMoney(salesSummary.netSales) }}</span>
-                    <span class="kpi-sub">{{ rangeLabel }}</span>
-                </div>
-                <div class="kpi-card kpi-card--orders">
-                    <div class="kpi-head">
-                        <span class="kpi-icon"><mdicon name="receipt-text-outline" size="18" /></span>
-                        <span class="kpi-label">Orders</span>
-                    </div>
-                    <span class="kpi-value">{{ salesSummary.orderCount }}</span>
-                    <span class="kpi-sub">Finalized sales</span>
-                </div>
-                <div v-if="visibleCards['kpi-avg']" class="kpi-card kpi-card--avg">
-                    <div class="kpi-head">
-                        <span class="kpi-icon"><mdicon name="chart-line-variant" size="18" /></span>
-                        <span class="kpi-label">Avg order</span>
-                    </div>
-                    <span class="kpi-value">{{ formatMoney(salesSummary.avgOrder) }}</span>
-                    <span class="kpi-sub">Across range</span>
-                </div>
-                <div class="kpi-card kpi-card--discounts">
-                    <div class="kpi-head">
-                        <span class="kpi-icon"><mdicon name="ticket-percent-outline" size="18" /></span>
-                        <span class="kpi-label">Discounts</span>
-                    </div>
-                    <span class="kpi-value">{{ formatMoney(salesSummary.discounts) }}</span>
-                    <span class="kpi-sub">Gross {{ formatMoney(salesSummary.grossSales) }}</span>
-                </div>
-                <div v-if="visibleCards['kpi-voids']" class="kpi-card kpi-card--voids">
-                    <div class="kpi-head">
-                        <span class="kpi-icon"><mdicon name="close-circle-outline" size="18" /></span>
-                        <span class="kpi-label">Voids</span>
-                    </div>
-                    <span class="kpi-value">{{ salesSummary.voidCount }}</span>
-                    <span class="kpi-sub">{{ formatMoney(salesSummary.voidedSales) }}</span>
-                </div>
-                <div class="kpi-card kpi-card--profit">
-                    <div class="kpi-head">
-                        <span class="kpi-icon"><mdicon name="trending-up" size="18" /></span>
-                        <span class="kpi-label">Net profit</span>
-                    </div>
-                    <span class="kpi-value" :class="{ 'kpi-value--negative': profitSummary.totalProfit < 0 }">
-                        {{ formatMoney(profitSummary.totalProfit) }}
-                    </span>
-                    <span class="kpi-sub">
-                        {{ profitSummary.marginPct }}% margin
-                        <span v-if="profitSummary.itemsWithCost < profitSummary.totalItems" class="kpi-warn">
-                            ({{ profitSummary.itemsWithCost }}/{{ profitSummary.totalItems }} costed)
-                        </span>
-                    </span>
-                </div>
-                <div v-if="canUseExpenses" class="kpi-card kpi-card--expense">
-                    <div class="kpi-head">
-                        <span class="kpi-icon"><mdicon name="cash-minus" size="18" /></span>
-                        <span class="kpi-label">Expenses</span>
-                    </div>
-                    <span class="kpi-value">{{ formatMoney(expenseSummary.total) }}</span>
-                    <span class="kpi-sub">
-                        <template v-if="expenseSummary.byCategory.length">
-                            {{ expenseSummary.byCategory[0].category }} {{ formatMoney(expenseSummary.byCategory[0].total) }}
-                            <span v-if="expenseSummary.byCategory.length > 1"> +{{ expenseSummary.byCategory.length - 1 }} more</span>
-                        </template>
-                        <template v-else>No expenses recorded</template>
-                    </span>
-                </div>
-                <div v-if="canUseExpenses" class="kpi-card kpi-card--net">
-                    <div class="kpi-head">
-                        <span class="kpi-icon"><mdicon name="scale-balance" size="18" /></span>
-                        <span class="kpi-label">Net after expenses</span>
-                    </div>
-                    <span class="kpi-value" :class="{ 'kpi-value--negative': netAfterExpenses < 0 }">
-                        {{ formatMoney(netAfterExpenses) }}
-                    </span>
-                    <span class="kpi-sub">Profit {{ formatMoney(profitSummary.totalProfit) }} − expenses {{ formatMoney(expenseSummary.total) }}</span>
-                </div>
-            </div>
 
             <div v-if="!storeContext.currentStoreId" class="panel-state">
                 Select or create a store to view reports.
@@ -235,482 +110,642 @@
                 {{ errorMessage }}
             </div>
 
-            <div v-else-if="!hasLoaded" class="reports-grid" aria-hidden="true">
-                <section v-for="n in 4" :key="`grid-skel-${n}`" class="report-card">
-                    <SkeletonLoader :rows="4" label="Loading reports…" />
-                </section>
-            </div>
+            <template v-else>
+                <!-- ── Business pulse hero ── -->
+                <div v-if="!hasLoaded" class="pulse pulse--skeleton" aria-hidden="true">
+                    <SkeletonLoader :rows="3" label="Loading summary…" />
+                </div>
 
-            <div v-else :key="`grid-${revealKey}`" class="reports-grid reports-reveal">
-                <section v-if="visibleCards['sales-charts']" class="report-card report-card--wide charts-row" :class="{ 'charts-row--single': isSingleDay }">
-                    <div v-if="!isSingleDay" class="chart-panel">
-                        <div class="chart-panel-header">
-                            <h3>Sales by day</h3>
-                            <span class="chart-total">{{ formatMoney(salesSummary.netSales) }}</span>
-                        </div>
-                        <SkeletonLoader v-if="isLoading" :rows="3" />
-                        <div v-else class="chart-with-axis">
-                            <div class="y-axis">
-                                <span>{{ formatCompactMoney(chartMax) }}</span>
-                                <span>{{ formatCompactMoney(chartMax / 2) }}</span>
-                                <span>0</span>
-                            </div>
-                            <div class="chart-area">
-                                <div class="grid-lines">
-                                    <span class="grid-line"></span>
-                                    <span class="grid-line"></span>
-                                    <span class="grid-line"></span>
-                                </div>
-                                <div class="mini-chart daily-chart">
-                                    <div
-                                        v-for="day in salesDays"
-                                        :key="day.date"
-                                        class="mini-bar"
-                                        :class="{
-                                            'bar-peak': day.totalSales === chartMax && chartMax > 0,
-                                            'bar-weekend': isWeekend(day.date)
-                                        }"
-                                        :title="`${formatDayLabel(day.date)}: ${formatMoney(day.totalSales)} (${day.orderCount} orders)`"
-                                    >
-                                        <span class="bar-fill" :style="{ height: miniBarHeight(day.totalSales, chartMax) }"></span>
-                                    </div>
-                                </div>
+                <section v-else :key="`pulse-${revealKey}`" class="pulse reveal-item">
+                    <div class="pulse-top">
+                        <div class="pulse-headline">
+                            <span class="pulse-eyebrow">Net sales · {{ rangeLabel }}</span>
+                            <span class="pulse-value">{{ formatMoney(salesSummary.netSales) }}</span>
+                            <div class="pulse-compare">
+                                <span
+                                    v-if="netSalesDelta.pct !== null"
+                                    class="delta-chip"
+                                    :class="`delta-chip--${netSalesDelta.tone}`"
+                                >
+                                    <mdicon :name="deltaIcon(netSalesDelta)" size="13" />
+                                    {{ formatDeltaPct(netSalesDelta.pct) }}
+                                </span>
+                                <span v-else class="delta-chip delta-chip--neutral">No prior data</span>
+                                <span class="pulse-compare-caption">vs {{ prevRangeLabel }}</span>
                             </div>
                         </div>
-                        <div class="chart-labels chart-labels--daily">
-                            <span v-for="(label, index) in dailyChartLabels" :key="index">{{ label }}</span>
+                        <div class="pulse-spark">
+                            <HeroSparkline :values="sparklineValues" />
+                            <span class="pulse-spark-caption">
+                                {{ isSingleDay ? 'Sales by hour' : 'Net sales by day' }}
+                            </span>
                         </div>
                     </div>
-                    <div class="chart-panel">
-                        <div class="chart-panel-header">
-                            <h3>Sales by hour</h3>
-                            <span class="chart-total">{{ salesSummary.orderCount }} orders</span>
-                        </div>
-                        <SkeletonLoader v-if="isLoading" :rows="3" />
-                        <div v-else class="chart-with-axis">
-                            <div class="y-axis">
-                                <span>{{ formatCompactMoney(hourlyMax) }}</span>
-                                <span>{{ formatCompactMoney(hourlyMax / 2) }}</span>
-                                <span>0</span>
-                            </div>
-                            <div class="chart-area">
-                                <div class="grid-lines">
-                                    <span class="grid-line"></span>
-                                    <span class="grid-line"></span>
-                                    <span class="grid-line"></span>
-                                </div>
-                                <div class="mini-chart hourly-chart">
-                                    <div
-                                        v-for="hour in hourlySales"
-                                        :key="hour.hour"
-                                        class="mini-bar"
-                                        :class="{ 'bar-peak': hour.totalSales === hourlyMax && hourlyMax > 0 }"
-                                        :title="`${formatHourLabel(hour.hour)}: ${formatMoney(hour.totalSales)} (${hour.orderCount} orders)`"
-                                    >
-                                        <span class="bar-fill" :style="{ height: miniBarHeight(hour.totalSales, hourlyMax) }"></span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="chart-labels chart-labels--hourly">
-                            <span>12a</span>
-                            <span>6a</span>
-                            <span>12p</span>
-                            <span>6p</span>
-                            <span>11p</span>
-                        </div>
-                    </div>
-                </section>
-
-                <section v-if="visibleCards['daypart-mix']" class="report-card">
-                    <div class="card-header">
-                        <div>
-                            <h2>Daypart mix</h2>
-                            <p>Sales share by time of day</p>
-                        </div>
-                        <div class="card-meta">
-                            <span class="pill">Breakdown</span>
-                        </div>
-                    </div>
-
-                    <SkeletonLoader v-if="isLoading" :rows="4" label="Loading daypart mix…" />
-                    <div v-else-if="daypartSummary.length === 0" class="panel-state">
-                        No sales data yet.
-                    </div>
-                    <div v-else class="daypart-list">
-                        <div v-for="part in daypartSummary" :key="part.label" class="daypart-row">
-                            <div>
-                                <div class="item-name">{{ part.label }}</div>
-                                <div class="item-meta">{{ part.orderCount }} orders · {{ part.sharePct }}% of sales</div>
-                            </div>
-                            <div class="item-metrics">
-                                <strong>{{ formatMoney(part.totalSales) }}</strong>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-
-                <section v-if="visibleCards['payment-methods']" class="report-card">
-                    <div class="card-header">
-                        <div>
-                            <h2>Payment methods</h2>
-                            <p>Sales split by payment type</p>
-                        </div>
-                        <div class="card-meta">
-                            <span class="pill">Breakdown</span>
-                        </div>
-                    </div>
-
-                    <SkeletonLoader v-if="isLoading" :rows="4" label="Loading payment methods…" />
-                    <div v-else-if="paymentMethods.length === 0" class="panel-state">
-                        No sales data yet.
-                    </div>
-                    <div v-else class="daypart-list">
-                        <div v-for="pm in paymentMethods" :key="pm.method" class="daypart-row">
-                            <div>
-                                <div class="item-name">{{ formatPaymentMethod(pm.method) }}</div>
-                                <div class="item-meta">{{ pm.orderCount }} orders · {{ pm.sharePct }}% of sales</div>
-                            </div>
-                            <div class="item-metrics">
-                                <strong>{{ formatMoney(pm.total) }}</strong>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-
-                <section v-if="visibleCards['top-products']" class="report-card">
-                    <div class="card-header">
-                        <div>
-                            <h2>Top products</h2>
-                            <p>By sales value</p>
-                        </div>
-                        <div class="card-meta">
-                            <span class="pill">Top {{ topProducts.length }}</span>
-                        </div>
-                    </div>
-
-                    <SkeletonLoader v-if="isLoading" :rows="5" label="Loading top products…" />
-                    <div v-else-if="topProducts.length === 0" class="panel-state">
-                        No sales data yet.
-                    </div>
-                    <div v-else class="top-list">
-                        <div v-for="product in topProducts" :key="product.productId" class="top-item">
-                            <div>
-                                <div class="item-name">{{ product.name }}</div>
-                                <div class="item-meta">
-                                    <span v-if="product.sku">SKU {{ product.sku }}</span>
-                                    <span v-if="product.unit">{{ product.unit }}</span>
-                                </div>
-                            </div>
-                            <div class="item-metrics">
-                                <span class="metric">{{ formatQty(product.qtySold) }} sold</span>
-                                <strong>{{ formatMoney(product.totalSales) }}</strong>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-
-                <section v-if="visibleCards['items-sold']" class="report-card report-card--wide">
-                    <div class="card-header">
-                        <div>
-                            <h2>Items sold per product</h2>
-                            <p>Units sold for each product, most sold first</p>
-                        </div>
-                        <div class="card-meta">
-                            <span class="pill">{{ formatQty(productsSoldSummary.totalQty) }} units</span>
-                        </div>
-                    </div>
-
-                    <SkeletonLoader v-if="isLoading" :rows="5" label="Loading items sold…" />
-                    <div v-else-if="productsSold.length === 0" class="panel-state">
-                        No sales data yet.
-                    </div>
-                    <div v-else class="table-wrap">
-                        <table class="low-stock-table table-compact table-compact--bordered">
-                            <thead>
-                                <tr>
-                                    <th>Product</th>
-                                    <th>Qty sold</th>
-                                    <th>Orders</th>
-                                    <th>Sales</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr v-for="item in productsSold" :key="item.productId">
-                                    <td>
-                                        <div class="item-name">{{ item.name }}</div>
-                                        <div class="item-meta">
-                                            <span v-if="item.sku">SKU {{ item.sku }}</span>
-                                            <span v-if="item.unit">{{ item.unit }}</span>
-                                        </div>
-                                    </td>
-                                    <td><strong>{{ formatQty(item.qtySold) }}</strong></td>
-                                    <td>{{ item.orderCount }}</td>
-                                    <td>{{ formatMoney(item.totalSales) }}</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                        <div class="chart-footnote">
-                            <template v-if="productsSoldSummary.limited">
-                                Showing top {{ productsSoldSummary.shown }} of {{ productsSoldSummary.productCount }} products by quantity.
-                            </template>
-                            <template v-else>
-                                {{ productsSoldSummary.productCount }} products with sales in this range.
-                            </template>
-                        </div>
-                    </div>
-                </section>
-
-                <section v-if="visibleCards['item-margins']" class="report-card report-card--wide">
-                    <div class="card-header">
-                        <div>
-                            <h2>Item margins</h2>
-                            <p>Gross profit for top sellers</p>
-                        </div>
-                        <div class="card-meta">
-                            <span class="pill">Profit</span>
-                        </div>
-                    </div>
-
-                    <SkeletonLoader v-if="isLoading" :rows="5" label="Loading margins…" />
-                    <div v-else-if="productMargins.length === 0" class="panel-state">
-                        No margin data yet.
-                    </div>
-                    <div v-else class="table-wrap">
-                        <table class="low-stock-table table-compact table-compact--bordered">
-                            <thead>
-                                <tr>
-                                    <th>Item</th>
-                                    <th>Qty sold</th>
-                                    <th>Revenue</th>
-                                    <th>Cost</th>
-                                    <th>Profit</th>
-                                    <th>Margin</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr v-for="item in productMargins" :key="item.productId">
-                                    <td>
-                                        <div class="item-name">{{ item.name }}</div>
-                                        <div class="item-meta">
-                                            <span v-if="item.sku">SKU {{ item.sku }}</span>
-                                            <span v-if="item.unit">{{ item.unit }}</span>
-                                            <span v-if="!item.costKnown" class="warn-text">Missing cost</span>
-                                        </div>
-                                    </td>
-                                    <td>{{ formatQty(item.qtySold) }}</td>
-                                    <td>{{ formatMoney(item.revenue) }}</td>
-                                    <td>{{ item.cost === null ? '—' : formatMoney(item.cost) }}</td>
-                                    <td>{{ item.profit === null ? '—' : formatMoney(item.profit) }}</td>
-                                    <td :class="item.marginPct === null ? '' : item.marginPct >= 30 ? 'margin-good' : item.marginPct >= 0 ? 'margin-warn' : 'margin-bad'">
-                                        {{ item.marginPct === null ? '—' : `${item.marginPct}%` }}
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                        <div class="chart-footnote">
-                            Costs known for {{ marginSummary.costedItems }} of {{ marginSummary.totalItems }} items.
-                        </div>
-                    </div>
-                </section>
-
-                <section v-if="visibleCards['ingredient-usage'] && canUseIngredients" class="report-card">
-                    <div class="card-header">
-                        <div>
-                            <h2>Ingredient usage</h2>
-                            <p>Based on recipe sales</p>
-                        </div>
-                        <div class="card-meta">
-                            <span class="pill">Top {{ ingredientUsage.length }}</span>
-                        </div>
-                    </div>
-
-                    <SkeletonLoader v-if="isLoading" :rows="5" label="Loading ingredient usage…" />
-                    <div v-else-if="ingredientUsage.length === 0" class="panel-state">
-                        No recipe usage tracked yet.
-                    </div>
-                    <div v-else class="top-list">
-                        <div v-for="item in ingredientUsage" :key="item.ingredientId" class="top-item">
-                            <div>
-                                <div class="item-name">{{ item.name }}</div>
-                                <div class="item-meta">
-                                    <span v-if="item.unit">{{ item.unit }}</span>
-                                </div>
-                            </div>
-                            <div class="item-metrics">
-                                <span class="metric">Used</span>
-                                <strong>{{ formatQty(item.qtyUsed) }}</strong>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-
-                <section v-if="visibleCards['supplier-analytics'] && canUsePurchaseOrders" class="report-card">
-                    <div class="card-header">
-                        <div>
-                            <h2>Supplier analytics</h2>
-                            <p>Purchase receipts snapshot</p>
-                        </div>
-                        <div class="card-meta">
-                            <span class="pill">Purchasing</span>
-                        </div>
-                    </div>
-
-                    <SkeletonLoader v-if="isLoading" :rows="4" label="Loading supplier analytics…" />
-                    <div v-else class="supplier-metrics">
-                        <div class="metric-card">
-                            <span class="metric-label">Total spend</span>
-                            <strong>{{ formatMoney(purchaseSpendSummary.totalSpend) }}</strong>
-                            <span class="metric-sub">{{ purchaseSpendSummary.totalReceipts }} receipts</span>
-                        </div>
-                        <div class="metric-card">
-                            <span class="metric-label">Avg receipt</span>
-                            <strong>{{ formatMoney(purchaseSpendSummary.avgReceipt) }}</strong>
-                            <span class="metric-sub">Across range</span>
-                        </div>
-                        <div class="metric-card">
-                            <span class="metric-label">Top supplier</span>
-                            <strong>{{ topSupplier?.supplierName || '-' }}</strong>
-                            <span class="metric-sub">
-                                {{ topSupplier ? formatMoney(topSupplier.totalSpend) : 'No receipts yet' }}
+                    <div class="pulse-kpis">
+                        <div v-for="kpi in heroKpis" :key="kpi.id" class="pulse-kpi">
+                            <span class="pulse-kpi-label">{{ kpi.label }}</span>
+                            <span class="pulse-kpi-value" :class="{ 'pulse-kpi-value--negative': kpi.negative }">
+                                {{ kpi.value }}
+                            </span>
+                            <span class="pulse-kpi-foot">
+                                <span
+                                    v-if="kpi.delta && kpi.delta.pct !== null"
+                                    class="delta-chip delta-chip--small"
+                                    :class="`delta-chip--${kpi.delta.tone}`"
+                                >
+                                    <mdicon :name="deltaIcon(kpi.delta)" size="11" />
+                                    {{ formatDeltaPct(kpi.delta.pct) }}
+                                </span>
+                                <span v-if="kpi.sub" class="pulse-kpi-sub">{{ kpi.sub }}</span>
                             </span>
                         </div>
                     </div>
                 </section>
 
-                <section v-if="visibleCards['low-stock']" class="report-card report-card--wide">
-                    <div class="card-header">
-                        <div>
-                            <h2>Low stock watch</h2>
-                            <p>Items at or below threshold</p>
-                        </div>
-                        <div class="card-meta">
-                            <span class="pill">Needs attention</span>
-                        </div>
-                    </div>
+                <!-- ── Insight chips ── -->
+                <div v-if="hasLoaded && insights.length" :key="`insights-${revealKey}`" class="insight-strip reveal-item">
+                    <template v-for="chip in insights" :key="chip.id">
+                        <button
+                            v-if="chip.tab"
+                            type="button"
+                            class="insight-chip insight-chip--link"
+                            :class="{ 'insight-chip--warn': chip.tone === 'warn' }"
+                            @click="activeTab = chip.tab"
+                        >
+                            <mdicon :name="chip.icon" size="15" class="insight-icon" />
+                            <span>{{ chip.text }}</span>
+                            <mdicon name="chevron-right" size="13" class="insight-go" />
+                        </button>
+                        <span
+                            v-else
+                            class="insight-chip"
+                            :class="{ 'insight-chip--warn': chip.tone === 'warn' }"
+                        >
+                            <mdicon :name="chip.icon" size="15" class="insight-icon" />
+                            <span>{{ chip.text }}</span>
+                        </span>
+                    </template>
+                </div>
 
-                    <SkeletonLoader v-if="isLoading" :rows="5" label="Loading low stock…" />
-                    <div v-else-if="lowStockItems.length === 0" class="panel-state">
-                        All tracked items are above their thresholds.
-                    </div>
-                    <div v-else class="table-wrap">
-                        <table class="low-stock-table table-compact table-compact--bordered">
-                            <thead>
-                                <tr>
-                                    <th>Item</th>
-                                    <th>Type</th>
-                                    <th>On hand</th>
-                                    <th>Threshold</th>
-                                    <th>Shortfall</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr v-for="item in lowStockItems" :key="`${item.itemType}-${item.itemId}`">
-                                    <td>
-                                        <div class="item-name">{{ item.name }}</div>
-                                        <div class="item-meta">{{ item.unit }}</div>
-                                    </td>
-                                    <td>
-                                        <span :class="['item-type-chip', item.itemType === 'INGREDIENT' ? 'item-type-chip--ingredient' : 'item-type-chip--product']">
-                                            {{ item.itemType === 'INGREDIENT' ? 'Ingredient' : 'Product' }}
-                                        </span>
-                                    </td>
-                                    <td>{{ formatQty(item.currentQty) }}</td>
-                                    <td>{{ formatQty(item.lowStockThreshold) }}</td>
-                                    <td class="shortfall">{{ formatQty(item.shortfall) }}</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </section>
+                <!-- ── Report tabs ── -->
+                <nav class="report-tabs" role="tablist" aria-label="Report sections">
+                    <button
+                        v-for="tab in TABS"
+                        :key="tab.id"
+                        type="button"
+                        role="tab"
+                        class="report-tab"
+                        :class="{ 'report-tab--active': activeTab === tab.id }"
+                        :aria-selected="activeTab === tab.id"
+                        @click="activeTab = tab.id"
+                    >
+                        <mdicon :name="tab.icon" size="16" class="report-tab-icon" />
+                        <span>{{ tab.label }}</span>
+                        <span v-if="tab.id === 'inventory' && lowStockItems.length" class="report-tab-badge">
+                            {{ lowStockItems.length }}
+                        </span>
+                    </button>
+                </nav>
 
-                <section v-if="visibleCards['purchase-spend'] && canUsePurchaseOrders" class="report-card report-card--wide">
-                    <div class="card-header">
-                        <div>
-                            <h2>Purchase spend by supplier</h2>
-                            <p>Receipts logged in the selected range</p>
-                        </div>
-                        <div class="card-meta">
-                            <span class="pill">Spend</span>
-                        </div>
-                    </div>
+                <div v-if="!hasLoaded" class="reports-grid" aria-hidden="true">
+                    <section v-for="n in 4" :key="`grid-skel-${n}`" class="report-card">
+                        <SkeletonLoader :rows="4" label="Loading reports…" />
+                    </section>
+                </div>
 
-                    <SkeletonLoader v-if="isLoading" :rows="4" label="Loading purchase spend…" />
-                    <div v-else-if="purchaseSpend.length === 0" class="panel-state">
-                        No receipts recorded in this range.
-                    </div>
-                    <div v-else class="table-wrap">
-                        <table class="low-stock-table table-compact table-compact--bordered">
-                            <thead>
-                                <tr>
-                                    <th>Supplier</th>
-                                    <th>Receipts</th>
-                                    <th>Total spend</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr v-for="supplier in purchaseSpend" :key="supplier.supplierId || supplier.supplierName">
-                                    <td>
-                                        <button class="supplier-link" type="button" @click="openSupplierSpend(supplier)">
-                                            {{ supplier.supplierName }}
-                                        </button>
-                                    </td>
-                                    <td>{{ supplier.receiptCount }}</td>
-                                    <td>{{ formatMoney(supplier.totalSpend) }}</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </section>
-                <section v-if="visibleCards['employee-sales']" class="report-card report-card--wide">
-                    <div class="card-header">
-                        <div>
-                            <h2>Employee sales</h2>
-                            <p>Sales per staff member with payment breakdown</p>
+                <!-- ═══════════ OVERVIEW ═══════════ -->
+                <div v-else-if="activeTab === 'overview'" :key="`overview-${revealKey}`" class="reports-grid reports-reveal">
+                    <section class="report-card report-card--wide charts-row" :class="{ 'charts-row--single': isSingleDay }">
+                        <div v-if="!isSingleDay" class="chart-panel">
+                            <div class="chart-panel-header">
+                                <h3>Sales by day</h3>
+                                <span class="chart-total">{{ formatMoney(salesSummary.netSales) }}</span>
+                            </div>
+                            <SkeletonLoader v-if="isLoading" :rows="3" />
+                            <div v-else class="chart-with-axis">
+                                <div class="y-axis">
+                                    <span>{{ formatCompactMoney(chartMax) }}</span>
+                                    <span>{{ formatCompactMoney(chartMax / 2) }}</span>
+                                    <span>0</span>
+                                </div>
+                                <div class="chart-area">
+                                    <div class="grid-lines">
+                                        <span class="grid-line"></span>
+                                        <span class="grid-line"></span>
+                                        <span class="grid-line"></span>
+                                    </div>
+                                    <div class="mini-chart daily-chart">
+                                        <div
+                                            v-for="day in salesDays"
+                                            :key="day.date"
+                                            class="mini-bar"
+                                            :class="{
+                                                'bar-peak': day.totalSales === chartMax && chartMax > 0,
+                                                'bar-weekend': isWeekend(day.date)
+                                            }"
+                                            :title="`${formatDayLabel(day.date)}: ${formatMoney(day.totalSales)} (${day.orderCount} orders)`"
+                                        >
+                                            <span class="bar-fill" :style="{ height: miniBarHeight(day.totalSales, chartMax) }"></span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="chart-labels chart-labels--daily">
+                                <span v-for="(label, index) in dailyChartLabels" :key="index">{{ label }}</span>
+                            </div>
                         </div>
-                        <div class="card-meta">
-                            <span class="pill">Staff</span>
+                        <div class="chart-panel">
+                            <div class="chart-panel-header">
+                                <h3>Sales by hour</h3>
+                                <span class="chart-total">{{ salesSummary.orderCount }} orders</span>
+                            </div>
+                            <SkeletonLoader v-if="isLoading" :rows="3" />
+                            <div v-else class="chart-with-axis">
+                                <div class="y-axis">
+                                    <span>{{ formatCompactMoney(hourlyMax) }}</span>
+                                    <span>{{ formatCompactMoney(hourlyMax / 2) }}</span>
+                                    <span>0</span>
+                                </div>
+                                <div class="chart-area">
+                                    <div class="grid-lines">
+                                        <span class="grid-line"></span>
+                                        <span class="grid-line"></span>
+                                        <span class="grid-line"></span>
+                                    </div>
+                                    <div class="mini-chart hourly-chart">
+                                        <div
+                                            v-for="hour in hourlySales"
+                                            :key="hour.hour"
+                                            class="mini-bar"
+                                            :class="{ 'bar-peak': hour.totalSales === hourlyMax && hourlyMax > 0 }"
+                                            :title="`${formatHourLabel(hour.hour)}: ${formatMoney(hour.totalSales)} (${hour.orderCount} orders)`"
+                                        >
+                                            <span class="bar-fill" :style="{ height: miniBarHeight(hour.totalSales, hourlyMax) }"></span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="chart-labels chart-labels--hourly">
+                                <span>12a</span>
+                                <span>6a</span>
+                                <span>12p</span>
+                                <span>6p</span>
+                                <span>11p</span>
+                            </div>
                         </div>
-                    </div>
+                    </section>
 
-                    <SkeletonLoader v-if="isLoading" :rows="4" label="Loading employee sales…" />
-                    <div v-else-if="employeeSales.length === 0" class="panel-state">
-                        No sales data yet.
-                    </div>
-                    <div v-else class="table-wrap">
-                        <table class="low-stock-table table-compact table-compact--bordered table--employee">
-                            <thead>
-                                <tr>
-                                    <th>Staff</th>
-                                    <th>Role</th>
-                                    <th>Orders</th>
-                                    <th v-for="method in employeePaymentMethods" :key="method">
-                                        {{ formatPaymentMethod(method) }}
-                                    </th>
-                                    <th>Total</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr v-for="emp in employeeSales" :key="emp.cashierId">
-                                    <td>
-                                        <div class="item-name">{{ emp.name }}</div>
-                                        <div class="item-meta">{{ emp.email }}</div>
-                                    </td>
-                                    <td>
-                                        <span v-if="emp.role" class="item-type-chip">{{ emp.role }}</span>
-                                        <span v-else class="item-meta">—</span>
-                                    </td>
-                                    <td>{{ emp.orderCount }}</td>
-                                    <td v-for="method in employeePaymentMethods" :key="method">
-                                        {{ formatMoney(emp.methods.find(m => m.method === method)?.total ?? 0) }}
-                                    </td>
-                                    <td><strong>{{ formatMoney(emp.totalSales) }}</strong></td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </section>
-            </div>
+                    <section class="report-card">
+                        <div class="card-header">
+                            <div>
+                                <h2>Payment mix</h2>
+                                <p>Where the money came in</p>
+                            </div>
+                        </div>
+
+                        <SkeletonLoader v-if="isLoading" :rows="4" label="Loading payment mix…" />
+                        <div v-else-if="paymentMethods.length === 0" class="panel-state panel-state--small">
+                            Payments appear here once sales are finalized in this range.
+                        </div>
+                        <div v-else class="payment-mix">
+                            <div class="stack-bar">
+                                <span
+                                    v-for="pm in paymentMethods"
+                                    :key="pm.method"
+                                    class="stack-seg"
+                                    :style="{ width: `${pm.sharePct}%`, background: paymentColor(pm.method) }"
+                                    :title="`${formatPaymentMethod(pm.method)}: ${formatMoney(pm.total)} (${pm.sharePct}%)`"
+                                ></span>
+                            </div>
+                            <div class="legend-list">
+                                <div v-for="pm in paymentMethods" :key="pm.method" class="legend-row">
+                                    <span class="legend-dot" :style="{ background: paymentColor(pm.method) }"></span>
+                                    <div class="legend-name">
+                                        {{ formatPaymentMethod(pm.method) }}
+                                        <span class="legend-meta">{{ pm.orderCount }} orders</span>
+                                    </div>
+                                    <div class="legend-value">
+                                        <strong>{{ formatMoney(pm.total) }}</strong>
+                                        <span class="legend-share">{{ pm.sharePct }}%</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="report-card">
+                        <div class="card-header">
+                            <div>
+                                <h2>Daypart mix</h2>
+                                <p>Sales share by time of day</p>
+                            </div>
+                        </div>
+
+                        <SkeletonLoader v-if="isLoading" :rows="4" label="Loading daypart mix…" />
+                        <div v-else-if="daypartSummary.length === 0" class="panel-state panel-state--small">
+                            Sales by time of day appear here once orders come in.
+                        </div>
+                        <div v-else class="share-list">
+                            <div v-for="part in daypartSummary" :key="part.label" class="share-row">
+                                <div class="share-head">
+                                    <span class="share-name">{{ part.label }}</span>
+                                    <strong class="share-amount">{{ formatMoney(part.totalSales) }}</strong>
+                                </div>
+                                <div class="share-track">
+                                    <span class="share-fill" :style="{ width: `${part.sharePct}%` }"></span>
+                                </div>
+                                <div class="share-meta">{{ part.orderCount }} orders · {{ part.sharePct }}% of sales</div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="report-card">
+                        <div class="card-header">
+                            <div>
+                                <h2>Best sellers</h2>
+                                <p>Top products by sales value</p>
+                            </div>
+                            <div class="card-meta">
+                                <button type="button" class="card-link" @click="activeTab = 'products'">
+                                    All products
+                                    <mdicon name="chevron-right" size="14" />
+                                </button>
+                            </div>
+                        </div>
+
+                        <SkeletonLoader v-if="isLoading" :rows="5" label="Loading best sellers…" />
+                        <div v-else-if="topProducts.length === 0" class="panel-state panel-state--small">
+                            Best sellers appear here once products are sold in this range.
+                        </div>
+                        <div v-else class="rank-list">
+                            <div v-for="(product, index) in topProducts" :key="product.productId" class="rank-item">
+                                <span class="rank-num">{{ index + 1 }}</span>
+                                <div class="rank-body">
+                                    <div class="rank-head">
+                                        <span class="item-name">{{ product.name }}</span>
+                                        <strong class="rank-amount">{{ formatMoney(product.totalSales) }}</strong>
+                                    </div>
+                                    <div class="share-track">
+                                        <span class="share-fill" :style="{ width: rankBarWidth(product.totalSales) }"></span>
+                                    </div>
+                                    <div class="item-meta">
+                                        <span>{{ formatQty(product.qtySold) }} sold</span>
+                                        <span v-if="product.sku">SKU {{ product.sku }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="report-card">
+                        <div class="card-header">
+                            <div>
+                                <h2>Sales breakdown</h2>
+                                <p>From gross to net for this range</p>
+                            </div>
+                        </div>
+
+                        <SkeletonLoader v-if="isLoading" :rows="4" label="Loading breakdown…" />
+                        <dl v-else class="breakdown-list">
+                            <div class="breakdown-row">
+                                <dt>Gross sales</dt>
+                                <dd>{{ formatMoney(salesSummary.grossSales) }}</dd>
+                            </div>
+                            <div class="breakdown-row">
+                                <dt>Discounts</dt>
+                                <dd class="breakdown-neg">−{{ formatMoney(salesSummary.discounts) }}</dd>
+                            </div>
+                            <div class="breakdown-row">
+                                <dt>Tax</dt>
+                                <dd>{{ formatMoney(salesSummary.tax) }}</dd>
+                            </div>
+                            <div class="breakdown-row breakdown-row--total">
+                                <dt>Net sales</dt>
+                                <dd>{{ formatMoney(salesSummary.netSales) }}</dd>
+                            </div>
+                            <div class="breakdown-row breakdown-row--muted">
+                                <dt>Voided sales ({{ salesSummary.voidCount }})</dt>
+                                <dd>{{ formatMoney(salesSummary.voidedSales) }}</dd>
+                            </div>
+                            <div v-if="canUseExpenses" class="breakdown-row breakdown-row--muted">
+                                <dt>Expenses</dt>
+                                <dd>−{{ formatMoney(expenseSummary.total) }}</dd>
+                            </div>
+                        </dl>
+                    </section>
+                </div>
+
+                <!-- ═══════════ PRODUCTS ═══════════ -->
+                <div v-else-if="activeTab === 'products'" :key="`products-${revealKey}`" class="reports-grid reports-reveal">
+                    <section class="report-card report-card--wide">
+                        <div class="card-header">
+                            <div>
+                                <h2>Items sold per product</h2>
+                                <p>Units sold for each product, most sold first</p>
+                            </div>
+                            <div class="card-meta">
+                                <span class="pill">{{ formatQty(productsSoldSummary.totalQty) }} units</span>
+                            </div>
+                        </div>
+
+                        <SkeletonLoader v-if="isLoading" :rows="5" label="Loading items sold…" />
+                        <div v-else-if="productsSold.length === 0" class="panel-state panel-state--small">
+                            No products sold in this range yet.
+                        </div>
+                        <div v-else class="table-wrap">
+                            <table class="report-table table-compact table-compact--bordered">
+                                <thead>
+                                    <tr>
+                                        <th>Product</th>
+                                        <th>Qty sold</th>
+                                        <th>Orders</th>
+                                        <th>Sales</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="item in productsSold" :key="item.productId">
+                                        <td>
+                                            <div class="item-name">{{ item.name }}</div>
+                                            <div class="item-meta">
+                                                <span v-if="item.sku">SKU {{ item.sku }}</span>
+                                                <span v-if="item.unit">{{ item.unit }}</span>
+                                            </div>
+                                        </td>
+                                        <td><strong>{{ formatQty(item.qtySold) }}</strong></td>
+                                        <td>{{ item.orderCount }}</td>
+                                        <td>{{ formatMoney(item.totalSales) }}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                            <div class="chart-footnote">
+                                <template v-if="productsSoldSummary.limited">
+                                    Showing top {{ productsSoldSummary.shown }} of {{ productsSoldSummary.productCount }} products by quantity.
+                                </template>
+                                <template v-else>
+                                    {{ productsSoldSummary.productCount }} products with sales in this range.
+                                </template>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="report-card report-card--wide">
+                        <div class="card-header">
+                            <div>
+                                <h2>Item margins</h2>
+                                <p>Gross profit for top sellers</p>
+                            </div>
+                            <div class="card-meta">
+                                <span class="pill">Profit</span>
+                            </div>
+                        </div>
+
+                        <SkeletonLoader v-if="isLoading" :rows="5" label="Loading margins…" />
+                        <div v-else-if="productMargins.length === 0" class="panel-state panel-state--small">
+                            Margins appear here once products with costs are sold.
+                        </div>
+                        <div v-else class="table-wrap">
+                            <table class="report-table table-compact table-compact--bordered">
+                                <thead>
+                                    <tr>
+                                        <th>Item</th>
+                                        <th>Qty sold</th>
+                                        <th>Revenue</th>
+                                        <th>Cost</th>
+                                        <th>Profit</th>
+                                        <th>Margin</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="item in productMargins" :key="item.productId">
+                                        <td>
+                                            <div class="item-name">{{ item.name }}</div>
+                                            <div class="item-meta">
+                                                <span v-if="item.sku">SKU {{ item.sku }}</span>
+                                                <span v-if="item.unit">{{ item.unit }}</span>
+                                                <span v-if="!item.costKnown" class="warn-text">Missing cost</span>
+                                            </div>
+                                        </td>
+                                        <td>{{ formatQty(item.qtySold) }}</td>
+                                        <td>{{ formatMoney(item.revenue) }}</td>
+                                        <td>{{ item.cost === null ? '—' : formatMoney(item.cost) }}</td>
+                                        <td>{{ item.profit === null ? '—' : formatMoney(item.profit) }}</td>
+                                        <td :class="item.marginPct === null ? '' : item.marginPct >= 30 ? 'margin-good' : item.marginPct >= 0 ? 'margin-warn' : 'margin-bad'">
+                                            {{ item.marginPct === null ? '—' : `${item.marginPct}%` }}
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                            <div class="chart-footnote">
+                                Costs known for {{ marginSummary.costedItems }} of {{ marginSummary.totalItems }} items.
+                                <template v-if="marginSummary.costedItems < marginSummary.totalItems">
+                                    Add costs to products (or ingredient costs to recipes) to complete this report.
+                                </template>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+
+                <!-- ═══════════ INVENTORY ═══════════ -->
+                <div v-else-if="activeTab === 'inventory'" :key="`inventory-${revealKey}`" class="reports-grid reports-reveal">
+                    <section class="report-card report-card--wide">
+                        <div class="card-header">
+                            <div>
+                                <h2>Low stock watch</h2>
+                                <p>Items at or below their reorder threshold</p>
+                            </div>
+                            <div class="card-meta">
+                                <span v-if="lowStockItems.length" class="pill pill--warn">{{ lowStockItems.length }} to restock</span>
+                                <span v-else class="pill">All clear</span>
+                            </div>
+                        </div>
+
+                        <SkeletonLoader v-if="isLoading" :rows="5" label="Loading low stock…" />
+                        <div v-else-if="lowStockItems.length === 0" class="panel-state panel-state--small">
+                            All tracked items are above their thresholds.
+                        </div>
+                        <div v-else class="table-wrap">
+                            <table class="report-table table-compact table-compact--bordered">
+                                <thead>
+                                    <tr>
+                                        <th>Item</th>
+                                        <th>Type</th>
+                                        <th>Status</th>
+                                        <th>Stock level</th>
+                                        <th>Shortfall</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="item in lowStockItems" :key="`${item.itemType}-${item.itemId}`">
+                                        <td>
+                                            <div class="item-name">{{ item.name }}</div>
+                                            <div class="item-meta">{{ item.unit }}</div>
+                                        </td>
+                                        <td>
+                                            <span :class="['item-type-chip', item.itemType === 'INGREDIENT' ? 'item-type-chip--ingredient' : 'item-type-chip--product']">
+                                                {{ item.itemType === 'INGREDIENT' ? 'Ingredient' : 'Product' }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span class="stock-chip" :class="`stock-chip--${stockSeverity(item).cls}`">
+                                                {{ stockSeverity(item).label }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <div class="stock-level">
+                                                <span class="stock-nums">{{ formatQty(item.currentQty) }} / {{ formatQty(item.lowStockThreshold) }}</span>
+                                                <div class="stock-track">
+                                                    <span
+                                                        class="stock-fill"
+                                                        :class="`stock-fill--${stockSeverity(item).cls}`"
+                                                        :style="{ width: `${stockCoverage(item)}%` }"
+                                                    ></span>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td class="shortfall">{{ formatQty(item.shortfall) }}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+
+                    <section v-if="canUseIngredients" class="report-card" :class="{ 'report-card--wide': !canUsePurchaseOrders }">
+                        <div class="card-header">
+                            <div>
+                                <h2>Ingredient usage</h2>
+                                <p>Consumed by recipe sales in this range</p>
+                            </div>
+                        </div>
+
+                        <SkeletonLoader v-if="isLoading" :rows="5" label="Loading ingredient usage…" />
+                        <div v-else-if="ingredientUsage.length === 0" class="panel-state panel-state--small">
+                            Usage appears here once recipe products are sold.
+                        </div>
+                        <div v-else class="share-list">
+                            <div v-for="item in ingredientUsage" :key="item.ingredientId" class="share-row">
+                                <div class="share-head">
+                                    <span class="share-name">{{ item.name }}</span>
+                                    <strong class="share-amount">{{ formatQty(item.qtyUsed) }} {{ item.unit }}</strong>
+                                </div>
+                                <div class="share-track">
+                                    <span class="share-fill" :style="{ width: usageBarWidth(item.qtyUsed) }"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section v-if="canUsePurchaseOrders" class="report-card" :class="{ 'report-card--wide': !canUseIngredients }">
+                        <div class="card-header">
+                            <div>
+                                <h2>Purchasing</h2>
+                                <p>Receipts logged in the selected range</p>
+                            </div>
+                        </div>
+
+                        <SkeletonLoader v-if="isLoading" :rows="4" label="Loading purchasing…" />
+                        <template v-else>
+                            <div class="supplier-metrics">
+                                <div class="metric-card">
+                                    <span class="metric-label">Total spend</span>
+                                    <strong>{{ formatMoney(purchaseSpendSummary.totalSpend) }}</strong>
+                                    <span class="metric-sub">{{ purchaseSpendSummary.totalReceipts }} receipts</span>
+                                </div>
+                                <div class="metric-card">
+                                    <span class="metric-label">Avg receipt</span>
+                                    <strong>{{ formatMoney(purchaseSpendSummary.avgReceipt) }}</strong>
+                                    <span class="metric-sub">Across range</span>
+                                </div>
+                            </div>
+                            <div v-if="purchaseSpend.length === 0" class="panel-state panel-state--small">
+                                No receipts recorded in this range.
+                            </div>
+                            <div v-else class="table-wrap">
+                                <table class="report-table table-compact table-compact--bordered">
+                                    <thead>
+                                        <tr>
+                                            <th>Supplier</th>
+                                            <th>Receipts</th>
+                                            <th>Total spend</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr v-for="supplier in purchaseSpend" :key="supplier.supplierId || supplier.supplierName">
+                                            <td>
+                                                <button class="supplier-link" type="button" @click="openSupplierSpend(supplier)">
+                                                    {{ supplier.supplierName }}
+                                                </button>
+                                            </td>
+                                            <td>{{ supplier.receiptCount }}</td>
+                                            <td>{{ formatMoney(supplier.totalSpend) }}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </template>
+                    </section>
+                </div>
+
+                <!-- ═══════════ TEAM ═══════════ -->
+                <div v-else-if="activeTab === 'team'" :key="`team-${revealKey}`" class="reports-grid reports-reveal">
+                    <section class="report-card report-card--wide">
+                        <div class="card-header">
+                            <div>
+                                <h2>Sales by staff member</h2>
+                                <p>Orders and takings per cashier, with payment breakdown</p>
+                            </div>
+                            <div class="card-meta">
+                                <span class="pill">{{ employeeSales.length }} staff</span>
+                            </div>
+                        </div>
+
+                        <SkeletonLoader v-if="isLoading" :rows="4" label="Loading staff sales…" />
+                        <div v-else-if="employeeSales.length === 0" class="panel-state panel-state--small">
+                            Staff sales appear here once orders are finalized in this range.
+                        </div>
+                        <div v-else class="table-wrap">
+                            <table class="report-table table-compact table-compact--bordered table--employee">
+                                <thead>
+                                    <tr>
+                                        <th>Staff</th>
+                                        <th>Role</th>
+                                        <th>Orders</th>
+                                        <th v-for="method in employeePaymentMethods" :key="method">
+                                            {{ formatPaymentMethod(method) }}
+                                        </th>
+                                        <th>Total</th>
+                                        <th>Share</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="emp in employeeSales" :key="emp.cashierId">
+                                        <td>
+                                            <div class="item-name">{{ emp.name }}</div>
+                                            <div class="item-meta">{{ emp.email }}</div>
+                                        </td>
+                                        <td>
+                                            <span v-if="emp.role" class="item-type-chip">{{ emp.role }}</span>
+                                            <span v-else class="item-meta">—</span>
+                                        </td>
+                                        <td>{{ emp.orderCount }}</td>
+                                        <td v-for="method in employeePaymentMethods" :key="method">
+                                            {{ formatMoney(emp.methods.find(m => m.method === method)?.total ?? 0) }}
+                                        </td>
+                                        <td><strong>{{ formatMoney(emp.totalSales) }}</strong></td>
+                                        <td>
+                                            <div class="emp-share">
+                                                <div class="share-track share-track--table">
+                                                    <span class="share-fill" :style="{ width: `${employeeShare(emp)}%` }"></span>
+                                                </div>
+                                                <span class="emp-share-pct">{{ employeeShare(emp) }}%</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+                </div>
+            </template>
         </div>
     </section>
 </template>
@@ -747,11 +782,11 @@ import {
 import { getExpenseSummary } from '@/api/expenses';
 import { suppressLoading, resumeLoading } from '@/composables/useLoading';
 import PullToRefresh from '@/components/PullToRefresh.vue';
+import HeroSparkline from './HeroSparkline.vue';
 import { useStoreContextStore } from '@/stores/storeContext';
 import { useUserContextStore } from '@/stores/userContext';
 import { canAccess } from '@/utils/roleAccess';
 import { hasPlanFeature } from '@/utils/planAccess';
-import type { PlanFeature } from '@/utils/planAccess';
 import SkeletonLoader from '@/components/SkeletonLoader.vue';
 
 const route = useRoute();
@@ -775,17 +810,27 @@ const filters = reactive({
 const activeRange = ref<'TODAY' | 'LAST_7' | 'LAST_30' | 'THIS_MONTH' | null>('TODAY');
 const isSettingRange = ref(false);
 
+type TabId = 'overview' | 'products' | 'inventory' | 'team';
+
+const TABS: { id: TabId; label: string; icon: string }[] = [
+    { id: 'overview', label: 'Overview', icon: 'view-dashboard-outline' },
+    { id: 'products', label: 'Products', icon: 'tag-outline' },
+    { id: 'inventory', label: 'Inventory', icon: 'archive-outline' },
+    { id: 'team', label: 'Team', icon: 'account-group-outline' },
+];
+
+const activeTab = ref<TabId>('overview');
+
 const isLoading = ref(false);
-// Bumped after every load so the KPI/report cards re-trigger their staggered
-// entrance animation each time fresh data arrives.
+// Bumped after every load so the hero and report cards re-trigger their
+// staggered entrance animation each time fresh data arrives.
 const revealKey = ref(0);
 // False until the first load settles. Gates the reveal sections so they mount
 // (and animate) exactly once — with real data — instead of animating first on
 // the empty initial render and then again after data arrives.
 const hasLoaded = ref(false);
 const errorMessage = ref('');
-const salesDays = ref<SalesByDayRecord[]>([]);
-const salesSummary = ref<SalesSummaryTotals>({
+const emptySalesSummary = (): SalesSummaryTotals => ({
     grossSales: 0,
     discounts: 0,
     tax: 0,
@@ -795,6 +840,8 @@ const salesSummary = ref<SalesSummaryTotals>({
     voidedSales: 0,
     voidCount: 0,
 });
+const salesDays = ref<SalesByDayRecord[]>([]);
+const salesSummary = ref<SalesSummaryTotals>(emptySalesSummary());
 const hourlySales = ref<SalesByHourRecord[]>([]);
 const topProducts = ref<TopProductRecord[]>([]);
 const productsSold = ref<ProductsSoldRecord[]>([]);
@@ -811,6 +858,12 @@ const purchaseSpendSummary = ref<PurchaseSpendSummary>({
     totalReceipts: 0,
     avgReceipt: 0,
 });
+
+// Previous-period figures used for the hero delta chips.
+const prevSalesSummary = ref<SalesSummaryTotals | null>(null);
+const prevProfitTotal = ref<number | null>(null);
+const prevExpenseTotal = ref<number | null>(null);
+
 const PAYMENT_METHOD_ORDER = ['CASH', 'CARD', 'GCASH', 'MAYA', 'TRANSFER', 'OTHER'];
 const employeePaymentMethods = computed(() => {
     const enabled = storeContext.currentStore?.paymentMethods;
@@ -824,53 +877,6 @@ const canUseIngredients = computed(() => hasPlanFeature(userContext.planTier, 'i
 const canUsePurchaseOrders = computed(() => hasPlanFeature(userContext.planTier, 'purchaseOrders'));
 const canUseExpenses = computed(() => hasPlanFeature(userContext.planTier, 'expenses'));
 
-const REPORT_CARDS: { id: string; label: string; planFeature?: PlanFeature }[] = [
-    { id: 'sales-charts',       label: 'Sales by day / hour' },
-    { id: 'daypart-mix',        label: 'Daypart mix' },
-    { id: 'payment-methods',    label: 'Payment methods' },
-    { id: 'top-products',       label: 'Top products' },
-    { id: 'items-sold',         label: 'Items sold per product' },
-    { id: 'item-margins',       label: 'Item margins' },
-    { id: 'ingredient-usage',   label: 'Ingredient usage',   planFeature: 'ingredients' },
-    { id: 'supplier-analytics', label: 'Supplier analytics', planFeature: 'purchaseOrders' },
-    { id: 'low-stock',          label: 'Low stock watch' },
-    { id: 'purchase-spend',     label: 'Purchase spend',     planFeature: 'purchaseOrders' },
-    { id: 'employee-sales',     label: 'Employee sales' },
-];
-
-const KPI_CARDS: { id: string; label: string }[] = [
-    { id: 'kpi-avg',   label: 'Avg order' },
-    { id: 'kpi-voids', label: 'Voids' },
-];
-
-const STORAGE_KEY = 'reports_card_visibility';
-
-const loadVisibility = (): Record<string, boolean> => {
-    try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (raw) return JSON.parse(raw);
-    } catch {}
-    return {};
-};
-
-const savedVisibility = loadVisibility();
-const visibleCards = reactive<Record<string, boolean>>({
-    ...Object.fromEntries(REPORT_CARDS.map(({ id }) => [id, savedVisibility[id] ?? true])),
-    // KPI cards default to hidden.
-    ...Object.fromEntries(KPI_CARDS.map(({ id }) => [id, savedVisibility[id] ?? false])),
-});
-
-const availableCards = computed(() =>
-    REPORT_CARDS.filter(c => !c.planFeature || hasPlanFeature(userContext.planTier, c.planFeature))
-);
-
-watch(visibleCards, (val) => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(val));
-}, { deep: true });
-
-const showCardSettings = ref(false);
-const cardSettingsRef = ref<HTMLElement | null>(null);
-
 const showDatePopover = ref(false);
 const datePopoverRef = ref<HTMLElement | null>(null);
 const draftFrom = ref(filters.from);
@@ -882,7 +888,6 @@ const toggleDatePopover = () => {
         draftTo.value = filters.to;
     }
     showDatePopover.value = !showDatePopover.value;
-    showCardSettings.value = false;
 };
 
 const closeDatePopover = () => { showDatePopover.value = false; };
@@ -935,11 +940,8 @@ const traverseRange = (direction: 1 | -1) => {
     nextTick(() => { isSettingRange.value = false; });
 };
 
-const onClickOutsideSettings = (e: MouseEvent) => {
+const onClickOutsidePopover = (e: MouseEvent) => {
     const target = e.target as Node;
-    if (showCardSettings.value && cardSettingsRef.value && !cardSettingsRef.value.contains(target)) {
-        showCardSettings.value = false;
-    }
     if (showDatePopover.value && datePopoverRef.value && !datePopoverRef.value.contains(target)) {
         showDatePopover.value = false;
     }
@@ -961,20 +963,23 @@ const expenseSummary = ref<{ total: number; byCategory: Array<{ category: string
 
 const netAfterExpenses = computed(() => profitSummary.value.totalProfit - expenseSummary.value.total);
 
+// The same-length window immediately before the selected range, used for
+// period-over-period comparison in the hero.
+const prevRange = computed(() => {
+    const MS_PER_DAY = 86400000;
+    const fromDate = new Date(filters.from + 'T00:00:00');
+    const toDate = new Date(filters.to + 'T00:00:00');
+    const daysInRange = Math.round((toDate.getTime() - fromDate.getTime()) / MS_PER_DAY) + 1;
+    const prevTo = new Date(fromDate.getTime() - MS_PER_DAY);
+    const prevFrom = new Date(prevTo.getTime() - (daysInRange - 1) * MS_PER_DAY);
+    return { from: buildDateInput(prevFrom), to: buildDateInput(prevTo) };
+});
+
 const loadReports = async () => {
     const storeId = storeContext.currentStoreId;
     if (!storeId || !canViewReports.value) {
         salesDays.value = [];
-        salesSummary.value = {
-            grossSales: 0,
-            discounts: 0,
-            tax: 0,
-            netSales: 0,
-            orderCount: 0,
-            avgOrder: 0,
-            voidedSales: 0,
-            voidCount: 0,
-        };
+        salesSummary.value = emptySalesSummary();
         topProducts.value = [];
         productsSold.value = [];
         productsSoldSummary.value = { totalQty: 0, productCount: 0, shown: 0, limited: false };
@@ -989,11 +994,15 @@ const loadReports = async () => {
         purchaseSpendSummary.value = { totalSpend: 0, totalReceipts: 0, avgReceipt: 0 };
         paymentMethods.value = [];
         employeeSales.value = [];
+        prevSalesSummary.value = null;
+        prevProfitTotal.value = null;
+        prevExpenseTotal.value = null;
         hasLoaded.value = true;
         return;
     }
     isLoading.value = true;
     errorMessage.value = '';
+    const prev = prevRange.value;
     try {
         // Build all requests under suppression so the page's own skeletons +
         // staggered reveal handle the loading UI instead of the global overlay.
@@ -1002,7 +1011,7 @@ const loadReports = async () => {
             getSalesSummary(storeId, { from: filters.from, to: filters.to }),
             getSalesByDay(storeId, { from: filters.from, to: filters.to }),
             getSalesByHour(storeId, { from: filters.from, to: filters.to }),
-            getTopProducts(storeId, { from: filters.from, to: filters.to, limit: 3 }),
+            getTopProducts(storeId, { from: filters.from, to: filters.to, limit: 5 }),
             getProductsSold(storeId, { from: filters.from, to: filters.to, limit: 100 }),
             getProfitSummary(storeId, { from: filters.from, to: filters.to }),
             getLowStock(storeId, { limit: 8 }),
@@ -1012,16 +1021,23 @@ const loadReports = async () => {
             canUsePurchaseOrders.value
                 ? getPurchaseSpend(storeId, { from: filters.from, to: filters.to, limit: 8 })
                 : Promise.resolve({ suppliers: [] as PurchaseSpendRecord[], summary: { totalSpend: 0, totalReceipts: 0, avgReceipt: 0 } as PurchaseSpendSummary }),
-            getProductMargins(storeId, { from: filters.from, to: filters.to, limit: 8 }),
+            getProductMargins(storeId, { from: filters.from, to: filters.to, limit: 10 }),
             getPaymentMethodBreakdown(storeId, { from: filters.from, to: filters.to }),
             getEmployeeSales(storeId, { from: filters.from, to: filters.to }),
             canUseExpenses.value
                 ? getExpenseSummary(storeId, filters.from, filters.to)
                 : Promise.resolve({ range: { from: filters.from, to: filters.to }, total: 0, byCategory: [] }),
+            getSalesSummary(storeId, { from: prev.from, to: prev.to }),
+            getProfitSummary(storeId, { from: prev.from, to: prev.to }),
+            canUseExpenses.value
+                ? getExpenseSummary(storeId, prev.from, prev.to)
+                : Promise.resolve({ range: { from: prev.from, to: prev.to }, total: 0, byCategory: [] }),
         ] as const;
         resumeLoading();
-        const [summary, sales, hourly, top, soldPerProduct, profit, lowStock, usage, spend, margins, paymentBreakdown, empSales, expense] =
-            await Promise.allSettled(reportRequests);
+        const [
+            summary, sales, hourly, top, soldPerProduct, profit, lowStock, usage, spend,
+            margins, paymentBreakdown, empSales, expense, prevSummary, prevProfit, prevExpense,
+        ] = await Promise.allSettled(reportRequests);
         if (summary.status === 'fulfilled') salesSummary.value = summary.value.totals;
         if (sales.status === 'fulfilled') salesDays.value = sales.value.days;
         if (hourly.status === 'fulfilled') hourlySales.value = hourly.value.hours;
@@ -1044,6 +1060,9 @@ const loadReports = async () => {
         if (paymentBreakdown.status === 'fulfilled') paymentMethods.value = paymentBreakdown.value.methods;
         if (empSales.status === 'fulfilled') employeeSales.value = empSales.value.employees;
         if (expense.status === 'fulfilled') expenseSummary.value = { total: expense.value.total, byCategory: expense.value.byCategory };
+        prevSalesSummary.value = prevSummary.status === 'fulfilled' ? prevSummary.value.totals : null;
+        prevProfitTotal.value = prevProfit.status === 'fulfilled' ? prevProfit.value.summary.totalProfit : null;
+        prevExpenseTotal.value = prevExpense.status === 'fulfilled' ? prevExpense.value.total : null;
         if (summary.status === 'rejected') {
             errorMessage.value = (summary.reason as any)?.body?.error?.message || 'Unable to load reports.';
         }
@@ -1056,6 +1075,157 @@ const loadReports = async () => {
     }
 };
 
+/* ── Deltas vs previous period ── */
+
+type Delta = { pct: number | null; dir: 'up' | 'down' | 'flat'; tone: 'good' | 'bad' | 'neutral' };
+
+const computeDelta = (current: number, prev: number | null | undefined, invert = false): Delta => {
+    if (prev === null || prev === undefined || prev === 0) {
+        return { pct: null, dir: 'flat', tone: 'neutral' };
+    }
+    const pct = ((current - prev) / Math.abs(prev)) * 100;
+    if (Math.abs(pct) < 0.05) {
+        return { pct: 0, dir: 'flat', tone: 'neutral' };
+    }
+    const dir = pct > 0 ? 'up' : 'down';
+    const good = invert ? pct < 0 : pct > 0;
+    return { pct: Math.round(pct * 10) / 10, dir, tone: good ? 'good' : 'bad' };
+};
+
+const deltaIcon = (delta: Delta) => {
+    if (delta.dir === 'up') return 'trending-up';
+    if (delta.dir === 'down') return 'trending-down';
+    return 'trending-neutral';
+};
+
+const formatDeltaPct = (pct: number) => {
+    const abs = Math.abs(pct);
+    const text = abs >= 100 ? Math.round(abs).toLocaleString() : abs.toFixed(1).replace(/\.0$/, '');
+    return `${text}%`;
+};
+
+const netSalesDelta = computed(() =>
+    computeDelta(salesSummary.value.netSales, prevSalesSummary.value?.netSales ?? null)
+);
+
+type HeroKpi = {
+    id: string;
+    label: string;
+    value: string;
+    delta: Delta | null;
+    sub?: string;
+    negative?: boolean;
+};
+
+const heroKpis = computed<HeroKpi[]>(() => {
+    const prev = prevSalesSummary.value;
+    const profit = profitSummary.value;
+    const kpis: HeroKpi[] = [
+        {
+            id: 'orders',
+            label: 'Orders',
+            value: salesSummary.value.orderCount.toLocaleString(),
+            delta: computeDelta(salesSummary.value.orderCount, prev?.orderCount ?? null),
+        },
+        {
+            id: 'avg-order',
+            label: 'Avg order',
+            value: formatMoney(salesSummary.value.avgOrder),
+            delta: computeDelta(salesSummary.value.avgOrder, prev?.avgOrder ?? null),
+        },
+        {
+            id: 'profit',
+            label: 'Gross profit',
+            value: formatMoney(profit.totalProfit),
+            delta: computeDelta(profit.totalProfit, prevProfitTotal.value),
+            sub: profit.itemsWithCost < profit.totalItems
+                ? `${profit.marginPct}% margin · ${profit.itemsWithCost}/${profit.totalItems} costed`
+                : `${profit.marginPct}% margin`,
+            negative: profit.totalProfit < 0,
+        },
+    ];
+    if (canUseExpenses.value) {
+        kpis.push({
+            id: 'expenses',
+            label: 'Expenses',
+            value: formatMoney(expenseSummary.value.total),
+            delta: computeDelta(expenseSummary.value.total, prevExpenseTotal.value, true),
+        });
+        const prevNet = prevProfitTotal.value !== null && prevExpenseTotal.value !== null
+            ? prevProfitTotal.value - prevExpenseTotal.value
+            : null;
+        kpis.push({
+            id: 'net-after',
+            label: 'Net after expenses',
+            value: formatMoney(netAfterExpenses.value),
+            delta: computeDelta(netAfterExpenses.value, prevNet),
+            negative: netAfterExpenses.value < 0,
+        });
+    }
+    return kpis;
+});
+
+/* ── Insight chips ── */
+
+const peakHour = computed<SalesByHourRecord | null>(() =>
+    hourlySales.value.reduce<SalesByHourRecord | null>((best, hour) => {
+        if (hour.totalSales <= 0) return best;
+        if (!best || hour.totalSales > best.totalSales) return hour;
+        return best;
+    }, null)
+);
+
+const bestDay = computed<SalesByDayRecord | null>(() =>
+    salesDays.value.reduce<SalesByDayRecord | null>((best, day) => {
+        if (day.totalSales <= 0) return best;
+        if (!best || day.totalSales > best.totalSales) return day;
+        return best;
+    }, null)
+);
+
+type InsightChip = { id: string; icon: string; text: string; tab?: TabId; tone: 'default' | 'warn' };
+
+const insights = computed<InsightChip[]>(() => {
+    const chips: InsightChip[] = [];
+    if (peakHour.value) {
+        chips.push({
+            id: 'peak-hour',
+            icon: 'clock-outline',
+            text: `Peak hour ${formatHourFull(peakHour.value.hour)}–${formatHourFull(peakHour.value.hour + 1)}`,
+            tone: 'default',
+        });
+    }
+    if (!isSingleDay.value && bestDay.value) {
+        chips.push({
+            id: 'best-day',
+            icon: 'calendar-star',
+            text: `Best day ${formatDayFull(bestDay.value.date)}`,
+            tone: 'default',
+        });
+    }
+    if (topProducts.value[0]) {
+        chips.push({
+            id: 'top-seller',
+            icon: 'trophy-outline',
+            text: `Top seller · ${topProducts.value[0].name}`,
+            tab: 'products',
+            tone: 'default',
+        });
+    }
+    if (lowStockItems.value.length) {
+        chips.push({
+            id: 'low-stock',
+            icon: 'alert-circle-outline',
+            text: `${lowStockItems.value.length} ${lowStockItems.value.length === 1 ? 'item' : 'items'} low on stock`,
+            tab: 'inventory',
+            tone: 'warn',
+        });
+    }
+    return chips;
+});
+
+/* ── Formatting helpers ── */
+
 const formatPaymentMethod = (method: string) => {
     const labels: Record<string, string> = {
         CASH: 'Cash',
@@ -1067,6 +1237,17 @@ const formatPaymentMethod = (method: string) => {
     };
     return labels[method] ?? method;
 };
+
+const PAYMENT_COLORS: Record<string, string> = {
+    CASH: '#0d9488',
+    CARD: '#6366f1',
+    GCASH: '#2563eb',
+    MAYA: '#16a34a',
+    TRANSFER: '#d97706',
+    OTHER: '#94a3b8',
+};
+
+const paymentColor = (method: string) => PAYMENT_COLORS[method] ?? '#94a3b8';
 
 const formatDateShort = (dateStr: string) => {
     const [year, month, day] = dateStr.split('-').map(Number);
@@ -1090,10 +1271,16 @@ const rangeLabel = computed(() => {
     return `${formatDateShort(filters.from)} – ${formatDateShort(filters.to)}`;
 });
 
+const prevRangeLabel = computed(() => {
+    const prev = prevRange.value;
+    if (prev.from === prev.to) return formatDateShort(prev.from);
+    return `${formatDateShort(prev.from)} – ${formatDateShort(prev.to)}`;
+});
+
 const currentStoreLabel = computed(() => {
     const store = storeContext.currentStore;
-    if (!store) return 'your stores';
-    return `${store.name} - ${store.currency}`;
+    if (!store) return 'your store';
+    return store.name;
 });
 
 const chartMax = computed(() => {
@@ -1106,11 +1293,40 @@ const hourlyMax = computed(() => {
     return Math.max(1, ...values);
 });
 
-const topSupplier = computed(() => purchaseSpend.value[0] ?? null);
+const sparklineValues = computed(() =>
+    isSingleDay.value
+        ? hourlySales.value.map((hour) => hour.totalSales)
+        : salesDays.value.map((day) => day.totalSales)
+);
 
 const miniBarHeight = (value: number, maxValue: number) => {
     const pct = Math.round((value / Math.max(1, maxValue)) * 100);
     return `${pct}%`;
+};
+
+const topProductMax = computed(() => Math.max(1, ...topProducts.value.map((p) => p.totalSales)));
+const rankBarWidth = (value: number) => `${Math.round((value / topProductMax.value) * 100)}%`;
+
+const usageMax = computed(() => Math.max(1, ...ingredientUsage.value.map((i) => i.qtyUsed)));
+const usageBarWidth = (value: number) => `${Math.round((value / usageMax.value) * 100)}%`;
+
+const employeeSalesTotal = computed(() =>
+    employeeSales.value.reduce((sum, emp) => sum + emp.totalSales, 0)
+);
+const employeeShare = (emp: EmployeeSalesRecord) =>
+    employeeSalesTotal.value > 0
+        ? Math.round((emp.totalSales / employeeSalesTotal.value) * 1000) / 10
+        : 0;
+
+const stockSeverity = (item: LowStockItem): { label: string; cls: string } => {
+    if (item.currentQty <= 0) return { label: 'Out of stock', cls: 'out' };
+    if (item.currentQty <= item.lowStockThreshold / 2) return { label: 'Critical', cls: 'critical' };
+    return { label: 'Low', cls: 'low' };
+};
+
+const stockCoverage = (item: LowStockItem) => {
+    if (item.lowStockThreshold <= 0) return 0;
+    return Math.max(0, Math.min(100, Math.round((item.currentQty / item.lowStockThreshold) * 100)));
 };
 
 const formatMoney = (value: number) => {
@@ -1134,11 +1350,26 @@ const formatDayLabel = (value: string) => {
     return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', timeZone: 'UTC' });
 };
 
+const formatDayFull = (value: string) => {
+    const [year, month, day] = value.split('-').map(Number);
+    if (!year || !month || !day) return value;
+    return new Date(Date.UTC(year, month - 1, day)).toLocaleDateString(undefined, {
+        weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC',
+    });
+};
+
 const formatHourLabel = (hour: number) => {
     const normalized = hour % 24;
     const suffix = normalized >= 12 ? 'p' : 'a';
     const display = normalized % 12 === 0 ? 12 : normalized % 12;
     return `${display}${suffix}`;
+};
+
+const formatHourFull = (hour: number) => {
+    const normalized = ((hour % 24) + 24) % 24;
+    const suffix = normalized >= 12 ? 'PM' : 'AM';
+    const display = normalized % 12 === 0 ? 12 : normalized % 12;
+    return `${display} ${suffix}`;
 };
 
 const formatCompactMoney = (value: number) => {
@@ -1243,7 +1474,7 @@ const openSupplierSpend = (supplier: PurchaseSpendRecord) => {
 };
 
 onMounted(async () => {
-    document.addEventListener('click', onClickOutsideSettings, true);
+    document.addEventListener('click', onClickOutsidePopover, true);
     await storeContext.fetchStores();
     const routeStoreId = route.params.storeId as string | undefined;
     if (routeStoreId && routeStoreId !== storeContext.currentStoreId) {
@@ -1253,7 +1484,7 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
-    document.removeEventListener('click', onClickOutsideSettings, true);
+    document.removeEventListener('click', onClickOutsidePopover, true);
     if (filterDebounceTimer !== null) clearTimeout(filterDebounceTimer);
 });
 
@@ -1301,7 +1532,10 @@ watch(
     --c-accent-dark: #0f766e;
     --c-border: #e2e8f0;
     --c-surface: #ffffff;
-    --c-bg: #f8fafc;
+    --c-bg: #f6f8f9;
+    --c-good: #059669;
+    --c-bad: #e11d48;
+    --c-warn: #d97706;
     min-height: 100vh;
     padding: 2rem 1.5rem 3rem;
     background: var(--c-bg);
@@ -1317,7 +1551,7 @@ watch(
     margin: 0 auto;
     display: flex;
     flex-direction: column;
-    gap: 1.75rem;
+    gap: 1.25rem;
 }
 
 .reports-header {
@@ -1326,6 +1560,7 @@ watch(
     gap: 1.25rem;
     align-items: flex-start;
     justify-content: space-between;
+    margin-bottom: 0.25rem;
 }
 
 .reports-eyebrow {
@@ -1367,7 +1602,6 @@ watch(
     align-items: flex-end;
 }
 
-/* ── Range nav ── */
 .range-nav {
     display: inline-flex;
     align-items: center;
@@ -1437,7 +1671,6 @@ watch(
     flex-shrink: 0;
 }
 
-/* ── Date popover ── */
 .date-popover {
     position: absolute;
     top: calc(100% + 8px);
@@ -1562,98 +1795,16 @@ watch(
     background: var(--c-accent-dark);
 }
 
-.card-settings-wrap {
-    position: relative;
-}
-
-.icon-button {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 34px;
-    height: 34px;
-    border-radius: 8px;
-    border: 1.5px solid var(--c-border);
-    background: var(--c-surface);
-    color: var(--c-muted);
-    cursor: pointer;
-    transition: color 0.15s, border-color 0.15s, background 0.15s;
-}
-
-.icon-button:hover,
-.icon-button.active {
-    color: var(--c-accent-dark);
-    border-color: var(--c-accent);
-    background: rgba(13, 148, 136, 0.06);
-}
-
-.card-settings-dropdown {
-    position: absolute;
-    top: calc(100% + 6px);
-    right: 0;
-    z-index: 100;
-    min-width: 220px;
-    background: var(--c-surface);
-    border: 1.5px solid var(--c-border);
-    border-radius: 10px;
-    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.1);
-    padding: 0.5rem 0;
-}
-
-.card-settings-header {
-    font-size: 0.68rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: var(--c-muted);
-    padding: 0.4rem 1rem 0.5rem;
-}
-
-.card-settings-row {
-    display: flex;
-    align-items: center;
-    gap: 0.65rem;
-    padding: 0.45rem 1rem;
-    font-size: 0.875rem;
-    color: var(--c-text);
-    cursor: pointer;
-    transition: background 0.1s;
-}
-
-.card-settings-row:hover {
-    background: var(--c-bg);
-}
-
-.card-settings-row input[type="checkbox"] {
-    accent-color: var(--c-accent);
-    width: 15px;
-    height: 15px;
-    cursor: pointer;
-    flex-shrink: 0;
-}
-
 /* ============================================================
-   KPI STRIP
+   ENTRANCE ANIMATION
 ============================================================ */
-.reports-kpis {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.75rem;
-}
-
-/* Neutral placeholder cards shown only during the very first load, before any
-   data (and the staggered reveal animation) arrives. */
-.kpi-card--skeleton {
-    background: var(--c-surface);
-    border-color: var(--c-border);
-    min-height: 88px;
-    justify-content: center;
-}
-
-/* ── Staggered entrance: cards rise in each time fresh data loads ── */
 @keyframes report-rise {
     from { opacity: 0; transform: translateY(12px) scale(0.99); }
     to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.reveal-item {
+    animation: report-rise 0.5s cubic-bezier(0.16, 1, 0.3, 1) backwards;
 }
 
 /* `backwards` holds the hidden state during the stagger delay, then hands
@@ -1666,115 +1817,310 @@ watch(
 .reports-reveal > *:nth-child(3) { animation-delay: 0.11s; }
 .reports-reveal > *:nth-child(4) { animation-delay: 0.15s; }
 .reports-reveal > *:nth-child(5) { animation-delay: 0.19s; }
-.reports-reveal > *:nth-child(6) { animation-delay: 0.23s; }
-.reports-reveal > *:nth-child(7) { animation-delay: 0.27s; }
-.reports-reveal > *:nth-child(8) { animation-delay: 0.31s; }
-.reports-reveal > *:nth-child(9) { animation-delay: 0.35s; }
-.reports-reveal > *:nth-child(n+10) { animation-delay: 0.39s; }
+.reports-reveal > *:nth-child(n+6) { animation-delay: 0.23s; }
 
 @media (prefers-reduced-motion: reduce) {
+    .reveal-item,
     .reports-reveal > * { animation: none; }
 }
 
-.kpi-card {
-    --kpi-accent: #0d9488;
+/* ============================================================
+   BUSINESS PULSE HERO
+============================================================ */
+.pulse {
     position: relative;
+    border-radius: 20px;
+    padding: 1.75rem 1.75rem 1.5rem;
+    background:
+        radial-gradient(120% 150% at 85% -10%, rgba(45, 212, 191, 0.18), transparent 55%),
+        linear-gradient(140deg, #0b302d, #123f3a 62%, #0d3330);
+    border: 1px solid rgba(45, 212, 191, 0.2);
+    color: #f0fdfa;
+    display: flex;
+    flex-direction: column;
+    gap: 1.4rem;
+    overflow: hidden;
+}
+
+.pulse--skeleton {
+    background: var(--c-surface);
+    border: 1px solid var(--c-border);
+    min-height: 220px;
+    justify-content: center;
+}
+
+.pulse-top {
+    display: flex;
+    gap: 2rem;
+    align-items: stretch;
+    justify-content: space-between;
+    flex-wrap: wrap;
+}
+
+.pulse-headline {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    min-width: 220px;
+}
+
+.pulse-eyebrow {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: #5eead4;
+}
+
+.pulse-value {
+    font-size: clamp(2rem, 4vw, 2.75rem);
+    font-weight: 800;
+    letter-spacing: -0.035em;
+    line-height: 1.05;
+    font-variant-numeric: tabular-nums;
+}
+
+.pulse-compare {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    flex-wrap: wrap;
+}
+
+.pulse-compare-caption {
+    font-size: 0.75rem;
+    color: rgba(240, 253, 250, 0.6);
+}
+
+.pulse-spark {
+    flex: 1;
+    min-width: 240px;
+    max-width: 520px;
     display: flex;
     flex-direction: column;
     gap: 0.35rem;
-    padding: 1rem 1.25rem;
-    background:
-        linear-gradient(135deg,
-            color-mix(in srgb, var(--kpi-accent) 7%, var(--c-surface)),
-            var(--c-surface) 65%);
-    border: 1px solid color-mix(in srgb, var(--kpi-accent) 22%, var(--c-border));
-    border-radius: 14px;
-    min-width: 140px;
-    flex: 1;
+    justify-content: flex-end;
+}
+
+.pulse-spark :deep(.hero-sparkline) {
+    height: 96px;
+}
+
+.pulse-spark-caption {
+    font-size: 0.68rem;
+    color: rgba(240, 253, 250, 0.5);
+    text-align: right;
+}
+
+.pulse-kpis {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1px;
+    background: rgba(94, 234, 212, 0.14);
+    border: 1px solid rgba(94, 234, 212, 0.14);
+    border-radius: 12px;
     overflow: hidden;
-    transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
 }
 
-/* accent rail down the left edge */
-.kpi-card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 3px;
-    height: 100%;
-    background: var(--kpi-accent);
-    opacity: 0.7;
+.pulse-kpi {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    padding: 0.85rem 1rem;
+    background: rgba(7, 34, 31, 0.55);
+    min-width: 0;
 }
 
-.kpi-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 10px 24px color-mix(in srgb, var(--kpi-accent) 18%, transparent);
-    border-color: color-mix(in srgb, var(--kpi-accent) 45%, var(--c-border));
+.pulse-kpi-label {
+    font-size: 0.64rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: rgba(153, 246, 228, 0.75);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-.kpi-head {
+.pulse-kpi-value {
+    font-size: 1.15rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: #f0fdfa;
+    font-variant-numeric: tabular-nums;
+}
+
+.pulse-kpi-value--negative {
+    color: #fda4af;
+}
+
+.pulse-kpi-foot {
     display: flex;
     align-items: center;
+    gap: 0.45rem;
+    flex-wrap: wrap;
+    min-height: 18px;
+}
+
+.pulse-kpi-sub {
+    font-size: 0.68rem;
+    color: rgba(240, 253, 250, 0.55);
+}
+
+/* ── Delta chips (used on the dark hero) ── */
+.delta-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.18rem 0.55rem;
+    border-radius: 999px;
+    font-size: 0.74rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.delta-chip--small {
+    font-size: 0.66rem;
+    padding: 0.1rem 0.45rem;
+}
+
+.delta-chip--good {
+    background: rgba(16, 185, 129, 0.2);
+    color: #6ee7b7;
+}
+
+.delta-chip--bad {
+    background: rgba(244, 63, 94, 0.2);
+    color: #fda4af;
+}
+
+.delta-chip--neutral {
+    background: rgba(148, 163, 184, 0.2);
+    color: #cbd5e1;
+}
+
+/* ============================================================
+   INSIGHT CHIPS
+============================================================ */
+.insight-strip {
+    display: flex;
+    flex-wrap: wrap;
     gap: 0.5rem;
 }
 
-.kpi-icon {
+.insight-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.45rem 0.85rem;
+    border-radius: 999px;
+    background: var(--c-surface);
+    border: 1px solid var(--c-border);
+    font-size: 0.78rem;
+    font-weight: 600;
+    font-family: inherit;
+    color: var(--c-text);
+}
+
+.insight-icon {
+    color: var(--c-accent-dark);
+    flex-shrink: 0;
+}
+
+.insight-chip--warn {
+    background: #fffbeb;
+    border-color: #fde68a;
+    color: #92400e;
+}
+
+.insight-chip--warn .insight-icon {
+    color: #d97706;
+}
+
+.insight-chip--link {
+    cursor: pointer;
+    transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+}
+
+.insight-chip--link:hover {
+    border-color: var(--c-accent);
+    box-shadow: 0 3px 10px rgba(13, 148, 136, 0.12);
+    transform: translateY(-1px);
+}
+
+.insight-chip--warn.insight-chip--link:hover {
+    border-color: #d97706;
+    box-shadow: 0 3px 10px rgba(217, 119, 6, 0.15);
+}
+
+.insight-go {
+    color: var(--c-muted);
+    margin-right: -0.2rem;
+}
+
+/* ============================================================
+   TABS
+============================================================ */
+.report-tabs {
+    display: flex;
+    gap: 0.25rem;
+    background: var(--c-surface);
+    border: 1.5px solid var(--c-border);
+    border-radius: 12px;
+    padding: 0.3rem;
+    width: fit-content;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.report-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.5rem 1rem;
+    border-radius: 9px;
+    border: none;
+    background: transparent;
+    font-size: 0.84rem;
+    font-weight: 600;
+    font-family: inherit;
+    color: var(--c-muted);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s, color 0.15s;
+}
+
+.report-tab:hover {
+    background: #f1f5f9;
+    color: var(--c-text);
+}
+
+.report-tab--active,
+.report-tab--active:hover {
+    background: var(--c-accent);
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(13, 148, 136, 0.3);
+}
+
+.report-tab-badge {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 30px;
-    height: 30px;
-    border-radius: 9px;
-    flex-shrink: 0;
-    color: var(--kpi-accent);
-    background: color-mix(in srgb, var(--kpi-accent) 14%, var(--c-surface));
-}
-
-.kpi-label {
-    font-size: 0.7rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--c-muted);
-}
-
-.kpi-value {
-    font-size: 1.6rem;
-    font-weight: 800;
-    letter-spacing: -0.03em;
-    color: var(--c-text);
-    line-height: 1.1;
-}
-
-.kpi-sub {
-    font-size: 0.72rem;
-    color: var(--c-muted);
-    line-height: 1.4;
-}
-
-/* per-metric accent colors */
-.kpi-card--sales     { --kpi-accent: #0d9488; }
-.kpi-card--orders    { --kpi-accent: #2563eb; }
-.kpi-card--avg       { --kpi-accent: #7c3aed; }
-.kpi-card--discounts { --kpi-accent: #d97706; }
-.kpi-card--voids     { --kpi-accent: #dc2626; }
-.kpi-card--profit    { --kpi-accent: #059669; }
-.kpi-card--expense   { --kpi-accent: #d97706; }
-.kpi-card--net       { --kpi-accent: #0f766e; }
-
-.kpi-card--profit .kpi-value,
-.kpi-card--net .kpi-value {
-    color: var(--kpi-accent);
-}
-
-.kpi-value--negative {
-    color: #dc2626 !important;
-}
-
-.kpi-warn {
+    min-width: 18px;
+    height: 18px;
+    padding: 0 0.35rem;
+    border-radius: 999px;
+    background: #fef3c7;
     color: #b45309;
-    font-size: 0.65rem;
+    font-size: 0.66rem;
+    font-weight: 800;
+}
+
+.report-tab--active .report-tab-badge {
+    background: rgba(255, 255, 255, 0.25);
+    color: #fff;
 }
 
 /* ============================================================
@@ -1805,11 +2151,11 @@ watch(
 }
 
 /* ============================================================
-   REPORTS GRID
+   REPORTS GRID & CARDS
 ============================================================ */
 .reports-grid {
     display: grid;
-    grid-template-columns: minmax(0, 1.35fr) minmax(0, 0.85fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 1.25rem;
 }
 
@@ -1828,9 +2174,6 @@ watch(
     grid-column: span 2;
 }
 
-/* ============================================================
-   CARD HEADER
-============================================================ */
 .card-header {
     display: flex;
     justify-content: space-between;
@@ -1856,6 +2199,7 @@ watch(
     display: flex;
     gap: 0.4rem;
     flex-shrink: 0;
+    align-items: center;
 }
 
 .pill {
@@ -1871,8 +2215,31 @@ watch(
     color: var(--c-accent-dark);
 }
 
+.pill--warn {
+    background: #fef3c7;
+    color: #b45309;
+}
+
+.card-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.15rem;
+    border: none;
+    background: none;
+    padding: 0;
+    font-size: 0.78rem;
+    font-weight: 600;
+    font-family: inherit;
+    color: var(--c-accent-dark);
+    cursor: pointer;
+}
+
+.card-link:hover {
+    text-decoration: underline;
+}
+
 /* ============================================================
-   CHARTS ROW
+   CHARTS
 ============================================================ */
 .charts-row {
     display: grid;
@@ -1913,6 +2280,7 @@ watch(
     font-size: 0.82rem;
     font-weight: 700;
     color: var(--c-accent-dark);
+    font-variant-numeric: tabular-nums;
 }
 
 .chart-with-axis {
@@ -2016,30 +2384,199 @@ watch(
 }
 
 /* ============================================================
-   TOP LIST & DAYPART
+   PAYMENT MIX
 ============================================================ */
-.top-list,
-.daypart-list {
-    display: grid;
-    gap: 0.5rem;
+.payment-mix {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
 }
 
-.top-item,
-.daypart-row {
+.stack-bar {
     display: flex;
-    justify-content: space-between;
+    height: 14px;
+    border-radius: 999px;
+    overflow: hidden;
+    background: #f1f5f9;
+}
+
+.stack-seg {
+    display: block;
+    min-width: 3px;
+    height: 100%;
+}
+
+.stack-seg + .stack-seg {
+    border-left: 2px solid var(--c-surface);
+}
+
+.legend-list {
+    display: grid;
+    gap: 0.35rem;
+}
+
+.legend-row {
+    display: flex;
     align-items: center;
-    gap: 0.8rem;
-    padding: 0.7rem 0.9rem;
+    gap: 0.65rem;
+    padding: 0.5rem 0.65rem;
     border-radius: 10px;
-    background: #f8fafc;
-    border: 1px solid var(--c-border);
     transition: background 0.12s;
 }
 
-.top-item:hover,
-.daypart-row:hover {
-    background: #f1f5f9;
+.legend-row:hover {
+    background: #f8fafc;
+}
+
+.legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 999px;
+    flex-shrink: 0;
+}
+
+.legend-name {
+    flex: 1;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--c-text);
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.legend-meta {
+    font-size: 0.7rem;
+    font-weight: 500;
+    color: var(--c-muted);
+}
+
+.legend-value {
+    text-align: right;
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+}
+
+.legend-value strong {
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: var(--c-text);
+    font-variant-numeric: tabular-nums;
+}
+
+.legend-share {
+    font-size: 0.7rem;
+    color: var(--c-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+/* ============================================================
+   SHARE ROWS (daypart, ingredient usage)
+============================================================ */
+.share-list {
+    display: grid;
+    gap: 0.85rem;
+}
+
+.share-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+.share-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 0.75rem;
+}
+
+.share-name {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--c-text);
+}
+
+.share-amount {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--c-text);
+    font-variant-numeric: tabular-nums;
+}
+
+.share-track {
+    height: 6px;
+    border-radius: 999px;
+    background: #eef2f5;
+    overflow: hidden;
+}
+
+.share-fill {
+    display: block;
+    height: 100%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #0d9488, #2dd4bf);
+    min-width: 2px;
+    transition: width 0.3s ease;
+}
+
+.share-meta {
+    font-size: 0.72rem;
+    color: var(--c-muted);
+}
+
+/* ============================================================
+   RANKED LIST (best sellers)
+============================================================ */
+.rank-list {
+    display: grid;
+    gap: 0.85rem;
+}
+
+.rank-item {
+    display: flex;
+    gap: 0.85rem;
+    align-items: flex-start;
+}
+
+.rank-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 8px;
+    background: rgba(13, 148, 136, 0.1);
+    color: var(--c-accent-dark);
+    font-size: 0.72rem;
+    font-weight: 800;
+    flex-shrink: 0;
+    margin-top: 0.1rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.rank-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    min-width: 0;
+}
+
+.rank-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 0.75rem;
+}
+
+.rank-amount {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--c-text);
+    flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
 }
 
 .item-name {
@@ -2057,28 +2594,71 @@ watch(
     margin-top: 0.1rem;
 }
 
-.item-metrics {
-    text-align: right;
-    display: flex;
-    flex-direction: column;
-    gap: 0.15rem;
-    flex-shrink: 0;
-}
-
-.item-metrics strong {
-    font-size: 0.9rem;
-    font-weight: 700;
-    color: var(--c-text);
-}
-
-.metric {
-    font-size: 0.72rem;
-    color: var(--c-muted);
-}
-
 .warn-text {
     color: #b45309;
     font-weight: 600;
+}
+
+/* ============================================================
+   SALES BREAKDOWN
+============================================================ */
+.breakdown-list {
+    display: grid;
+    gap: 0;
+    margin: 0;
+}
+
+.breakdown-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 1rem;
+    padding: 0.65rem 0.25rem;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.breakdown-row:last-child {
+    border-bottom: none;
+}
+
+.breakdown-row dt {
+    font-size: 0.85rem;
+    color: var(--c-muted);
+    font-weight: 500;
+}
+
+.breakdown-row dd {
+    margin: 0;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--c-text);
+    font-variant-numeric: tabular-nums;
+}
+
+.breakdown-neg {
+    color: var(--c-warn) !important;
+}
+
+.breakdown-row--total {
+    border-top: 1.5px solid var(--c-border);
+    border-bottom: 1.5px solid var(--c-border);
+}
+
+.breakdown-row--total dt {
+    color: var(--c-text);
+    font-weight: 700;
+}
+
+.breakdown-row--total dd {
+    font-weight: 800;
+    color: var(--c-accent-dark);
+}
+
+.breakdown-row--muted dt,
+.breakdown-row--muted dd {
+    font-size: 0.78rem;
+    color: var(--c-muted);
+    font-weight: 500;
 }
 
 /* ============================================================
@@ -2086,7 +2666,7 @@ watch(
 ============================================================ */
 .supplier-metrics {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
     gap: 0.75rem;
 }
 
@@ -2112,6 +2692,7 @@ watch(
     font-size: 1.05rem;
     font-weight: 700;
     color: var(--c-text);
+    font-variant-numeric: tabular-nums;
 }
 
 .metric-sub {
@@ -2120,20 +2701,20 @@ watch(
 }
 
 /* ============================================================
-   TABLE
+   TABLES
 ============================================================ */
 .table-wrap {
     overflow-x: auto;
     min-width: 0; /* flex item must opt out of min-width:auto so overflow-x:auto fires */
 }
 
-.low-stock-table {
+.report-table {
     width: 100%;
     border-collapse: collapse;
     font-size: 0.875rem;
 }
 
-.low-stock-table thead th {
+.report-table thead th {
     padding: 0.6rem 0.9rem;
     text-align: left;
     font-size: 0.7rem;
@@ -2145,22 +2726,23 @@ watch(
     white-space: nowrap;
 }
 
-.low-stock-table tbody tr {
+.report-table tbody tr {
     border-bottom: 1px solid var(--c-border);
     transition: background 0.12s;
 }
 
-.low-stock-table tbody tr:last-child {
+.report-table tbody tr:last-child {
     border-bottom: none;
 }
 
-.low-stock-table tbody tr:hover {
+.report-table tbody tr:hover {
     background: #f8fafc;
 }
 
-.low-stock-table tbody td {
+.report-table tbody td {
     padding: 0.8rem 0.9rem;
     vertical-align: middle;
+    font-variant-numeric: tabular-nums;
 }
 
 .item-type-chip {
@@ -2202,6 +2784,85 @@ watch(
     color: #dc2626;
 }
 
+/* ── Low stock status ── */
+.stock-chip {
+    display: inline-block;
+    padding: 2px 9px;
+    border-radius: 20px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.stock-chip--out {
+    background: #ffe4e6;
+    color: #be123c;
+}
+
+.stock-chip--critical {
+    background: #ffedd5;
+    color: #c2410c;
+}
+
+.stock-chip--low {
+    background: #fef9c3;
+    color: #a16207;
+}
+
+.stock-level {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    min-width: 120px;
+}
+
+.stock-nums {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--c-text);
+    font-variant-numeric: tabular-nums;
+}
+
+.stock-track {
+    height: 5px;
+    border-radius: 999px;
+    background: #eef2f5;
+    overflow: hidden;
+    max-width: 140px;
+}
+
+.stock-fill {
+    display: block;
+    height: 100%;
+    border-radius: 999px;
+    min-width: 2px;
+}
+
+.stock-fill--out { background: #e11d48; }
+.stock-fill--critical { background: #ea580c; }
+.stock-fill--low { background: #ca8a04; }
+
+/* ── Employee share ── */
+.emp-share {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 110px;
+}
+
+.share-track--table {
+    flex: 1;
+    max-width: 90px;
+}
+
+.emp-share-pct {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--c-muted);
+    font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
+}
+
 /* ============================================================
    SUPPLIER LINK
 ============================================================ */
@@ -2225,70 +2886,6 @@ watch(
 }
 
 /* ============================================================
-   BUTTONS
-============================================================ */
-.button-compact {
-    font-size: 0.82rem;
-    padding: 0.5rem 0.9rem;
-}
-
-.ghost-button {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.3rem;
-    padding: 0.45rem 0.9rem;
-    border-radius: 6px;
-    border: 1.5px solid var(--c-border);
-    background: transparent;
-    color: var(--c-text);
-    font-size: 0.82rem;
-    font-weight: 600;
-    font-family: 'Inter', -apple-system, sans-serif;
-    cursor: pointer;
-    transition: all 0.15s;
-    white-space: nowrap;
-}
-
-.ghost-button:hover:not(:disabled) {
-    border-color: var(--c-accent);
-    color: var(--c-accent-dark);
-    background: rgba(13, 148, 136, 0.05);
-}
-
-.ghost-button:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-}
-
-.secondary-button {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    padding: 0.5rem 0.9rem;
-    border-radius: 8px;
-    border: 1.5px solid var(--c-border);
-    background: transparent;
-    color: var(--c-text);
-    font-size: 0.82rem;
-    font-weight: 600;
-    font-family: 'Inter', -apple-system, sans-serif;
-    cursor: pointer;
-    transition: all 0.15s;
-    white-space: nowrap;
-}
-
-.secondary-button:hover:not(:disabled) {
-    border-color: var(--c-accent);
-    color: var(--c-accent-dark);
-    background: rgba(13, 148, 136, 0.05);
-}
-
-.secondary-button:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-}
-
-/* ============================================================
    RESPONSIVE
 ============================================================ */
 @media (max-width: 960px) {
@@ -2300,7 +2897,7 @@ watch(
 @media (max-width: 640px) {
     /* ── Page & shell ── */
     .reports-page { padding: 1rem 0.875rem 2.5rem; }
-    .reports-shell { gap: 1.25rem; }
+    .reports-shell { gap: 1rem; }
 
     /* ── Header ── */
     .reports-header { flex-direction: column; gap: 0.875rem; }
@@ -2315,14 +2912,21 @@ watch(
         width: min(260px, calc(100vw - 1.75rem));
     }
 
-    /* ── KPI strip → 2-column grid ── */
-    .reports-kpis {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 0.5rem;
-    }
-    .kpi-card { min-width: 0; padding: 0.75rem 0.875rem; }
-    .kpi-value { font-size: 1.25rem; }
+    /* ── Hero ── */
+    .pulse { padding: 1.25rem 1.1rem 1.1rem; border-radius: 16px; gap: 1.1rem; }
+    .pulse-top { gap: 1rem; }
+    .pulse-spark { min-width: 100%; max-width: none; }
+    .pulse-spark :deep(.hero-sparkline) { height: 64px; }
+    .pulse-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .pulse-kpi { padding: 0.7rem 0.8rem; }
+    .pulse-kpi-value { font-size: 1rem; }
+    /* Odd KPI count: stretch the last one so no empty cell shows. */
+    .pulse-kpi:last-child:nth-child(odd) { grid-column: span 2; }
+
+    /* ── Tabs: drop icons so all four fit without scrolling ── */
+    .report-tabs { width: 100%; }
+    .report-tab { padding: 0.5rem 0.6rem; font-size: 0.8rem; flex: 1; justify-content: center; }
+    .report-tab :deep(.report-tab-icon) { display: none; }
 
     /* ── Cards ── */
     .report-card { padding: 1rem; gap: 1rem; border-radius: 12px; }
@@ -2340,13 +2944,10 @@ watch(
     .chart-labels { padding-left: 36px; font-size: 0.6rem; }
 
     /* ── Tables: min-width so overflow-x actually scrolls ── */
-    .low-stock-table { min-width: 360px; }
-    .low-stock-table.table-compact--bordered { min-width: 440px; }
-    .low-stock-table.table--employee { min-width: 640px; }
+    .report-table { min-width: 440px; }
+    .report-table.table--employee { min-width: 720px; }
 
     /* ── List items ── */
-    .top-item, .daypart-row { padding: 0.55rem 0.7rem; }
     .item-name { font-size: 0.82rem; }
-    .item-metrics strong { font-size: 0.85rem; }
 }
 </style>
