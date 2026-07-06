@@ -365,8 +365,8 @@ interface NavLink {
 // Inline (primary) items per role. Owners/Admins get the focused set;
 // other roles fall back to their full accessible primary set.
 const primaryKeysByRole: Record<string, string[]> = {
-    OWNER: ['reports', 'inventory', 'daily-sales', 'ai-insights'],
-    ADMIN: ['reports', 'inventory', 'daily-sales', 'ai-insights'],
+    OWNER: ['reports', 'inventory', 'purchase-orders', 'daily-sales', 'ai-insights'],
+    ADMIN: ['reports', 'inventory', 'purchase-orders', 'daily-sales', 'ai-insights'],
 };
 const defaultPrimaryKeys = ['pos', 'products', 'inventory', 'reports', 'daily-sales'];
 
@@ -380,17 +380,20 @@ const allNavLinks = computed<NavLink[]>(() => [
     { key: 'reports', label: 'Reports', icon: 'chart-line', route: 'reports', group: 'insights', visible: canViewReports.value },
     { key: 'daily-sales', label: 'Daily Sales', icon: 'cash-register', route: 'daily-sales', group: 'insights', visible: canViewDailySales.value },
     { key: 'ai-insights', label: 'AI Insights', icon: 'robot-happy-outline', route: 'ai-insights', group: 'insights', visible: canViewAi.value },
-    { key: 'purchase-orders', label: 'Purchase Orders', icon: 'truck-delivery', route: 'purchase-orders', group: 'procurement', visible: canViewPurchaseOrders.value, locked: isPurchaseOrdersLocked.value, upgradeFeature: 'purchaseOrders' },
+    { key: 'purchase-orders', label: 'Purchases', icon: 'truck-delivery', route: 'purchase-orders', group: 'procurement', visible: canViewPurchaseOrders.value, locked: isPurchaseOrdersLocked.value, upgradeFeature: 'purchaseOrders' },
     { key: 'suppliers', label: 'Suppliers', icon: 'account-group', route: 'suppliers', group: 'procurement', visible: canViewSuppliers.value, locked: isPurchaseOrdersLocked.value, upgradeFeature: 'purchaseOrders' },
     { key: 'expenses', label: 'Expenses', icon: 'cash-minus', route: 'expenses', group: 'procurement', visible: canViewExpenses.value, locked: isExpensesLocked.value, upgradeFeature: 'expenses' },
     { key: 'settings', label: 'Settings', icon: 'cog', route: 'settings', group: 'settings', visible: canViewSettings.value },
     { key: 'audit-logs', label: 'Audit Log', icon: 'history', route: 'audit-logs', group: 'settings', visible: canViewSettings.value },
 ]);
 
+// Inline links render as plain router links with no upgrade prompt, so
+// plan-locked items are kept out and fall back to the More menu, which
+// knows how to render the locked state.
 const primaryLinks = computed(() => {
     const keys = primaryKeys.value;
     return allNavLinks.value
-        .filter((l) => l.visible && keys.includes(l.key))
+        .filter((l) => l.visible && !l.locked && keys.includes(l.key))
         .sort((a, b) => keys.indexOf(a.key) - keys.indexOf(b.key));
 });
 
@@ -402,17 +405,20 @@ const groupLabels: Record<NavGroupKey, string> = {
     settings: 'Settings',
 };
 
-const moreGroups = computed(() =>
-    groupOrder
+const moreGroups = computed(() => {
+    // Exclude only links actually rendered inline, so a locked primary item
+    // still surfaces here with its upgrade prompt.
+    const shownInline = new Set(primaryLinks.value.map((l) => l.key));
+    return groupOrder
         .map((group) => ({
             group,
             label: groupLabels[group],
             items: allNavLinks.value.filter(
-                (l) => l.visible && !primaryKeys.value.includes(l.key) && l.group === group
+                (l) => l.visible && !shownInline.has(l.key) && l.group === group
             ),
         }))
-        .filter((g) => g.items.length > 0)
-);
+        .filter((g) => g.items.length > 0);
+});
 
 const showMoreMenu = computed(() => Boolean(currentStoreId.value) && moreGroups.value.length > 0);
 

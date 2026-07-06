@@ -45,6 +45,7 @@ export type TransferStockPayload = {
     itemId: string;
     qty: number;
     note?: string | null;
+    transferDate?: string | null;
 };
 
 export type StockAdjustmentPayload = {
@@ -140,6 +141,7 @@ export type BatchTransferPayload = {
     destinationStoreId: string;
     items: Array<{ itemType: 'PRODUCT' | 'INGREDIENT'; itemId: string; qty: number }>;
     note?: string | null;
+    transferDate?: string | null;
 };
 
 export const batchTransferStock = (storeId: string, payload: BatchTransferPayload) => {

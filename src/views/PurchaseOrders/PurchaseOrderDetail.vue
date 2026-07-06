@@ -430,6 +430,7 @@ import { createSupplier, listSuppliers, Supplier } from '@/api/suppliers';
 import { useToast } from '@/composables/useToast';
 import { useStoreContextStore } from '@/stores/storeContext';
 import { canAccess } from '@/utils/roleAccess';
+import { todayStr } from '@/utils/datetime';
 import { hasPlanFeature } from '@/utils/planAccess';
 import PlanGate from '@/components/PlanGate.vue';
 import ConfirmModal from '@/components/ConfirmModal.vue';
@@ -668,7 +669,7 @@ const canSubmitReceive = computed(() => {
 
 const resetReceiveForm = () => {
     receiveForm.invoiceNumber = '';
-    receiveForm.receivedAt = '';
+    receiveForm.receivedAt = todayStr(storeContext.currentStore?.timezone);
     buildReceiveLines();
 };
 
@@ -702,9 +703,12 @@ const submitReceive = async () => {
 
     isSubmitting.value = true;
     try {
+        // Leaving the default (today) sends no date so the backend stamps the
+        // exact current time; an explicitly changed date is sent as picked.
+        const isToday = receiveForm.receivedAt === todayStr(storeContext.currentStore?.timezone);
         const payload = {
             invoiceNumber: receiveForm.invoiceNumber || undefined,
-            receivedAt: receiveForm.receivedAt || undefined,
+            receivedAt: receiveForm.receivedAt && !isToday ? receiveForm.receivedAt : undefined,
             items,
         };
         const data = await receivePurchaseOrder(routeStoreId.value, routePurchaseOrderId.value, payload);

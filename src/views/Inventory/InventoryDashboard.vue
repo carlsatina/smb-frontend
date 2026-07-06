@@ -194,6 +194,18 @@
                         </select>
                     </div>
 
+                    <!-- Transfer date -->
+                    <div class="form-field">
+                        <label>Transfer date</label>
+                        <input
+                            v-model="transferDate"
+                            type="date"
+                            class="form-input"
+                            :max="todayStr()"
+                        />
+                        <p class="field-hint">Set a past date to record a transfer you missed.</p>
+                    </div>
+
                     <!-- Item cart -->
                     <div class="form-field">
                         <div class="cart-header">
@@ -412,8 +424,21 @@ const transferItemDropdown = ref(false);
 const transferDestStoreId = ref('');
 const transferCart = ref<CartRow[]>([]);
 const transferNote = ref('');
+const transferDate = ref('');
 const isTransferring = ref(false);
 const transferError = ref('');
+
+// Today's date (YYYY-MM-DD) in the store's timezone, so the default date doesn't
+// land on the wrong day near midnight across a timezone offset.
+const todayStr = () => {
+    const tz = storeContext.currentStore?.timezone || 'Asia/Manila';
+    const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit',
+    }).formatToParts(new Date());
+    const p: Record<string, string> = {};
+    parts.forEach((x) => { if (x.type !== 'literal') p[x.type] = x.value; });
+    return `${p.year}-${p.month}-${p.day}`;
+};
 
 const cartItemIds = computed(() => new Set(transferCart.value.map((r) => `${r.item.itemType}-${r.item.itemId}`)));
 
@@ -481,6 +506,7 @@ const openTransferModal = () => {
     transferDestStoreId.value = '';
     transferCart.value = [];
     transferNote.value = '';
+    transferDate.value = todayStr();
     transferError.value = '';
     showTransferModal.value = true;
 };
@@ -520,6 +546,9 @@ const submitTransfer = async () => {
                 qty: r.qty!,
             })),
             note: transferNote.value || null,
+            // Only send a date when backdated — a normal transfer keeps the
+            // exact current timestamp instead of midnight today.
+            transferDate: transferDate.value && transferDate.value !== todayStr() ? transferDate.value : null,
         });
         showTransferModal.value = false;
         await loadStock();
@@ -1261,6 +1290,12 @@ watch(
 
 .label-opt {
     font-weight: 400;
+    color: var(--c-muted);
+}
+
+.field-hint {
+    margin: 0;
+    font-size: 0.75rem;
     color: var(--c-muted);
 }
 

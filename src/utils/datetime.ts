@@ -53,6 +53,19 @@ const zonedWallTimeToUtcIso = (
     return new Date(utcGuess - refined).toISOString();
 };
 
+/**
+ * Today's date (YYYY-MM-DD) in `timeZone`, so date-input defaults don't land on
+ * the wrong day near midnight across a timezone offset.
+ */
+export const todayStr = (timeZone = DEFAULT_TIMEZONE): string => {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone, year: 'numeric', month: '2-digit', day: '2-digit',
+    }).formatToParts(new Date());
+    const p: Record<string, string> = {};
+    parts.forEach((x) => { if (x.type !== 'literal') p[x.type] = x.value; });
+    return `${p.year}-${p.month}-${p.day}`;
+};
+
 const parseDateInput = (dateStr: string): [number, number, number] | null => {
     const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr.trim());
     if (!match) return null;
