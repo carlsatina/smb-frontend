@@ -1,6 +1,6 @@
 {
   "name": "sales-and-inventory-frontend",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "private": true,
   "description": "Vue 3 + Vite frontend for the Sales & Inventory platform",
   "scripts": {
