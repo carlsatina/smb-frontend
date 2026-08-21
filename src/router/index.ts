@@ -23,6 +23,7 @@ import ReportsDashboard from '@/views/Reports/ReportsDashboard.vue'
 import AiInsights from '@/views/AI/AiInsights.vue'
 import ExpensesList from '@/views/Expenses/ExpensesList.vue'
 import DailySalesView from '@/views/Sales/DailySalesView.vue'
+import ScheduleView from '@/views/Schedule/ScheduleView.vue'
 import { useStoreContextStore } from '@/stores/storeContext'
 import { useAdminContextStore } from '@/stores/adminContext'
 import { getAdminAccessToken } from '@/api/client'
@@ -191,6 +192,12 @@ const routes: Array<RouteRecordRaw> = [
     name: 'daily-sales',
     component: DailySalesView,
     meta: { requiresAuth: true, feature: 'dailySales' }
+  },
+  {
+    path: '/stores/:storeId/schedule',
+    name: 'schedule',
+    component: ScheduleView,
+    meta: { requiresAuth: true, feature: 'schedule' }
   },
   {
     path: '/stores/:storeId/team',

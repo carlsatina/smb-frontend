@@ -19,6 +19,9 @@ const accessMap = {
     // router-level role check for defense-in-depth and UX.
     aiInsights: ['OWNER', 'ADMIN', 'INVENTORY_MANAGER'],
     dailySales: ['OWNER', 'CASHIER'],
+    // Everyone can open the schedule; the backend decides which pay columns
+    // come back per row, and only OWNER/ADMIN can write.
+    schedule: ['OWNER', 'ADMIN', 'CASHIER', 'INVENTORY_MANAGER', 'VIEWER'],
 } as const;
 
 export type FeatureKey = keyof typeof accessMap;
@@ -44,6 +47,7 @@ const featureRouteMap: Record<FeatureKey, string> = {
     expensesWrite: 'expenses',
     aiInsights: 'ai-insights',
     dailySales: 'daily-sales',
+    schedule: 'schedule',
 };
 
 const defaultFeatureOrder: FeatureKey[] = ['products', 'inventory', 'purchaseOrders', 'reports', 'salesPos'];

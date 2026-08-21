@@ -341,6 +341,9 @@ const canViewDailySales = computed(() =>
     ['OWNER', 'CASHIER'].includes(storeContext.currentStore?.role ?? '')
 );
 const canViewExpenses = computed(() => canAccess(storeContext.currentStore?.role, 'expenses'));
+// Every member can open the schedule — staff read it, owners/admins edit it.
+// Warehouses are included: they have staff and shifts like any other store.
+const canViewSchedule = computed(() => canAccess(storeContext.currentStore?.role, 'schedule'));
 const planKnown = computed(() => userContext.planTier !== null);
 const isPurchaseOrdersLocked = computed(() => planKnown.value && !hasPlanFeature(userContext.effectivePlan, 'purchaseOrders'));
 const isExpensesLocked = computed(() => planKnown.value && !hasPlanFeature(userContext.effectivePlan, 'expenses'));
@@ -365,10 +368,10 @@ interface NavLink {
 // Inline (primary) items per role. Owners/Admins get the focused set;
 // other roles fall back to their full accessible primary set.
 const primaryKeysByRole: Record<string, string[]> = {
-    OWNER: ['reports', 'inventory', 'purchase-orders', 'daily-sales', 'ai-insights'],
-    ADMIN: ['reports', 'inventory', 'purchase-orders', 'daily-sales', 'ai-insights'],
+    OWNER: ['reports', 'inventory', 'purchase-orders', 'daily-sales', 'ai-insights', 'schedule'],
+    ADMIN: ['reports', 'inventory', 'purchase-orders', 'daily-sales', 'ai-insights', 'schedule'],
 };
-const defaultPrimaryKeys = ['pos', 'products', 'inventory', 'reports', 'daily-sales'];
+const defaultPrimaryKeys = ['pos', 'products', 'inventory', 'reports', 'daily-sales', 'schedule'];
 
 const primaryKeys = computed(() => primaryKeysByRole[storeContext.currentStore?.role ?? ''] ?? defaultPrimaryKeys);
 
@@ -383,6 +386,7 @@ const allNavLinks = computed<NavLink[]>(() => [
     { key: 'purchase-orders', label: 'Purchases', icon: 'truck-delivery', route: 'purchase-orders', group: 'procurement', visible: canViewPurchaseOrders.value, locked: isPurchaseOrdersLocked.value, upgradeFeature: 'purchaseOrders' },
     { key: 'suppliers', label: 'Suppliers', icon: 'account-group', route: 'suppliers', group: 'procurement', visible: canViewSuppliers.value, locked: isPurchaseOrdersLocked.value, upgradeFeature: 'purchaseOrders' },
     { key: 'expenses', label: 'Expenses', icon: 'cash-minus', route: 'expenses', group: 'procurement', visible: canViewExpenses.value, locked: isExpensesLocked.value, upgradeFeature: 'expenses' },
+    { key: 'schedule', label: 'Schedule', icon: 'calendar-account', route: 'schedule', group: 'settings', visible: canViewSchedule.value },
     { key: 'settings', label: 'Settings', icon: 'cog', route: 'settings', group: 'settings', visible: canViewSettings.value },
     { key: 'audit-logs', label: 'Audit Log', icon: 'history', route: 'audit-logs', group: 'settings', visible: canViewSettings.value },
 ]);

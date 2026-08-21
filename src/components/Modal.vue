@@ -3,7 +3,11 @@
             <teleport to="body">
                 <transition name="fade" appear>
                 <div class="modal" @keyup.esc="close" tabindex="0">
-                    <div class="modal-container d-flex flex-column shadow-sm" ref="modal" >
+                    <div
+                        class="modal-container d-flex flex-column shadow-sm"
+                        ref="modal"
+                        :style="{ width: `min(${width}, 94vw)` }"
+                    >
                         <slot />
                     </div>
                 </div>
@@ -14,10 +18,18 @@
 
 <script>
 import { onClickOutside } from '@vueuse/core'
-import { ref, defineProps } from 'vue'
+import { ref } from 'vue'
 
 export default {
     name: 'Modal',
+    props: {
+        // CSS length. Always clamped to the viewport so wide content cannot
+        // overflow the container on smaller screens.
+        width: {
+            type: String,
+            default: '550px',
+        },
+    },
     setup(props, { emit }) {
         const modal = ref(null)
         
@@ -59,6 +71,8 @@ export default {
     padding: 15px 20px 20px;
     border-radius: 10px;
     width: 550px;
+    max-height: 92vh;
+    overflow-y: auto;
 }
 
 .fade-enter-active,
