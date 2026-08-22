@@ -32,7 +32,11 @@ export type ScheduleRowPay = {
     otHourlyRate: number;
     lessCa: number;
     payout: number;
-    suggestedOtHours: number;
+    // OT is derived from the roster unless the owner overrode it for this week.
+    otAuto: boolean;
+    computedOtHours: number;
+    hoursPerDay: number;
+    breakMinutes: number;
     remarks: string | null;
     caBalance: number;
     deductions: ScheduleDeduction[];
@@ -88,6 +92,7 @@ export type StaffRate = {
     current: {
         dailyRate: number;
         hoursPerDay: number;
+        breakMinutes: number;
         otMultiplier: number;
         otHourlyRate: number;
         effectiveFrom: string;
@@ -109,6 +114,7 @@ export type SaveWeekPayload = {
     rows: {
         storeMemberId: string;
         otHours: number;
+        otAuto: boolean;
         remarks?: string | null;
         sortOrder: number;
         shifts: Omit<ScheduleShift, 'id'>[];
@@ -225,7 +231,7 @@ export const listStaffRates = (storeId: string) =>
 export const setStaffRate = (
     storeId: string,
     storeMemberId: string,
-    data: { dailyRate: number; hoursPerDay: number; otMultiplier: number; effectiveFrom: string }
+    data: { dailyRate: number; hoursPerDay: number; otMultiplier: number; breakMinutes: number; effectiveFrom: string }
 ) => apiClient.request<{ rate: object }>(`${base(storeId)}/rates/${storeMemberId}`, { method: 'PUT', body: data });
 
 export const listCashAdvances = (storeId: string) =>
@@ -243,7 +249,7 @@ export const setRowDeduction = (
     storeId: string,
     rowId: string,
     data: { cashAdvanceId: string; amount: number; skipped: boolean; reason?: string | null }
-) => apiClient.request<{ deduction: object }>(`${base(storeId)}/rows/${rowId}/deduction`, { method: 'PUT', body: data });
+) => apiClient.request<{ deduction: ScheduleDeduction }>(`${base(storeId)}/rows/${rowId}/deduction`, { method: 'PUT', body: data });
 
 export const removeRowDeduction = (storeId: string, rowId: string, deductionId: string) =>
     apiClient.request<void>(`${base(storeId)}/rows/${rowId}/deduction/${deductionId}`, { method: 'DELETE' });

@@ -137,7 +137,7 @@
                             <div class="sc-day-date">{{ shortDate(date) }}</div>
                         </th>
                         <th class="sc-col-num sc-col-seam">Days</th>
-                        <th class="sc-col-num">OT</th>
+                        <th class="sc-col-num sc-col-ot">OT</th>
                         <th class="sc-col-num">less CA</th>
                         <th class="sc-col-num sc-col-payout">Payout</th>
                         <th class="sc-col-remarks">Remarks</th>
@@ -199,17 +199,25 @@
                              them for this row; there is nothing to hide client-side. -->
                         <template v-if="row.pay">
                             <td class="sc-col-num sc-col-seam">{{ row.pay.daysWorked }}</td>
-                            <td class="sc-col-num">
-                                <input
-                                    v-if="canEdit && !isPublished"
-                                    type="number"
-                                    class="sc-input sc-input--num"
-                                    min="0"
-                                    step="0.5"
-                                    :value="row.pay.otHours"
-                                    :title="`Scheduled hours suggest ${row.pay.suggestedOtHours}h OT`"
-                                    @input="onOtInput(row, $event)"
-                                />
+                            <td class="sc-col-num sc-col-ot">
+                                <div v-if="canEdit && !isPublished" class="sc-ot-cell">
+                                    <input
+                                        type="number"
+                                        class="sc-input sc-input--num"
+                                        :class="{ 'sc-input--auto': row.pay.otAuto }"
+                                        min="0"
+                                        step="0.5"
+                                        :value="row.pay.otHours"
+                                        :title="otTitle(row)"
+                                        @input="onOtInput(row, $event)"
+                                    />
+                                    <button
+                                        v-if="!row.pay.otAuto"
+                                        class="sc-ot-reset"
+                                        :title="`Back to the roster figure (${formatNumber(row.pay.computedOtHours)}h)`"
+                                        @click="resetOt(row)"
+                                    >auto</button>
+                                </div>
                                 <span v-else>{{ formatNumber(row.pay.otHours) }}</span>
                             </td>
                             <td class="sc-col-num">
@@ -520,6 +528,8 @@
                 <p class="sc-modal-sub">
                     Rates are effective-dated — changing one opens a new record and leaves published weeks untouched.
                     <strong>Each row must be saved individually</strong>; a week can't be published until everyone on it has a rate.
+                    <em>Break</em> is unpaid minutes per worked day, deducted before overtime is calculated — a 9AM–6PM shift with a
+                    60-minute break is exactly one 8-hour day and generates no OT.
                 </p>
 
                 <div class="sc-table-scroll">
@@ -529,6 +539,7 @@
                             <th>Staff</th>
                             <th>Daily rate</th>
                             <th>Hrs/day</th>
+                            <th>Break</th>
                             <th>OT ×</th>
                             <th>OT /hr</th>
                             <th>Effective</th>
@@ -544,6 +555,18 @@
                             </td>
                             <td><input type="number" min="0" step="0.01" v-model.number="rate.dailyRate" class="sc-input sc-input--num" @input="rate.dirty = true" /></td>
                             <td><input type="number" min="1" max="24" step="0.5" v-model.number="rate.hoursPerDay" class="sc-input sc-input--num" @input="rate.dirty = true" /></td>
+                            <td>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    max="480"
+                                    step="15"
+                                    v-model.number="rate.breakMinutes"
+                                    class="sc-input sc-input--num"
+                                    title="Unpaid break per worked day, deducted before OT is calculated"
+                                    @input="rate.dirty = true"
+                                />
+                            </td>
                             <td><input type="number" min="0" max="5" step="0.05" v-model.number="rate.otMultiplier" class="sc-input sc-input--num" @input="rate.dirty = true" /></td>
                             <td class="sc-muted">{{ formatMoney(previewOtRate(rate)) }}</td>
                             <td><input type="date" v-model="rate.effectiveFrom" class="sc-input" @input="rate.dirty = true" /></td>
@@ -917,7 +940,10 @@ const emptyPay = () => ({
     otHourlyRate: 0,
     lessCa: 0,
     payout: 0,
-    suggestedOtHours: 0,
+    otAuto: true,
+    computedOtHours: 0,
+    hoursPerDay: 8,
+    breakMinutes: 0,
     remarks: null,
     caBalance: 0,
     deductions: [],
@@ -958,11 +984,28 @@ const removeRow = (row: ScheduleRow) => {
     );
 };
 
+// Typing an OT figure is what makes a row manual — there is no separate toggle
+// to forget. `auto` puts it back on the roster.
 const onOtInput = (row: ScheduleRow, event: Event) => {
     if (!row.pay) return;
     row.pay.otHours = Number((event.target as HTMLInputElement).value) || 0;
+    row.pay.otAuto = false;
     recalcRow(row);
     isDirty.value = true;
+};
+
+const resetOt = (row: ScheduleRow) => {
+    if (!row.pay) return;
+    row.pay.otAuto = true;
+    recalcRow(row);
+    isDirty.value = true;
+};
+
+const otTitle = (row: ScheduleRow) => {
+    if (!row.pay) return '';
+    return row.pay.otAuto
+        ? `Calculated from the roster (${row.pay.hoursPerDay}h day, ${row.pay.breakMinutes}min unpaid break). Type to override.`
+        : `Manual override. The roster works out to ${formatNumber(row.pay.computedOtHours)}h.`;
 };
 
 const onRemarksInput = (row: ScheduleRow, event: Event) => {
@@ -971,12 +1014,23 @@ const onRemarksInput = (row: ScheduleRow, event: Event) => {
     isDirty.value = true;
 };
 
-// Mirrors the backend formula so the grid updates as the owner types. The
+// Mirrors the backend formula so the grid updates as the owner edits. The
 // server recomputes and is the authority — this is presentation only.
 const recalcRow = (row: ScheduleRow) => {
     if (!row.pay) return;
-    const daysWorked = row.shifts.filter((s) => !s.isRestDay && s.startMinute !== null).length;
+    const worked = row.shifts.filter((s) => !s.isRestDay && s.startMinute !== null);
+    const daysWorked = worked.length;
+
+    const scheduledMinutes = worked.reduce(
+        (total, s) => total + ((s.endMinute ?? 0) - (s.startMinute ?? 0)),
+        0
+    );
+    const paidMinutes = scheduledMinutes - daysWorked * Math.max(0, row.pay.breakMinutes);
+    const overMinutes = paidMinutes - daysWorked * (row.pay.hoursPerDay || 8) * 60;
+    row.pay.computedOtHours = overMinutes > 0 ? Math.round((overMinutes / 60) * 100) / 100 : 0;
+
     row.pay.daysWorked = daysWorked;
+    if (row.pay.otAuto) row.pay.otHours = row.pay.computedOtHours;
     row.pay.payout =
         daysWorked * row.pay.dailyRate + row.pay.otHours * row.pay.otHourlyRate - row.pay.lessCa;
 };
@@ -1079,6 +1133,7 @@ const save = async () => {
             rows: rows.value.map((row, index) => ({
                 storeMemberId: row.storeMemberId,
                 otHours: row.pay?.otHours ?? 0,
+                otAuto: row.pay?.otAuto ?? true,
                 remarks: row.pay?.remarks ?? null,
                 sortOrder: index,
                 shifts: row.shifts.map((s) => ({
@@ -1258,6 +1313,7 @@ type RateDraft = {
     name: string;
     dailyRate: number;
     hoursPerDay: number;
+    breakMinutes: number;
     otMultiplier: number;
     effectiveFrom: string;
     // `saved` distinguishes "no rate on record" from "rate of 0" — publish
@@ -1276,6 +1332,7 @@ const openRates = async () => {
         name: rate.name,
         dailyRate: rate.current?.dailyRate ?? 0,
         hoursPerDay: rate.current?.hoursPerDay ?? 8,
+        breakMinutes: rate.current?.breakMinutes ?? 0,
         otMultiplier: rate.current?.otMultiplier ?? 1,
         effectiveFrom: rate.current?.effectiveFrom ?? weekStart.value,
         saved: rate.current !== null,
@@ -1292,6 +1349,7 @@ const saveRate = async (rate: RateDraft) => {
     await setStaffRate(storeId.value, rate.storeMemberId, {
         dailyRate: rate.dailyRate,
         hoursPerDay: rate.hoursPerDay,
+        breakMinutes: rate.breakMinutes,
         otMultiplier: rate.otMultiplier,
         effectiveFrom: rate.effectiveFrom,
     });
@@ -1323,6 +1381,15 @@ const buildEntries = (row: ScheduleRow): DeductionEntry[] =>
             };
         });
 
+// The row's "ca bal" is the member's outstanding total across every advance.
+// Recomputed from the freshly loaded list rather than adjusted by hand.
+const syncCaBalance = (row: ScheduleRow | undefined) => {
+    if (!row?.pay) return;
+    row.pay.caBalance = advances.value
+        .filter((a) => a.storeMemberId === row.storeMemberId)
+        .reduce((sum, a) => sum + a.balance, 0);
+};
+
 const openDeductions = (row: ScheduleRow) => {
     if (!row.id) {
         showToast('Save the draft first, then record deductions', 'info');
@@ -1344,11 +1411,31 @@ const saveDeduction = async (entry: DeductionEntry) => {
     // v-model.number hands back the raw string when parseFloat gives NaN, so an
     // emptied field would post amount: "" and trip backend validation.
     const amount = Number(entry.amount) || 0;
-    await setRowDeduction(storeId.value, deductionEditor.value.rowId, {
+    const applied = entry.skipped ? 0 : amount;
+    const { deduction } = await setRowDeduction(storeId.value, deductionEditor.value.rowId, {
         cashAdvanceId: entry.advance.id,
-        amount: entry.skipped ? 0 : amount,
+        amount: applied,
         skipped: entry.skipped,
     });
+
+    // Fold the saved deduction into the grid row. `closeDeductions` reloads the
+    // week only when there is nothing unsaved to lose, so without this the
+    // less CA and Payout columns sit stale behind the modal.
+    const row = rows.value.find((r) => r.storeMemberId === deductionEditor.value?.storeMemberId);
+    if (row?.pay) {
+        const existing = row.pay.deductions.find((d) => d.cashAdvanceId === deduction.cashAdvanceId);
+        if (existing) Object.assign(existing, deduction);
+        else row.pay.deductions.push(deduction);
+        row.pay.lessCa = row.pay.deductions.reduce((sum, d) => sum + d.amount, 0);
+        recalcRow(row);
+    }
+
+    // Advance balances are derived from every week's deductions, so the
+    // modal's Balance column and the row's "ca bal" need the server's figures.
+    advances.value = (await listCashAdvances(storeId.value)).advances;
+    syncCaBalance(row);
+    if (row) deductionEditor.value.entries = buildEntries(row);
+
     showToast('Deduction saved', 'success');
 };
 
@@ -1367,6 +1454,7 @@ const addAdvance = async () => {
     });
     advances.value = (await listCashAdvances(storeId.value)).advances;
     const row = rows.value.find((r) => r.storeMemberId === deductionEditor.value?.storeMemberId);
+    syncCaBalance(row);
     if (row) deductionEditor.value.entries = buildEntries(row);
     newAdvance.amount = null;
     newAdvance.note = '';
@@ -1384,6 +1472,7 @@ const removeAdvance = async (entry: DeductionEntry) => {
             await deleteCashAdvance(storeId.value, entry.advance.id);
             advances.value = (await listCashAdvances(storeId.value)).advances;
             const row = rows.value.find((r) => r.storeMemberId === deductionEditor.value?.storeMemberId);
+            syncCaBalance(row);
             if (row) deductionEditor.value.entries = buildEntries(row);
             showToast('Cash advance deleted', 'success');
         }
@@ -1608,6 +1697,10 @@ thead .sc-col-staff {
     min-width: 4.5rem;
 }
 
+.sc-col-ot {
+    min-width: 6.5rem;
+}
+
 .sc-col-payout {
     font-weight: 700;
     background: rgba(16, 185, 129, 0.06);
@@ -1708,6 +1801,16 @@ thead .sc-col-staff {
 .sc-input--num {
     text-align: right;
     max-width: 5.5rem;
+    // The spinner is wider than the value at these cell sizes — it was hiding
+    // the OT figure entirely. Type the number instead.
+    appearance: textfield;
+    -moz-appearance: textfield;
+}
+
+.sc-input--num::-webkit-outer-spin-button,
+.sc-input--num::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
 }
 
 .sc-select {
@@ -2094,6 +2197,38 @@ thead .sc-col-staff {
     gap: 0.3rem;
     align-items: center;
     white-space: nowrap;
+}
+
+.sc-ot-cell {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.25rem;
+}
+
+.sc-ot-cell .sc-input--num {
+    flex: 0 0 3.2rem;
+    width: 3.2rem;
+    min-width: 0;
+    max-width: none;
+}
+
+// A derived value looks different from one that was typed in.
+.sc-input--auto {
+    background: rgba(59, 130, 246, 0.05);
+    border-style: dashed;
+}
+
+.sc-ot-reset {
+    border: none;
+    background: none;
+    padding: 0;
+    font-size: 0.6rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #1d4ed8;
+    cursor: pointer;
+    text-decoration: underline;
 }
 
 .sc-rate-flag {
