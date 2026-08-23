@@ -79,6 +79,11 @@
                     </RouterLink>
                 </div>
 
+                <!-- Time clock: the one control that must be reachable from
+                     every page, since cashiers land on POS and never open the
+                     schedule to punch in. -->
+                <TimeClockButton v-if="isAuthenticated && currentStoreId" />
+
                 <!-- Profile button -->
                 <div v-if="isAuthenticated" ref="profileMenuRef" class="topnav__profile-wrap">
                     <button type="button" class="topnav__profile-btn" @click="toggleProfile">
@@ -306,6 +311,7 @@ import { useUserContextStore } from '@/stores/userContext';
 import { canAccess, FeatureKey, getDefaultRouteForRole } from '@/utils/roleAccess';
 import { hasPlanFeature, openPlanUpgradeModal, getPlanConfig } from '@/utils/planAccess';
 import { useToast } from '@/composables/useToast';
+import TimeClockButton from '@/components/Navigation/TimeClockButton.vue';
 
 const router = useRouter();
 const route = useRoute();

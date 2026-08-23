@@ -65,8 +65,14 @@
             </button>
         </div>
 
+        <ScheduleAttendance
+            v-if="activeTab === 'attendance'"
+            :store-id="storeId"
+            :week-start="weekStart"
+        />
+
         <ScheduleStackedWeeks
-            v-if="activeTab === 'stacked'"
+            v-else-if="activeTab === 'stacked'"
             :store-id="storeId"
             :currency="currency"
             @edit-week="jumpToWeek"
@@ -198,7 +204,17 @@
                         <!-- Pay columns. `pay` is null when the backend withheld
                              them for this row; there is nothing to hide client-side. -->
                         <template v-if="row.pay">
-                            <td class="sc-col-num sc-col-seam">{{ row.pay.daysWorked }}</td>
+                            <td class="sc-col-num sc-col-seam">
+                                {{ row.pay.daysWorked }}
+                                <!-- What the time clock actually recorded, shown
+                                     only when it disagrees with the roster. The
+                                     stored figure is never overwritten. -->
+                                <span
+                                    v-if="row.pay.hasAttendance && row.pay.actualDaysWorked !== row.pay.daysWorked"
+                                    class="sc-actual"
+                                    :title="`Time clock recorded ${row.pay.actualDaysWorked} day(s) worked`"
+                                >{{ row.pay.actualDaysWorked }} act</span>
+                            </td>
                             <td class="sc-col-num sc-col-ot">
                                 <div v-if="canEdit && !isPublished" class="sc-ot-cell">
                                     <input
@@ -219,6 +235,11 @@
                                     >auto</button>
                                 </div>
                                 <span v-else>{{ formatNumber(row.pay.otHours) }}</span>
+                                <span
+                                    v-if="row.pay.hasAttendance"
+                                    class="sc-actual"
+                                    :title="`${formatNumber(row.pay.actualHours)}h on the clock this week`"
+                                >{{ formatNumber(row.pay.actualOtHours) }} act</span>
                             </td>
                             <td class="sc-col-num">
                                 <button
@@ -698,6 +719,7 @@ import {
     setRowDeduction,
     setStaffRate,
 } from '@/api/schedule';
+import ScheduleAttendance from '@/views/Schedule/ScheduleAttendance.vue';
 import ScheduleStackedWeeks from './ScheduleStackedWeeks.vue';
 import ScheduleMonthSummary from './ScheduleMonthSummary.vue';
 import ScheduleMemberCalendar from './ScheduleMemberCalendar.vue';
@@ -748,11 +770,14 @@ const isSaving = ref(false);
 const isDirty = ref(false);
 const memberToAdd = ref('');
 
-type TabKey = 'week' | 'stacked' | 'month' | 'calendar';
+type TabKey = 'week' | 'attendance' | 'stacked' | 'month' | 'calendar';
 
 const activeTab = ref<TabKey>('week');
 const tabs: { key: TabKey; label: string; icon: string }[] = [
     { key: 'week', label: 'Week', icon: 'view-week-outline' },
+    // Sits beside the roster deliberately: attendance is only meaningful as a
+    // comparison against the week the owner planned.
+    { key: 'attendance', label: 'Attendance', icon: 'clock-check-outline' },
     { key: 'stacked', label: 'Month grid', icon: 'table-large' },
     { key: 'month', label: 'Month totals', icon: 'cash-multiple' },
     { key: 'calendar', label: 'Calendar', icon: 'calendar-month-outline' },
@@ -946,6 +971,10 @@ const emptyPay = () => ({
     breakMinutes: 0,
     remarks: null,
     caBalance: 0,
+    actualDaysWorked: 0,
+    actualHours: 0,
+    actualOtHours: 0,
+    hasAttendance: false,
     deductions: [],
 });
 
@@ -1003,9 +1032,14 @@ const resetOt = (row: ScheduleRow) => {
 
 const otTitle = (row: ScheduleRow) => {
     if (!row.pay) return '';
-    return row.pay.otAuto
+    const base = row.pay.otAuto
         ? `Calculated from the roster (${row.pay.hoursPerDay}h day, ${row.pay.breakMinutes}min unpaid break). Type to override.`
         : `Manual override. The roster works out to ${formatNumber(row.pay.computedOtHours)}h.`;
+    // The clock's figure is offered, never applied — identical shift patterns
+    // legitimately carry different OT, so the owner still decides.
+    return row.pay.hasAttendance
+        ? `${base} Time clock suggests ${formatNumber(row.pay.actualOtHours)}h.`
+        : base;
 };
 
 const onRemarksInput = (row: ScheduleRow, event: Event) => {
@@ -2217,6 +2251,15 @@ thead .sc-col-staff {
 .sc-input--auto {
     background: rgba(59, 130, 246, 0.05);
     border-style: dashed;
+}
+
+/* The time clock's figure, subordinate to the stored one it sits under. */
+.sc-actual {
+    display: block;
+    font-size: 0.62rem;
+    font-weight: 600;
+    color: #6b7280;
+    letter-spacing: 0.01em;
 }
 
 .sc-ot-reset {

@@ -39,6 +39,14 @@ export type ScheduleRowPay = {
     breakMinutes: number;
     remarks: string | null;
     caBalance: number;
+    // From the time clock, for reconciliation against the roster figures above.
+    // Suggestions only — the stored Days/OT columns are never auto-rewritten.
+    actualDaysWorked: number;
+    actualHours: number;
+    actualOtHours: number;
+    // False when the clock recorded nothing that week, so the UI can stay quiet
+    // for stores that don't punch in.
+    hasAttendance: boolean;
     deductions: ScheduleDeduction[];
 } | null;
 
