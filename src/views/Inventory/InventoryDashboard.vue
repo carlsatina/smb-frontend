@@ -4,8 +4,39 @@
 
         <div class="inventory-shell">
 
-            <!-- HEADER -->
-            <header class="inventory-header">
+            <!-- VIEW TABS (visible when DAILY_SALES feature is granted) -->
+            <div v-if="hasDailySales" class="inventory-view-tabs" role="tablist" aria-label="Inventory Views">
+                <button
+                    type="button"
+                    role="tab"
+                    class="inventory-view-tab"
+                    :class="{ 'inventory-view-tab--active': activeView === 'stock' }"
+                    :aria-selected="activeView === 'stock'"
+                    @click="setView('stock')"
+                >
+                    <mdicon name="package-variant-closed" size="18" />
+                    <span>Stock Overview</span>
+                </button>
+                <button
+                    type="button"
+                    role="tab"
+                    class="inventory-view-tab"
+                    :class="{ 'inventory-view-tab--active': activeView === 'daily-report' }"
+                    :aria-selected="activeView === 'daily-report'"
+                    @click="setView('daily-report')"
+                >
+                    <mdicon name="clipboard-text-clock-outline" size="18" />
+                    <span>Daily Inventory Report</span>
+                </button>
+            </div>
+
+            <!-- DAILY INVENTORY REPORT VIEW -->
+            <DailyInventoryReportView v-if="hasDailySales && activeView === 'daily-report'" />
+
+            <!-- STOCK OVERVIEW VIEW -->
+            <div v-else class="stock-overview-wrapper">
+                <!-- HEADER -->
+                <header class="inventory-header">
                 <div class="inventory-title">
                     <span class="inventory-eyebrow">Inventory</span>
                     <h1>Stock overview</h1>
@@ -168,6 +199,7 @@
                     </template>
                 </section>
             </template>
+            </div>
         </div>
     </section>
 
@@ -306,12 +338,32 @@ import { useRoute, useRouter } from 'vue-router';
 import SkeletonLoader from '@/components/SkeletonLoader.vue';
 import { batchTransferStock, listStock, StockItem } from '@/api/inventory';
 import { useStoreContextStore } from '@/stores/storeContext';
+import { useUserContextStore } from '@/stores/userContext';
 import { canAccess } from '@/utils/roleAccess';
 import { hasPlanFeature } from '@/utils/planAccess';
+import DailyInventoryReportView from './DailyInventoryReportView.vue';
 
 const router = useRouter();
 const route = useRoute();
 const storeContext = useStoreContextStore();
+const userContext = useUserContextStore();
+
+const hasDailySales = computed(() =>
+    userContext.features.includes('DAILY_SALES') || Boolean(userContext.profile?.isSuperAdmin)
+);
+
+const activeView = ref<'stock' | 'daily-report'>('stock');
+
+const setView = (v: 'stock' | 'daily-report') => {
+    activeView.value = v;
+    const query = { ...route.query };
+    if (v === 'daily-report') {
+        query.view = 'daily-report';
+    } else {
+        delete query.view;
+    }
+    router.replace({ query });
+};
 
 const stockItems = ref<StockItem[]>([]);
 const isLoading = ref(false);
@@ -588,13 +640,30 @@ onMounted(async () => {
     // Show the skeleton from the first frame so the store fetch doesn't briefly
     // flash the empty-state table before the first load kicks in.
     isLoading.value = true;
+    if (!userContext.hasLoaded) {
+        await userContext.fetchMe();
+    }
     await storeContext.fetchStores();
     const routeStoreId = route.params.storeId as string | undefined;
     if (routeStoreId && routeStoreId !== storeContext.currentStoreId) {
         storeContext.setCurrentStore(routeStoreId);
     }
+    if (route.query.view === 'daily-report' && hasDailySales.value) {
+        activeView.value = 'daily-report';
+    }
     await loadStock();
 });
+
+watch(
+    () => route.query.view,
+    (v) => {
+        if (v === 'daily-report' && hasDailySales.value) {
+            activeView.value = 'daily-report';
+        } else if (activeView.value === 'daily-report' && v !== 'daily-report') {
+            activeView.value = 'stock';
+        }
+    }
+);
 
 watch(
     () => route.params.storeId,
@@ -663,8 +732,50 @@ watch(
    SHELL & HEADER
 ============================================================ */
 .inventory-shell {
-    max-width: 1100px;
+    max-width: 1280px;
     margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+/* View Tabs */
+.inventory-view-tabs {
+    display: inline-flex;
+    align-items: center;
+    background: #e2e8f0;
+    padding: 0.3rem;
+    border-radius: 12px;
+    gap: 0.35rem;
+    width: fit-content;
+}
+
+.inventory-view-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.5rem 1.15rem;
+    border: none;
+    background: transparent;
+    border-radius: 9px;
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: #475569;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.inventory-view-tab:hover {
+    color: #0f172a;
+}
+
+.inventory-view-tab--active {
+    background: #ffffff;
+    color: #0f172a;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+.stock-overview-wrapper {
     display: flex;
     flex-direction: column;
     gap: 1.25rem;

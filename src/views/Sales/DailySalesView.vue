@@ -1,6 +1,37 @@
 <template>
     <div class="ds-page">
-        <div class="ds-header">
+        <!-- VIEW TABS -->
+        <div class="ds-view-tabs" role="tablist" aria-label="Daily Sales Sections">
+            <button
+                type="button"
+                role="tab"
+                class="ds-view-tab"
+                :class="{ 'ds-view-tab--active': activeTab === 'sales' }"
+                :aria-selected="activeTab === 'sales'"
+                @click="setTab('sales')"
+            >
+                <mdicon name="cash-register" size="18" />
+                <span>Sales & Cash Remittance</span>
+            </button>
+            <button
+                type="button"
+                role="tab"
+                class="ds-view-tab"
+                :class="{ 'ds-view-tab--active': activeTab === 'inventory' }"
+                :aria-selected="activeTab === 'inventory'"
+                @click="setTab('inventory')"
+            >
+                <mdicon name="clipboard-text-clock-outline" size="18" />
+                <span>Daily Inventory Sheet</span>
+            </button>
+        </div>
+
+        <!-- DAILY INVENTORY SHEET TAB -->
+        <DailyInventoryReportView v-if="activeTab === 'inventory'" />
+
+        <!-- SALES & CASH REMITTANCE TAB -->
+        <div v-else class="ds-sales-section">
+            <div class="ds-header">
             <div>
                 <h1 class="ds-title">Daily Sales</h1>
                 <p class="ds-subtitle">Review per-day totals and staff cash entries</p>
@@ -540,6 +571,7 @@
                 </div>
             </template>
         </div>
+        </div>
 
         <!-- Denomination modal (editable for add row / inline edit, read-only for existing) -->
         <DenominationModal
@@ -654,8 +686,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { useStoreContextStore } from '@/stores/storeContext';
+import DailyInventoryReportView from '@/views/Inventory/DailyInventoryReportView.vue';
 import {
     type CashierEntry,
     type DailySalesRow,
@@ -678,6 +712,21 @@ import { useToast } from '@/composables/useToast';
 
 const storeContext = useStoreContextStore();
 const { showToast } = useToast();
+const router = useRouter();
+const route = useRoute();
+
+const activeTab = ref<'sales' | 'inventory'>('sales');
+
+const setTab = (tab: 'sales' | 'inventory') => {
+    activeTab.value = tab;
+    const query = { ...route.query };
+    if (tab === 'inventory') {
+        query.tab = 'inventory';
+    } else {
+        delete query.tab;
+    }
+    router.replace({ query });
+};
 
 const now = new Date();
 const year = ref(now.getFullYear());
@@ -738,8 +787,22 @@ const loadMembers = async () => {
 };
 
 onMounted(async () => {
+    if (route.query.tab === 'inventory') {
+        activeTab.value = 'inventory';
+    }
     await Promise.all([loadData(), loadMembers()]);
 });
+
+watch(
+    () => route.query.tab,
+    (t) => {
+        if (t === 'inventory') {
+            activeTab.value = 'inventory';
+        } else if (activeTab.value === 'inventory' && t !== 'inventory') {
+            activeTab.value = 'sales';
+        }
+    }
+);
 
 const prevMonth = () => {
     if (month.value === 1) { month.value = 12; year.value--; }
@@ -1639,6 +1702,49 @@ const saveGoal = async () => {
 <style scoped>
 .ds-page { padding: 1.5rem; max-width: 100%; font-family: var(--app-font-sans); }
 .ds-page input, .ds-page select, .ds-page button { font-family: inherit; }
+
+/* View Tabs */
+.ds-view-tabs {
+    display: inline-flex;
+    align-items: center;
+    background: #e2e8f0;
+    padding: 0.3rem;
+    border-radius: 12px;
+    gap: 0.35rem;
+    width: fit-content;
+    margin-bottom: 1.25rem;
+}
+
+.ds-view-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.5rem 1.15rem;
+    border: none;
+    background: transparent;
+    border-radius: 9px;
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: #475569;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.ds-view-tab:hover {
+    color: #0f172a;
+}
+
+.ds-view-tab--active {
+    background: #ffffff;
+    color: #0f172a;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+.ds-sales-section {
+    display: flex;
+    flex-direction: column;
+}
+
 .ds-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 1rem; gap: 1rem; flex-wrap: nowrap; }
 .ds-title { font-size: 1.25rem; font-weight: 700; margin: 0; }
 .ds-subtitle { font-size: 0.82rem; color: #6b7280; margin: 0.2rem 0 0; }
