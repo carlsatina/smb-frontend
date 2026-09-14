@@ -16,6 +16,10 @@
                 </template>
                 <template v-else>Time In</template>
             </span>
+            <!-- A day the member never timed out of pays nothing until a manager
+                 supplies the real time, so they are told rather than finding out
+                 on payday. -->
+            <span v-if="missedTimeOuts > 0" class="tc__flag" :title="missedLabel">!</span>
         </button>
 
         <!-- Timing out ends a shift and writes the payroll record, so it is
@@ -61,6 +65,14 @@ const isVisible = computed(() => Boolean(storeId.value) && role.value !== '' && 
 
 const isClockedIn = computed(() => Boolean(state.value?.openEntry));
 
+const missedTimeOuts = computed(() => state.value?.missedTimeOuts ?? 0);
+
+const missedLabel = computed(() =>
+    missedTimeOuts.value === 1
+        ? 'You missed a time out on 1 day — ask your manager to correct it, or that day pays nothing.'
+        : `You missed a time out on ${missedTimeOuts.value} days — ask your manager to correct them, or those days pay nothing.`
+);
+
 const elapsedMinutes = computed(() => {
     const entry = state.value?.openEntry;
     if (!entry) return 0;
@@ -81,6 +93,7 @@ const shiftLabel = computed(() => {
 });
 
 const tooltip = computed(() => {
+    if (missedTimeOuts.value > 0) return missedLabel.value;
     if (isClockedIn.value) return `Timed in — tap to time out${shiftLabel.value ? ` (rostered ${shiftLabel.value})` : ''}`;
     if (state.value?.shift?.isRestDay) return 'Rest day — timing in will be flagged as unscheduled';
     return shiftLabel.value ? `Rostered ${shiftLabel.value} today` : 'No shift rostered today';
@@ -204,6 +217,22 @@ watch(storeId, () => load());
     cursor: pointer;
     transition: background 0.15s ease, border-color 0.15s ease;
     white-space: nowrap;
+}
+
+/* Amber against the button's green: an unpaid day waiting on a correction,
+   which is a warning rather than an error the member can clear themselves. */
+.tc__flag {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1rem;
+    height: 1rem;
+    border-radius: 999px;
+    background: #f59e0b;
+    color: #1f2937;
+    font-size: 0.65rem;
+    font-weight: 700;
+    line-height: 1;
 }
 
 .tc__btn:hover:not(:disabled) {

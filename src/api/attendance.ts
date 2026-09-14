@@ -22,6 +22,7 @@ export type TimeEntry = {
 
 export type DayStatus =
     | 'OPEN'
+    | 'MISSING_OUT'
     | 'ABSENT'
     | 'SCHEDULED'
     | 'UNSCHEDULED'
@@ -39,6 +40,9 @@ export type DayReconciliation = {
     overtimeMinutes: number;
     varianceMinutes: number;
     isOpen: boolean;
+    // A punch the member never closed. It stays open in the record — the day pays
+    // nothing until a manager supplies the real time out.
+    hasMissingOut: boolean;
     status: DayStatus;
 };
 
@@ -74,6 +78,7 @@ export type AttendanceRow = {
         daysWorked: number;
         daysAbsent: number;
         openDays: number;
+        missingOutDays: number;
         scheduledHours: number;
         actualHours: number;
         varianceHours: number;
@@ -98,6 +103,9 @@ export type MyAttendance = {
     // this so a phone with a skewed clock doesn't drift the display.
     serverTime: string;
     openEntry: TimeEntry | null;
+    // Punches the member never closed, still awaiting a manager's correction.
+    // Those days pay nothing until they are fixed.
+    missedTimeOuts: number;
     shift: (AttendanceShift & { isDraft: boolean }) | null;
     entries: TimeEntry[];
     reconciliation: DayReconciliation;

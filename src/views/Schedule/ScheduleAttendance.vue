@@ -231,12 +231,19 @@ const actualLabel = (day: AttendanceDay) => {
     if (day.entries.length === 0) return day.status === 'ABSENT' ? 'no punch' : '';
     const first = day.entries[0];
     const last = day.entries[day.entries.length - 1];
-    if (last.outMinute === null) return `${formatMinute(first.inMinute)} →`;
+    // An arrow reads as "still going"; a punch nobody is coming back for should
+    // read as the gap it is, so the owner fills it in.
+    if (last.outMinute === null) {
+        return day.status === 'MISSING_OUT'
+            ? `${formatMinute(first.inMinute)} - ?`
+            : `${formatMinute(first.inMinute)} →`;
+    }
     return `${formatMinute(first.inMinute)} - ${formatMinute(last.outMinute)}`;
 };
 
 const STATUS_TEXT: Record<AttendanceDay['status'], string> = {
     OPEN: 'Still timed in',
+    MISSING_OUT: 'Never timed out — set the real time out to pay this day',
     ABSENT: 'Rostered but never timed in',
     SCHEDULED: 'Rostered — not yet worked',
     UNSCHEDULED: 'Worked without a rostered shift',
@@ -251,6 +258,7 @@ const cellTitle = (day: AttendanceDay) => {
     if (day.scheduleHidden) return 'This week is still a draft';
     const parts = [STATUS_TEXT[day.status]];
     if (day.actualMinutes > 0) parts.push(`${hours(day.actualMinutes)}h worked`);
+    if (day.hasMissingOut) parts.push('counts as 0h until corrected');
     if (day.lateMinutes > 0) parts.push(`${day.lateMinutes} min late`);
     if (day.earlyOutMinutes > 0) parts.push(`left ${day.earlyOutMinutes} min early`);
     return parts.join(' · ');
@@ -563,6 +571,9 @@ thead .at-col-name {
 .at-cell--absent { background: #fee2e2; }
 .at-cell--unscheduled { background: #f5f3ff; }
 .at-cell--open { background: #ecfeff; }
+/* Amber rather than the absent red: the day was worked, the record is just
+   incomplete — a correction the owner owes, not a no-show. */
+.at-cell--missing-out { background: #ffedd5; }
 
 .at-legend {
     display: flex;
