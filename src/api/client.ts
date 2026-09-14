@@ -101,6 +101,21 @@ const refreshSession = async (admin: boolean) => {
     return false;
 };
 
+// A member suspended mid-session keeps hitting 403 on every call, on a screen
+// they can no longer use. Announced once here so the app can move them off the
+// store rather than showing them a wall of failed requests.
+const maybeDispatchStoreSuspended = (errorBody: any) => {
+    if (typeof window !== 'undefined' && errorBody?.error?.code === 'MEMBER_SUSPENDED') {
+        window.dispatchEvent(
+            new CustomEvent('store:suspended', {
+                detail: {
+                    message: errorBody?.error?.message || 'Your access to this store has been suspended.',
+                },
+            })
+        );
+    }
+};
+
 const maybeDispatchPlanUpgrade = (errorBody: any) => {
     const errorCode = errorBody?.error?.code;
     if (typeof window !== 'undefined' && (errorCode === 'PLAN_LIMIT' || errorCode === 'SUBSCRIPTION_REQUIRED')) {
@@ -146,6 +161,7 @@ export const apiClient = {
                     errorBody = null;
                 }
                 maybeDispatchPlanUpgrade(errorBody);
+                maybeDispatchStoreSuspended(errorBody);
                 throw { status: response.status, body: errorBody };
             }
 
@@ -189,6 +205,7 @@ export const apiClient = {
                     errorBody = null;
                 }
                 maybeDispatchPlanUpgrade(errorBody);
+                maybeDispatchStoreSuspended(errorBody);
                 throw { status: response.status, body: errorBody };
             }
 
@@ -223,6 +240,7 @@ export const apiClient = {
                 let errorBody: any = null;
                 try { errorBody = await response.json(); } catch { errorBody = null; }
                 maybeDispatchPlanUpgrade(errorBody);
+                maybeDispatchStoreSuspended(errorBody);
                 throw { status: response.status, body: errorBody };
             }
 

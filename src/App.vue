@@ -16,12 +16,16 @@ import PlanUpgradeModal from '@/components/PlanUpgradeModal.vue';
 import Loading from '@/components/Loading.vue';
 import OfflineOverlay from '@/components/OfflineOverlay.vue';
 import { useUserContextStore } from '@/stores/userContext';
+import { useStoreContextStore } from '@/stores/storeContext';
 import { isLoading } from '@/composables/useLoading';
+import { useToast } from '@/composables/useToast';
 import type { PlanFeature } from '@/utils/planAccess';
 
 const route = useRoute();
 const router = useRouter();
 const userContext = useUserContextStore();
+const storeContext = useStoreContextStore();
+const { showToast } = useToast();
 const hideTopNavRoutes = new Set(['home', 'login', 'register', 'forgot-password', 'reset-password', 'verify-email']);
 const showTopNav = computed(() => {
     const routeName = route.name?.toString();
@@ -45,6 +49,17 @@ const handleAuthLogin = () => {
     userContext.fetchMe(true);
 };
 
+const handleStoreSuspended = (event: Event) => {
+    const detail = (event as CustomEvent<{ message?: string | null }>).detail;
+    showToast(detail?.message || 'Your access to this store has been suspended.', 'error', 6000);
+    // The suspended store has dropped out of the list, so this either lands them
+    // on another store they still belong to or clears the selection entirely.
+    storeContext.fetchStores();
+    if (router.currentRoute.value.path !== '/stores') {
+        router.push('/stores');
+    }
+};
+
 const handlePlanUpgrade = (event: Event) => {
     const detail = (event as CustomEvent<{ feature?: PlanFeature | null; message?: string | null }>).detail;
     planModalFeature.value = detail?.feature ?? null;
@@ -66,12 +81,14 @@ onMounted(() => {
     window.addEventListener('auth:logout', handleAuthLogout);
     window.addEventListener('auth:login', handleAuthLogin);
     window.addEventListener('plan:upgrade', handlePlanUpgrade);
+    window.addEventListener('store:suspended', handleStoreSuspended);
 });
 
 onBeforeUnmount(() => {
     window.removeEventListener('auth:logout', handleAuthLogout);
     window.removeEventListener('auth:login', handleAuthLogin);
     window.removeEventListener('plan:upgrade', handlePlanUpgrade);
+    window.removeEventListener('store:suspended', handleStoreSuspended);
 });
 </script>
 

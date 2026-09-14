@@ -7,6 +7,10 @@ export type StoreMember = {
     email: string;
     role: string;
     createdAt: string;
+    // Access revoked without removing the member: their history stays, they keep
+    // their role, and they stop consuming a plan seat until reinstated.
+    suspendedAt?: string | null;
+    suspendedBy?: string | null;
 };
 
 export type StoreInvite = {
@@ -33,6 +37,18 @@ export const updateStoreMemberRole = (storeId: string, memberId: string, role: s
         method: 'PATCH',
         body: { role },
     });
+};
+
+// Returns the whole refreshed list rather than the one row, so the seat count
+// shown beside the plan limit stays in step with the change.
+export const setStoreMemberSuspension = (storeId: string, memberId: string, suspended: boolean) => {
+    return apiClient.request<{ members: StoreMember[] }>(
+        `/api/v1/stores/${storeId}/members/${memberId}/suspension`,
+        {
+            method: 'PATCH',
+            body: { suspended },
+        }
+    );
 };
 
 export const removeStoreMember = (storeId: string, memberId: string) => {

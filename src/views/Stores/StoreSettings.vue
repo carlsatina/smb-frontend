@@ -234,10 +234,21 @@
                                 <div v-else-if="!currentStore" class="st-state">Select a store to view members.</div>
                                 <div v-else-if="members.length === 0" class="st-team-empty">No members yet.</div>
                                 <div v-else class="st-member-list">
-                                    <div v-for="member in members" :key="member.id" class="st-member-row">
+                                    <div
+                                        v-for="member in members"
+                                        :key="member.id"
+                                        class="st-member-row"
+                                        :class="{ 'st-member-row--suspended': isSuspended(member) }"
+                                    >
                                         <div class="st-member-info">
-                                            <div class="st-member-name">{{ member.fullName || member.email }}</div>
-                                            <div class="st-member-meta">{{ member.email }}</div>
+                                            <div class="st-member-name">
+                                                {{ member.fullName || member.email }}
+                                                <span v-if="isSuspended(member)" class="st-member-badge">Suspended</span>
+                                            </div>
+                                            <div class="st-member-meta">
+                                                {{ member.email }}
+                                                <template v-if="isSuspended(member)"> · {{ suspendedNote(member) }}</template>
+                                            </div>
                                         </div>
                                         <div class="st-member-actions">
                                             <select
@@ -248,6 +259,25 @@
                                             >
                                                 <option v-for="role in roleOptions" :key="role" :value="role">{{ role }}</option>
                                             </select>
+                                            <button
+                                                class="st-btn-ghost"
+                                                type="button"
+                                                :disabled="!canManageMembers || isOwnerLocked(member) || isSuspendingMember(member.id) || member.userId === currentUserId"
+                                                :title="
+                                                    isSuspended(member)
+                                                        ? 'Restore access. Needs a free seat on the plan.'
+                                                        : 'Revoke access without removing them. Their history is kept and the seat is freed.'
+                                                "
+                                                @click="toggleMemberSuspension(member)"
+                                            >
+                                                {{
+                                                    isSuspendingMember(member.id)
+                                                        ? '…'
+                                                        : isSuspended(member)
+                                                          ? 'Reinstate'
+                                                          : 'Suspend'
+                                                }}
+                                            </button>
                                             <button
                                                 class="st-btn-ghost st-btn-ghost--danger"
                                                 type="button"
@@ -619,6 +649,7 @@ import {
     listStoreInvites,
     listStoreMembers,
     removeStoreMember,
+    setStoreMemberSuspension,
     revokeStoreInvite,
     updateStoreMemberRole,
     type StoreInvite,
@@ -1116,6 +1147,7 @@ const isTeamLoading = ref(false);
 const isInviting = ref(false);
 const updatingMemberId = ref<string | null>(null);
 const removingMemberId = ref<string | null>(null);
+const suspendingMemberId = ref<string | null>(null);
 const revokingInviteId = ref<string | null>(null);
 const currentUserId = ref<string | null>(null);
 const members = ref<StoreMember[]>([]);
@@ -1133,6 +1165,13 @@ const pendingInvites = computed(() => invites.value.filter((i) => i.status !== '
 const isOwnerLocked = (member: StoreMember) => member.role === 'OWNER' && !canManageOwners.value;
 const isUpdatingMember = (id: string) => updatingMemberId.value === id;
 const isRemovingMember = (id: string) => removingMemberId.value === id;
+const isSuspendingMember = (id: string) => suspendingMemberId.value === id;
+const isSuspended = (member: StoreMember) => Boolean(member.suspendedAt);
+
+const suspendedNote = (member: StoreMember) => {
+    const when = member.suspendedAt ? new Date(member.suspendedAt).toLocaleDateString() : '';
+    return member.suspendedBy ? `suspended ${when} by ${member.suspendedBy}` : `suspended ${when}`;
+};
 const isRevokingInvite = (id: string) => revokingInviteId.value === id;
 
 const loadTeam = async () => {
@@ -1238,6 +1277,40 @@ const performRemoveMember = async (member: StoreMember) => {
         showToast(error?.body?.error?.message || 'Unable to remove member.', 'error');
     } finally {
         removingMemberId.value = null;
+    }
+};
+
+const toggleMemberSuspension = (member: StoreMember) => {
+    if (!currentStore.value || !canManageMembers.value) return;
+    if (member.userId === currentUserId.value) {
+        showToast('You cannot suspend your own membership.', 'error');
+        return;
+    }
+    const suspend = !isSuspended(member);
+    confirmModal.title = suspend ? 'Suspend member' : 'Reinstate member';
+    confirmModal.message = suspend
+        ? `Suspend ${member.email}? They lose access to this store immediately, but keep their role and history and free up a seat on your plan. You can reinstate them later.`
+        : `Reinstate ${member.email}? They get their access back with the ${member.role} role. This needs a free seat on your plan.`;
+    confirmModal.confirmText = suspend ? 'Suspend' : 'Reinstate';
+    confirmModal.onConfirm = () => performSetMemberSuspension(member, suspend);
+    confirmModal.show = true;
+};
+
+const performSetMemberSuspension = async (member: StoreMember, suspend: boolean) => {
+    if (!currentStore.value) return;
+    suspendingMemberId.value = member.id;
+    try {
+        const data = await setStoreMemberSuspension(currentStore.value.id, member.id, suspend);
+        members.value = data.members;
+        showToast(suspend ? 'Member suspended.' : 'Member reinstated.', 'success');
+    } catch (error: any) {
+        showToast(
+            error?.body?.error?.message ||
+                (suspend ? 'Unable to suspend member.' : 'Unable to reinstate member.'),
+            'error'
+        );
+    } finally {
+        suspendingMemberId.value = null;
     }
 };
 
@@ -2163,6 +2236,22 @@ watch(
 .st-member-name { font-weight: 600; font-size: 0.9rem; color: var(--c-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .st-member-meta { font-size: 0.78rem; color: var(--c-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .st-member-actions { display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0; }
+
+/* Dimmed rather than hidden: a suspended member is still on the team, still
+   holds their role, and is still the one to reinstate. */
+.st-member-row--suspended .st-member-info { opacity: 0.6; }
+.st-member-badge {
+    display: inline-block;
+    margin-left: 0.4rem;
+    padding: 0.1rem 0.4rem;
+    border-radius: 999px;
+    background: #ffedd5;
+    color: #9a3412;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    vertical-align: middle;
+}
 
 .st-role-select {
     border: 1px solid var(--c-border);
