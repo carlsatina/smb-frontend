@@ -19,22 +19,38 @@
                     type="button"
                     class="ghost-button button-compact"
                     :disabled="isLoading || isSaving"
-                    @click="loadReport"
-                    title="Reload data"
+                    @click="refreshReport"
+                    title="Reload this sheet and the inventory links, picking up anything saved on another device"
                 >
                     <mdicon name="refresh" size="16" :class="{ 'spin-icon': isLoading }" />
                     Refresh
                 </button>
-                <button
-                    type="button"
-                    class="primary-button button-compact"
-                    :disabled="isSaving || isLoading"
-                    @click="handleSave"
-                >
-                    <mdicon v-if="!isSaving" name="content-save-outline" size="16" />
-                    <span v-else class="btn-spinner"></span>
-                    {{ isSaving ? 'Saving…' : isDirty ? 'Save Changes *' : 'Save Daily Inventory' }}
-                </button>
+
+                <!-- Autosave status. Replaces the old Save button: the sheet
+                     writes itself, so what the user needs here is proof of it. -->
+                <div class="save-state" :class="`save-state--${saveState}`" role="status" aria-live="polite">
+                    <template v-if="saveState === 'saving'">
+                        <span class="btn-spinner btn-spinner--dark"></span>
+                        <span>Saving…</span>
+                    </template>
+                    <template v-else-if="saveState === 'pending'">
+                        <mdicon name="pencil-outline" size="15" />
+                        <span>Unsaved changes</span>
+                    </template>
+                    <template v-else-if="saveState === 'error'">
+                        <mdicon name="alert-circle-outline" size="15" />
+                        <span>{{ saveError || 'Not saved' }}</span>
+                        <button type="button" class="save-state-retry" @click="retrySave">Retry</button>
+                    </template>
+                    <template v-else-if="saveState === 'saved'">
+                        <mdicon name="check-circle-outline" size="15" />
+                        <span>Saved {{ lastSavedLabel }}</span>
+                    </template>
+                    <template v-else>
+                        <mdicon name="cloud-check-outline" size="15" />
+                        <span>Autosaves as you type</span>
+                    </template>
+                </div>
             </div>
         </div>
 
@@ -250,13 +266,14 @@
                                     <!-- Editable for Owner/Admin -->
                                     <input
                                         v-if="isOwnerOrAdmin"
-                                        v-model.number="item.openingInventory"
+                                        :value="item.openingInventory"
                                         type="number"
                                         step="any"
                                         min="0"
                                         class="cell-input cell-input--opening"
-                                        placeholder="0"
-                                        @input="onFieldInput"
+                                        @input="onNumberInput(item, 'openingInventory', $event)"
+                                        @focus="selectOnFocus"
+                                        @mouseup="keepSelectionOnClick"
                                     />
                                     <!-- Locked for Store Staff -->
                                     <div
@@ -277,13 +294,14 @@
                                 <!-- Delivery -->
                                 <td class="col-delivery">
                                     <input
-                                        v-model.number="item.delivery"
+                                        :value="item.delivery"
                                         type="number"
                                         step="any"
                                         min="0"
                                         class="cell-input cell-input--delivery"
-                                        placeholder="0"
-                                        @input="onFieldInput"
+                                        @input="onNumberInput(item, 'delivery', $event)"
+                                        @focus="selectOnFocus"
+                                        @mouseup="keepSelectionOnClick"
                                     />
                                 </td>
 
@@ -297,14 +315,15 @@
                                 <!-- Ending Inventory (Editable by both staff and admin) -->
                                 <td class="col-ending">
                                     <input
-                                        v-model.number="item.endingInventory"
+                                        :value="item.endingInventory"
                                         type="number"
                                         step="any"
                                         min="0"
                                         class="cell-input cell-input--ending"
                                         :class="{ 'cell-input--filled': item.endingInventory !== null && item.endingInventory !== undefined }"
-                                        placeholder="Ending"
-                                        @input="onFieldInput"
+                                        @input="onNumberInput(item, 'endingInventory', $event)"
+                                        @focus="selectOnFocus"
+                                        @mouseup="keepSelectionOnClick"
                                     />
                                 </td>
 
@@ -317,6 +336,8 @@
                                         :class="{ 'cell-input--urgent': isUrgentNote(item.reminders) }"
                                         placeholder="Notes…"
                                         @input="onFieldInput"
+                                        @focus="selectOnFocus"
+                                        @mouseup="keepSelectionOnClick"
                                     />
                                 </td>
 
@@ -480,7 +501,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useStoreContextStore } from '@/stores/storeContext';
 import { listStock, StockItem } from '@/api/inventory';
 import {
@@ -497,14 +518,42 @@ const toast = useToast();
 const selectedTemplate = ref<DailyInventoryReportType>('TAKOYAKI');
 const selectedDate = ref<string>('');
 const isLoading = ref(false);
-const isSaving = ref(false);
 const isDirty = ref(false);
+
+// ── Autosave ────────────────────────────────────────────────────────────────
+// The sheet saves itself as values change, so there is no Save button to miss.
+// 'pending' means edited but not yet written — the one state the user must be
+// able to see, because it is the only one where closing the tab loses counts.
+type SaveState = 'idle' | 'pending' | 'saving' | 'saved' | 'error';
+const saveState = ref<SaveState>('idle');
+const saveError = ref<string | null>(null);
+const lastSavedAt = ref<Date | null>(null);
+const isSaving = computed(() => saveState.value === 'saving');
+
+// Long enough that typing a three-digit count is one save rather than three,
+// short enough that a glance at the chip after a row tells the truth.
+const AUTOSAVE_DELAY_MS = 900;
+
+let autosaveTimer: ReturnType<typeof setTimeout> | null = null;
+let inFlight: Promise<void> | null = null;
+// Bumped on every edit. A save that completes while the sequence has moved on
+// leaves the chip 'pending', because newer keystrokes are still unwritten.
+let editSeq = 0;
 
 const isNewReport = ref(true);
 const carriedOverDate = ref<string | null>(null);
 const reportUpdatedAt = ref<string | null>(null);
 
-const items = ref<DailyInventoryReportItem[]>([]);
+// A row as the sheet holds it. Blank is a distinct state from zero here: an
+// empty Opening/Delivery is simply nothing yet (and saves as 0), while an empty
+// Ending means "not counted" — which is why it must not collapse to 0, or an
+// uncounted item would look like a shelf with none left.
+type SheetItem = Omit<DailyInventoryReportItem, 'openingInventory' | 'delivery'> & {
+    openingInventory: number | null;
+    delivery: number | null;
+};
+
+const items = ref<SheetItem[]>([]);
 const storeStock = ref<StockItem[]>([]);
 
 // Modal state
@@ -587,7 +636,7 @@ const normalizedStockMap = computed(() => {
     return map;
 });
 
-const isLinked = (item: DailyInventoryReportItem): boolean => {
+const isLinked = (item: SheetItem): boolean => {
     if (!item) return false;
 
     // 1. Explicit link by itemId
@@ -616,10 +665,10 @@ const isLinked = (item: DailyInventoryReportItem): boolean => {
 };
 
 // Manual link modal state
-const linkModalItem = ref<DailyInventoryReportItem | null>(null);
+const linkModalItem = ref<SheetItem | null>(null);
 const selectedStockId = ref<string>('');
 
-const openLinkModal = (item: DailyInventoryReportItem) => {
+const openLinkModal = (item: SheetItem) => {
     linkModalItem.value = item;
     selectedStockId.value = item.itemId || '';
 };
@@ -636,15 +685,15 @@ const confirmLinkItem = () => {
             linkModalItem.value.itemType = found.itemType;
         }
     }
-    isDirty.value = true;
+    markChanged();
     linkModalItem.value = null;
-    toast.show('Item link updated. Remember to save daily inventory.', 'success');
+    toast.showToast('Item link updated.', 'success');
 };
 
 // Section groupers
 const groupedSections = computed(() => {
-    const sections: { name: string; items: DailyInventoryReportItem[] }[] = [];
-    const map = new Map<string, DailyInventoryReportItem[]>();
+    const sections: { name: string; items: SheetItem[] }[] = [];
+    const map = new Map<string, SheetItem[]>();
 
     for (const item of items.value) {
         const secName = item.section || 'Main';
@@ -674,13 +723,13 @@ const totalUsedCount = computed(() => {
 });
 
 // Row calculations
-const computeTotal = (item: DailyInventoryReportItem): number => {
+const computeTotal = (item: SheetItem): number => {
     const op = Number(item.openingInventory) || 0;
     const del = Number(item.delivery) || 0;
     return op + del;
 };
 
-const computeTotalUsed = (item: DailyInventoryReportItem): number | null => {
+const computeTotalUsed = (item: SheetItem): number | null => {
     if (item.endingInventory === null || item.endingInventory === undefined || isNaN(Number(item.endingInventory))) {
         return null;
     }
@@ -725,37 +774,191 @@ const sectionHeaderClass = (secName: string): string => {
     return 'section-header--neutral';
 };
 
-const isSuppliesRow = (item: DailyInventoryReportItem): boolean => {
+const isSuppliesRow = (item: SheetItem): boolean => {
     return item.section === 'Supplies';
 };
 
-const onFieldInput = () => {
+// Every edit funnels through here: cell input, added row, removed row, link
+// change. Nothing else may set isDirty, or it would go unsaved.
+const markChanged = () => {
     isDirty.value = true;
+    editSeq += 1;
+    saveState.value = 'pending';
+    saveError.value = null;
+    if (autosaveTimer) clearTimeout(autosaveTimer);
+    autosaveTimer = setTimeout(() => {
+        autosaveTimer = null;
+        void flushAutosave();
+    }, AUTOSAVE_DELAY_MS);
 };
 
+const onFieldInput = () => {
+    markChanged();
+};
+
+// Typed rather than bound with v-model.number, which leaves '' in the model for
+// a cleared field. '' then reads as 0 through Number(), so an emptied Ending
+// would silently record a count of zero instead of "not counted".
+const onNumberInput = (
+    item: SheetItem,
+    field: 'openingInventory' | 'delivery' | 'endingInventory',
+    event: Event
+) => {
+    const raw = (event.target as HTMLInputElement).value;
+    const parsed = raw === '' ? null : Number(raw);
+    item[field] = parsed !== null && isNaN(parsed) ? null : parsed;
+    markChanged();
+};
+
+// Counting a shelf means replacing numbers, not editing them, so a cell arrives
+// selected and the first keystroke overwrites it.
+let selectedOnFocus = false;
+
+const selectOnFocus = (event: FocusEvent) => {
+    const el = event.target as HTMLInputElement | null;
+    if (!el) return;
+    selectedOnFocus = true;
+    el.select();
+};
+
+// A click focuses first and places the caret on release, which would drop the
+// selection made above. Suppressed for that first click only, so dragging to
+// select part of a value still works once the cell has focus.
+const keepSelectionOnClick = (event: MouseEvent) => {
+    if (!selectedOnFocus) return;
+    selectedOnFocus = false;
+    event.preventDefault();
+};
+
+// Writes the sheet now. Awaited before anything that swaps what `items` holds
+// (date, template, reload, unmount) — the payload is built from current state,
+// so a timer left to fire after a switch would write yesterday's counts onto
+// today's sheet.
+const flushAutosave = async (): Promise<void> => {
+    if (autosaveTimer) {
+        clearTimeout(autosaveTimer);
+        autosaveTimer = null;
+    }
+    if (!isDirty.value) return;
+    // One writer at a time: the API replaces the report wholesale, so overlapping
+    // writes would race. Wait for the current one, then write again if still dirty.
+    if (inFlight) {
+        await inFlight;
+        if (!isDirty.value) return;
+    }
+    inFlight = persistReport();
+    try {
+        await inFlight;
+    } finally {
+        inFlight = null;
+    }
+};
+
+const persistReport = async (): Promise<void> => {
+    const storeId = storeContext.currentStoreId;
+    if (!storeId || !selectedDate.value) return;
+
+    const seqAtStart = editSeq;
+    const dateAtStart = selectedDate.value;
+    const templateAtStart = selectedTemplate.value;
+    saveState.value = 'saving';
+
+    try {
+        const payloadItems = items.value.map((item, idx) => ({
+            id: item.id,
+            section: item.section,
+            particulars: item.particulars,
+            unit: item.unit,
+            openingInventory: Number(item.openingInventory) || 0,
+            delivery: Number(item.delivery) || 0,
+            endingInventory:
+                item.endingInventory !== null && item.endingInventory !== undefined && !isNaN(Number(item.endingInventory))
+                    ? Number(item.endingInventory)
+                    : null,
+            reminders: item.reminders || null,
+            sortOrder: idx + 1,
+            itemType: item.itemType,
+            itemId: item.itemId,
+        }));
+
+        const res = await saveDailyInventoryReport(storeId, {
+            reportType: templateAtStart,
+            date: dateAtStart,
+            items: payloadItems,
+        });
+
+        // Deliberately no reload: re-reading would replace `items` under the
+        // cursor and throw away whatever is being typed right now. The response
+        // carries everything needed, and the API rekeys items by particulars,
+        // so the ids going stale costs nothing.
+        isNewReport.value = false;
+        carriedOverDate.value = null;
+        reportUpdatedAt.value = res.report?.updatedAt || new Date().toISOString();
+        lastSavedAt.value = new Date();
+        saveError.value = null;
+
+        if (editSeq === seqAtStart) {
+            isDirty.value = false;
+            saveState.value = 'saved';
+        }
+        // Otherwise the user kept typing: stay 'pending', the timer is already set.
+    } catch (err: unknown) {
+        const e = err as { message?: string; body?: { error?: { message?: string } } };
+        // isDirty stays true, so the next edit or a Retry writes these counts again.
+        saveError.value = e?.body?.error?.message || e?.message || 'Not saved';
+        saveState.value = 'error';
+    }
+};
+
+const retrySave = () => {
+    void flushAutosave();
+};
+
+const lastSavedLabel = computed(() => {
+    if (!lastSavedAt.value) return '';
+    return lastSavedAt.value.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+});
+
 // Date changes
-const changeDate = (days: number) => {
+// Each of these swaps the sheet out, so pending edits are written against the
+// date and template they were typed on before anything changes.
+const changeDate = async (days: number) => {
     if (!selectedDate.value) return;
+    await flushAutosave();
     const [y, m, d] = selectedDate.value.split('-').map(Number);
     const date = new Date(Date.UTC(y, m - 1, d));
     date.setUTCDate(date.getUTCDate() + days);
     selectedDate.value = date.toISOString().slice(0, 10);
-    loadReport();
+    await loadReport();
 };
 
-const goToToday = () => {
+const goToToday = async () => {
+    await flushAutosave();
     selectedDate.value = getTodayDateStr();
-    loadReport();
+    await loadReport();
 };
 
-const onDateChanged = () => {
-    loadReport();
+// The date input has already changed `selectedDate` by the time this fires, so
+// the flush is skipped when dirty — writing now would file the old day's counts
+// under the new date. Those edits are saved by the debounce or on switch anyway.
+const onDateChanged = async () => {
+    await loadReport();
 };
 
-const switchTemplate = (tmpl: DailyInventoryReportType) => {
+const switchTemplate = async (tmpl: DailyInventoryReportType) => {
     if (selectedTemplate.value === tmpl) return;
+    await flushAutosave();
     selectedTemplate.value = tmpl;
-    loadReport();
+    await loadReport();
+};
+
+// Pulls in what another device has saved, and clears "Not in inventory" flags
+// for items linked elsewhere since this sheet was opened — which is why it
+// reloads the stock list too, not just the report. Pending edits are written
+// first, so refreshing can never cost a count.
+const refreshReport = async () => {
+    await flushAutosave();
+    await Promise.all([fetchStock(), loadReport()]);
 };
 
 // Load stock from inventory API
@@ -788,8 +991,12 @@ const loadReport = async () => {
             section: i.section,
             particulars: i.particulars,
             unit: i.unit,
-            openingInventory: Number(i.openingInventory) || 0,
-            delivery: Number(i.delivery) || 0,
+            // Shown blank when zero. Nothing was delivered and nothing was
+            // carried over reads as an empty cell on a paper count sheet; a
+            // literal 0 is just something you would have to clear before typing.
+            // The TOTAL column still shows the arithmetic, so nothing is hidden.
+            openingInventory: Number(i.openingInventory) || null,
+            delivery: Number(i.delivery) || null,
             total: Number(i.total) || 0,
             endingInventory: i.endingInventory !== null && i.endingInventory !== undefined ? Number(i.endingInventory) : null,
             reminders: i.reminders || null,
@@ -799,56 +1006,14 @@ const loadReport = async () => {
             itemId: i.itemId,
         }));
         isDirty.value = false;
+        editSeq += 1;
+        saveState.value = 'idle';
+        saveError.value = null;
     } catch (err: unknown) {
         const e = err as { message?: string };
-        toast.show(e?.message || 'Failed to load daily inventory', 'error');
+        toast.showToast(e?.message || 'Failed to load daily inventory', 'error');
     } finally {
         isLoading.value = false;
-    }
-};
-
-// Save report
-const handleSave = async () => {
-    const storeId = storeContext.currentStoreId;
-    if (!storeId || !selectedDate.value) return;
-
-    isSaving.value = true;
-    try {
-        const payloadItems = items.value.map((item, idx) => ({
-            id: item.id,
-            section: item.section,
-            particulars: item.particulars,
-            unit: item.unit,
-            openingInventory: Number(item.openingInventory) || 0,
-            delivery: Number(item.delivery) || 0,
-            endingInventory:
-                item.endingInventory !== null && item.endingInventory !== undefined && !isNaN(Number(item.endingInventory))
-                    ? Number(item.endingInventory)
-                    : null,
-            reminders: item.reminders || null,
-            sortOrder: idx + 1,
-            itemType: item.itemType,
-            itemId: item.itemId,
-        }));
-
-        const res = await saveDailyInventoryReport(storeId, {
-            reportType: selectedTemplate.value,
-            date: selectedDate.value,
-            items: payloadItems,
-        });
-
-        const rep = res.report;
-        isNewReport.value = false;
-        carriedOverDate.value = null;
-        reportUpdatedAt.value = rep.updatedAt || new Date().toISOString();
-        isDirty.value = false;
-        toast.show('Daily inventory saved successfully!', 'success');
-        await loadReport();
-    } catch (err: unknown) {
-        const e = err as { message?: string };
-        toast.show(e?.message || 'Failed to save daily inventory', 'error');
-    } finally {
-        isSaving.value = false;
     }
 };
 
@@ -860,8 +1025,8 @@ const confirmAddItem = () => {
         section: newItem.value.section,
         particulars: newItem.value.particulars.trim(),
         unit: newItem.value.unit.trim(),
-        openingInventory: Number(newItem.value.openingInventory) || 0,
-        delivery: Number(newItem.value.delivery) || 0,
+        openingInventory: Number(newItem.value.openingInventory) || null,
+        delivery: Number(newItem.value.delivery) || null,
         total: (Number(newItem.value.openingInventory) || 0) + (Number(newItem.value.delivery) || 0),
         endingInventory: null,
         reminders: newItem.value.reminders.trim() || null,
@@ -878,29 +1043,46 @@ const confirmAddItem = () => {
         reminders: '',
     };
     showAddModal.value = false;
-    isDirty.value = true;
-    toast.show('Item added to sheet', 'info');
+    markChanged();
+    toast.showToast('Item added to sheet', 'info');
 };
 
-const removeItem = (index: number, sectionList: DailyInventoryReportItem[]) => {
+const removeItem = (index: number, sectionList: SheetItem[]) => {
     const itemToRemove = sectionList[index];
     const overallIdx = items.value.indexOf(itemToRemove);
     if (overallIdx !== -1) {
         items.value.splice(overallIdx, 1);
-        isDirty.value = true;
+        markChanged();
     }
 };
 
+// The debounce leaves a sub-second window where counts are typed but not yet
+// written. Closing the tab in that window is the one way to lose them, so the
+// browser asks first.
+const warnIfUnsaved = (event: BeforeUnloadEvent) => {
+    if (!isDirty.value) return;
+    event.preventDefault();
+    event.returnValue = '';
+};
+
 onMounted(async () => {
+    window.addEventListener('beforeunload', warnIfUnsaved);
     selectedDate.value = getTodayDateStr();
     await fetchStock();
     await loadReport();
+});
+
+onBeforeUnmount(() => {
+    window.removeEventListener('beforeunload', warnIfUnsaved);
+    // Navigating away inside the app: no dialog, just write what is pending.
+    void flushAutosave();
 });
 
 watch(
     () => storeContext.currentStoreId,
     async (newStoreId) => {
         if (newStoreId) {
+            await flushAutosave();
             selectedDate.value = getTodayDateStr();
             await fetchStock();
             await loadReport();
@@ -1580,6 +1762,74 @@ watch(
     border-top-color: #ffffff;
     border-radius: 50%;
     animation: spin 0.6s linear infinite;
+}
+
+/* The spinner sits on the page rather than on a dark button here. */
+.btn-spinner--dark {
+    border-color: rgba(15, 23, 42, 0.2);
+    border-top-color: #0f172a;
+}
+
+/* ── AUTOSAVE STATUS ── */
+/* Sized like the buttons beside it so removing Save did not leave the bar
+   lurching between widths as the state changes. */
+.save-state {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    min-width: 170px;
+    padding: 0.3rem 0.6rem;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.save-state--idle {
+    color: #64748b;
+}
+
+/* Amber, not red: nothing is wrong, it just has not landed yet. */
+.save-state--pending {
+    background: #fffbeb;
+    border-color: #fde68a;
+    color: #92400e;
+}
+
+.save-state--saving {
+    background: #f8fafc;
+    border-color: #e2e8f0;
+    color: #334155;
+}
+
+.save-state--saved {
+    background: #f0fdf4;
+    border-color: #bbf7d0;
+    color: #15803d;
+}
+
+.save-state--error {
+    background: #fef2f2;
+    border-color: #fecaca;
+    color: #b91c1c;
+}
+
+.save-state-retry {
+    margin-left: 0.15rem;
+    padding: 0.1rem 0.4rem;
+    border: 1px solid #f87171;
+    border-radius: 4px;
+    background: #fee2e2;
+    color: #b91c1c;
+    font-size: 0.72rem;
+    font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+}
+
+.save-state-retry:hover {
+    background: #fecaca;
 }
 
 .spin-icon {
