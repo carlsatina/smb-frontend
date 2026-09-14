@@ -2,21 +2,7 @@
     <div class="daily-inv-shell">
         <!-- ── HEADER & CONTROLS ── -->
         <div class="daily-inv-header">
-            <div class="daily-inv-title-area">
-                <div class="daily-inv-title-row">
-                    <h2 class="daily-inv-heading">Daily Inventory Report</h2>
-                    <span
-                        class="role-indicator"
-                        :class="isOwnerOrAdmin ? 'role-indicator--admin' : 'role-indicator--staff'"
-                    >
-                        <mdicon :name="isOwnerOrAdmin ? 'shield-account' : 'account-tie'" size="15" />
-                        {{ isOwnerOrAdmin ? 'Owner / Admin Mode (Full Access)' : 'Store Staff Mode (Ending Inventory Only)' }}
-                    </span>
-                </div>
-                <p class="daily-inv-sub">
-                    Daily tracking for {{ currentStoreName }} · Opening inventory rolls over from previous day
-                </p>
-            </div>
+            <h2 class="daily-inv-heading">Daily Inventory Report</h2>
 
             <!-- Top Actions -->
             <div class="daily-inv-actions">
@@ -50,6 +36,19 @@
                     {{ isSaving ? 'Saving…' : isDirty ? 'Save Changes *' : 'Save Daily Inventory' }}
                 </button>
             </div>
+        </div>
+
+        <div class="daily-inv-meta">
+            <span
+                class="role-indicator"
+                :class="isOwnerOrAdmin ? 'role-indicator--admin' : 'role-indicator--staff'"
+            >
+                <mdicon :name="isOwnerOrAdmin ? 'shield-account' : 'account-tie'" size="15" />
+                {{ isOwnerOrAdmin ? 'Owner / Admin Mode (Full Access)' : 'Store Staff Mode (Ending Inventory Only)' }}
+            </span>
+            <p class="daily-inv-sub">
+                Daily tracking for {{ currentStoreName }} · Opening inventory rolls over from previous day
+            </p>
         </div>
 
         <!-- ── CONTROLS STRIP (Template selector + Date Nav) ── -->
@@ -914,34 +913,46 @@ watch(
 .daily-inv-shell {
     display: flex;
     flex-direction: column;
-    gap: 1.25rem;
+    gap: 0.7rem;
     width: 100%;
+    /* The app's sticky TopNav: 56px tall plus its 1px bottom border. The bar
+       below parks directly beneath it. */
+    --topnav-height: 57px;
 }
 
 /* ── HEADER ── */
+/* Pinned so Save stays reachable from anywhere in a long sheet: the whole point
+   of the screen is counting your way down the rows and saving at the end, and
+   scrolling back up to a button is the one thing you do every single day.
+   Deliberately one row tall: the role badge and subtitle sit below and scroll
+   away, since they are orientation you read once, and a pinned bar costs
+   viewport on every row you are trying to read. */
 .daily-inv-header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 1rem;
-}
-
-.daily-inv-title-area {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-}
-
-.daily-inv-title-row {
+    position: sticky;
+    top: var(--topnav-height);
+    /* Under the TopNav's 100, above the sheet so rows pass beneath it. */
+    z-index: 20;
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    padding: 0.5rem 0;
+    background: #ffffff;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+/* Role badge and store line: on screen when you arrive, gone once you start
+   counting. */
+.daily-inv-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
     flex-wrap: wrap;
 }
 
 .daily-inv-heading {
-    font-size: 1.5rem;
+    font-size: 1.1rem;
     font-weight: 800;
     color: #0f172a;
     letter-spacing: -0.02em;
@@ -951,10 +962,10 @@ watch(
 .role-indicator {
     display: inline-flex;
     align-items: center;
-    gap: 0.35rem;
-    padding: 0.25rem 0.65rem;
+    gap: 0.3rem;
+    padding: 0.15rem 0.5rem;
     border-radius: 9999px;
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     font-weight: 600;
 }
 
@@ -971,7 +982,7 @@ watch(
 }
 
 .daily-inv-sub {
-    font-size: 0.875rem;
+    font-size: 0.78rem;
     color: #64748b;
     margin: 0;
 }
@@ -979,7 +990,8 @@ watch(
 .daily-inv-actions {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.4rem;
+    flex-shrink: 0;
 }
 
 /* ── CONTROLS CARD ── */
@@ -988,11 +1000,11 @@ watch(
     align-items: center;
     justify-content: space-between;
     flex-wrap: wrap;
-    gap: 1rem;
-    padding: 0.75rem 1rem;
+    gap: 0.6rem;
+    padding: 0.45rem 0.65rem;
     background: #ffffff;
     border: 1px solid #e2e8f0;
-    border-radius: 12px;
+    border-radius: 10px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
@@ -1007,12 +1019,12 @@ watch(
 .template-pill {
     display: inline-flex;
     align-items: center;
-    gap: 0.4rem;
-    padding: 0.45rem 0.9rem;
+    gap: 0.35rem;
+    padding: 0.3rem 0.65rem;
     border: none;
     background: transparent;
     border-radius: 8px;
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     font-weight: 600;
     color: #475569;
     cursor: pointer;
@@ -1119,10 +1131,10 @@ watch(
 .banner {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-    padding: 0.75rem 1rem;
-    border-radius: 10px;
-    font-size: 0.85rem;
+    gap: 0.5rem;
+    padding: 0.4rem 0.7rem;
+    border-radius: 8px;
+    font-size: 0.78rem;
 }
 
 .banner--info {
@@ -1160,27 +1172,27 @@ watch(
 /* ── STATS STRIP ── */
 .inv-stats-strip {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 0.75rem;
+    grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+    gap: 0.45rem;
 }
 
 .stat-box {
     display: flex;
     flex-direction: column;
-    padding: 0.65rem 0.85rem;
+    padding: 0.4rem 0.6rem;
     background: #ffffff;
     border: 1px solid #e2e8f0;
     border-radius: 8px;
 }
 
 .stat-box-val {
-    font-size: 1.15rem;
+    font-size: 0.98rem;
     font-weight: 800;
     color: #0f172a;
 }
 
 .stat-box-lbl {
-    font-size: 0.75rem;
+    font-size: 0.68rem;
     color: #64748b;
     font-weight: 500;
 }
@@ -1245,15 +1257,15 @@ watch(
 .sheet-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 0.82rem;
+    font-size: 0.78rem;
     font-family: inherit;
     text-align: left;
 }
 
 /* ── TABLE HEADERS ── */
 .header-main-row th {
-    padding: 0.65rem 0.75rem;
-    font-size: 0.72rem;
+    padding: 0.4rem 0.55rem;
+    font-size: 0.68rem;
     font-weight: 800;
     letter-spacing: 0.03em;
     border: 1px solid #cbd5e1;
@@ -1284,9 +1296,9 @@ watch(
 
 /* ── SECTION HEADER BARS ── */
 .section-header-row td {
-    padding: 0.4rem 0.75rem;
+    padding: 0.25rem 0.6rem;
     font-weight: 800;
-    font-size: 0.8rem;
+    font-size: 0.72rem;
     border: 1px solid #94a3b8;
     text-transform: uppercase;
     letter-spacing: 0.04em;
@@ -1317,7 +1329,7 @@ watch(
 
 /* ── ROW STYLES ── */
 .sheet-row td {
-    padding: 0.35rem 0.5rem;
+    padding: 0.2rem 0.4rem;
     border: 1px solid #cbd5e1;
     vertical-align: middle;
 }
@@ -1333,7 +1345,7 @@ watch(
 
 /* ── PARTICULARS CELL ── */
 .col-particulars {
-    min-width: 220px;
+    min-width: 190px;
 }
 
 .particular-cell {
@@ -1388,7 +1400,7 @@ watch(
 .col-opening,
 .col-delivery,
 .col-ending {
-    width: 110px;
+    width: 92px;
     text-align: right;
 }
 
@@ -1407,10 +1419,10 @@ watch(
 
 .cell-input {
     width: 100%;
-    padding: 0.3rem 0.45rem;
+    padding: 0.2rem 0.35rem;
     border: 1px solid #cbd5e1;
     border-radius: 5px;
-    font-size: 0.85rem;
+    font-size: 0.78rem;
     font-family: inherit;
     color: #0f172a;
     background: #ffffff;
@@ -1435,7 +1447,7 @@ watch(
 
 .cell-input--notes {
     text-align: left;
-    min-width: 160px;
+    min-width: 140px;
 }
 
 .cell-input--urgent {
@@ -1449,11 +1461,11 @@ watch(
     align-items: center;
     justify-content: flex-end;
     gap: 0.3rem;
-    padding: 0.3rem 0.45rem;
+    padding: 0.2rem 0.35rem;
     background: #f1f5f9;
     border: 1px solid #e2e8f0;
     border-radius: 5px;
-    font-size: 0.85rem;
+    font-size: 0.78rem;
     font-weight: 600;
     color: #475569;
 }
@@ -1465,21 +1477,21 @@ watch(
 /* ── READONLY / COMPUTED CELLS ── */
 .col-unit,
 .col-unit2 {
-    width: 70px;
+    width: 56px;
     text-align: center;
 }
 
 .unit-text {
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     color: #475569;
     font-weight: 500;
 }
 
 .col-total,
 .col-used {
-    width: 100px;
+    width: 88px;
     text-align: right;
-    padding-right: 0.75rem !important;
+    padding-right: 0.6rem !important;
 }
 
 .computed-val {
@@ -1487,7 +1499,7 @@ watch(
 }
 
 .col-reminders {
-    min-width: 180px;
+    min-width: 150px;
 }
 
 .col-actions {
