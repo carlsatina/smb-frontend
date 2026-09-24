@@ -549,8 +549,7 @@
                 <p class="sc-modal-sub">
                     Rates are effective-dated — changing one opens a new record and leaves published weeks untouched.
                     <strong>Each row must be saved individually</strong>; a week can't be published until everyone on it has a rate.
-                    <em>Break</em> is unpaid minutes per worked day, deducted before overtime is calculated — a 9AM–6PM shift with a
-                    60-minute break is exactly one 8-hour day and generates no OT.
+                    <em>Break (mins)</em> is unpaid <strong>minutes</strong> per worked day, deducted before overtime is calculated — enter <strong>60</strong> for a 1-hour break (a 9AM–6PM shift with a 60-minute break is exactly one 8-hour day and generates no OT).
                 </p>
 
                 <div class="sc-table-scroll">
@@ -560,7 +559,7 @@
                             <th>Staff</th>
                             <th>Daily rate</th>
                             <th>Hrs/day</th>
-                            <th>Break</th>
+                            <th>Break (mins)</th>
                             <th>OT ×</th>
                             <th>OT /hr</th>
                             <th>Effective</th>
@@ -584,9 +583,13 @@
                                     step="15"
                                     v-model.number="rate.breakMinutes"
                                     class="sc-input sc-input--num"
-                                    title="Unpaid break per worked day, deducted before OT is calculated"
+                                    placeholder="mins"
+                                    title="Unpaid break in minutes per worked day (e.g. 60 for 1 hr)"
                                     @input="rate.dirty = true"
                                 />
+                                <div v-if="rate.breakMinutes > 0" class="sc-break-hint" :class="{ 'sc-break-hint--warn': rate.breakMinutes <= 5 }">
+                                    {{ formatBreakHint(rate.breakMinutes) }}
+                                </div>
                             </td>
                             <td><input type="number" min="0" max="5" step="0.05" v-model.number="rate.otMultiplier" class="sc-input sc-input--num" @input="rate.dirty = true" /></td>
                             <td class="sc-muted">{{ formatMoney(previewOtRate(rate)) }}</td>
@@ -1378,7 +1381,17 @@ const openRates = async () => {
 const previewOtRate = (rate: { dailyRate: number; hoursPerDay: number; otMultiplier: number }) =>
     (rate.dailyRate / (rate.hoursPerDay || 8)) * rate.otMultiplier;
 
-const saveRate = async (rate: RateDraft) => {
+const formatBreakHint = (minutes: number): string => {
+    if (!minutes || minutes <= 0) return '';
+    if (minutes <= 5) return `⚠️ ${minutes}m (did you mean ${minutes * 60}m?)`;
+    const hrs = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    if (hrs > 0 && mins > 0) return `${hrs}h ${mins}m`;
+    if (hrs > 0) return `${hrs}h`;
+    return `${mins}m`;
+};
+
+const executeSaveRate = async (rate: RateDraft) => {
     if (!storeId.value) return;
     await setStaffRate(storeId.value, rate.storeMemberId, {
         dailyRate: rate.dailyRate,
@@ -1390,9 +1403,37 @@ const saveRate = async (rate: RateDraft) => {
     rate.saved = true;
     rate.dirty = false;
     showToast(`Rate saved for ${rate.name}`, 'success');
-    // Only refresh the grid when there is nothing pending to lose — a new rate
+
+    // Immediately fold the updated rate into the week grid so OT hours and
+    // payouts recalculate live, even when there are unsaved shift edits.
+    const row = rows.value.find((r) => r.storeMemberId === rate.storeMemberId);
+    if (row?.pay) {
+        row.pay.dailyRate = rate.dailyRate;
+        row.pay.hoursPerDay = rate.hoursPerDay || 8;
+        row.pay.breakMinutes = rate.breakMinutes;
+        row.pay.otHourlyRate = previewOtRate(rate);
+        recalcRow(row);
+    }
+
+    // Only refresh the grid from server when there is nothing pending to lose — a new rate
     // changes computed payouts, but not at the cost of the owner's edits.
     if (!isDirty.value) await loadWeek();
+};
+
+const saveRate = async (rate: RateDraft) => {
+    if (rate.breakMinutes > 0 && rate.breakMinutes <= 5) {
+        askConfirm(
+            'Confirm Break Duration',
+            `You entered ${rate.breakMinutes} for Break (mins). This will be recorded as a ${rate.breakMinutes}-minute unpaid break per day. Did you mean ${rate.breakMinutes} hour (${rate.breakMinutes * 60} mins)?`,
+            `Change to ${rate.breakMinutes * 60} mins and save`,
+            async () => {
+                rate.breakMinutes = rate.breakMinutes * 60;
+                await executeSaveRate(rate);
+            }
+        );
+        return;
+    }
+    await executeSaveRate(rate);
 };
 
 // ── Cash advances ────────────────────────────────────────────────────────────
@@ -2294,6 +2335,18 @@ thead .sc-col-staff {
     border-color: #1d4ed8 !important;
     color: #1d4ed8 !important;
     font-weight: 700;
+}
+
+.sc-break-hint {
+    font-size: 0.65rem;
+    color: var(--text-muted, #6b7280);
+    margin-top: 0.15rem;
+    white-space: nowrap;
+
+    &--warn {
+        color: #d97706;
+        font-weight: 600;
+    }
 }
 
 .sc-cell-icon {
