@@ -115,6 +115,14 @@ export type CashAdvance = {
     balance: number;
     takenOn: string;
     note: string | null;
+    deductions?: {
+        id: string;
+        scheduleWeekRowId: string;
+        amount: number;
+        skipped: boolean;
+        reason?: string | null;
+        weekStart: string;
+    }[];
 };
 
 export type SaveWeekPayload = {
@@ -258,6 +266,16 @@ export const setRowDeduction = (
     rowId: string,
     data: { cashAdvanceId: string; amount: number; skipped: boolean; reason?: string | null }
 ) => apiClient.request<{ deduction: ScheduleDeduction }>(`${base(storeId)}/rows/${rowId}/deduction`, { method: 'PUT', body: data });
+
+export const setRowTotalDeduction = (
+    storeId: string,
+    rowId: string,
+    data: { amount: number; skipped?: boolean; reason?: string | null }
+) =>
+    apiClient.request<{ deductions: ScheduleDeduction[]; lessCa: number; caBalance?: number }>(
+        `${base(storeId)}/rows/${rowId}/deductions/total`,
+        { method: 'PUT', body: data }
+    );
 
 export const removeRowDeduction = (storeId: string, rowId: string, deductionId: string) =>
     apiClient.request<void>(`${base(storeId)}/rows/${rowId}/deduction/${deductionId}`, { method: 'DELETE' });

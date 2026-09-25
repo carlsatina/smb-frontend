@@ -243,7 +243,7 @@
                             </td>
                             <td class="sc-col-num">
                                 <button
-                                    v-if="canEdit && !isPublished"
+                                    v-if="canEdit"
                                     class="sc-linkish"
                                     :disabled="!row.id"
                                     @click="openDeductions(row)"
@@ -363,7 +363,7 @@
                         <div class="sc-mstat">
                             <span class="sc-mstat-label">less CA</span>
                             <button
-                                v-if="canEdit && !isPublished"
+                                v-if="canEdit"
                                 class="sc-linkish"
                                 :disabled="!row.id"
                                 @click="openDeductions(row)"
@@ -615,61 +615,112 @@
         <!-- ── Cash advances / deductions ── -->
         <Modal v-if="deductionEditor" width="50rem" @close="deductionEditor = null">
             <div class="sc-modal">
-                <h2 class="sc-modal-title">Cash advances — {{ deductionEditor.rowName }}</h2>
+                <h2 class="sc-modal-title">
+                    Cash advances — {{ deductionEditor.rowName }}
+                    <span v-if="isPublished" class="sc-badge-published">Published</span>
+                </h2>
                 <p class="sc-modal-sub">
-                    Deduct against a specific advance. The running balance is derived, so it can’t drift.
+                    <span v-if="isPublished">
+                        This week is published and settled. Viewing cash advance breakdown.
+                    </span>
+                    <span v-else>
+                        Set a single deduction for this week based on the total balance. When there are multiple advances, deductions are automatically applied to the oldest advance first.
+                    </span>
                 </p>
 
+                <!-- ── Single deduction field based on total ── -->
+                <div v-if="deductionEditor.entries.length > 0" class="sc-deduction-card">
+                    <div class="sc-deduction-card-header">
+                        <div>
+                            <span class="sc-deduction-label">Total Outstanding Balance</span>
+                            <div class="sc-deduction-balance">{{ formatMoney(totalAvailableBalance) }}</div>
+                        </div>
+                        <div v-if="!isPublished" class="sc-deduction-action-wrap">
+                            <div class="sc-deduction-field">
+                                <label class="sc-deduction-input-label">Deduct this week</label>
+                                <div class="sc-deduction-input-group">
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        :max="totalAvailableBalance"
+                                        step="0.01"
+                                        class="sc-input sc-input--num sc-deduction-input"
+                                        v-model.number="deductionEditor.totalAmount"
+                                        :disabled="deductionEditor.skipped"
+                                        placeholder="0.00"
+                                    />
+                                    <button
+                                        class="primary-button button-compact"
+                                        :disabled="isSavingDeduction"
+                                        @click="guard(saveTotalDeduction)"
+                                    >
+                                        {{ isSavingDeduction ? 'Saving…' : 'Save deduction' }}
+                                    </button>
+                                </div>
+                            </div>
+                            <label class="sc-deduction-skip">
+                                <input type="checkbox" v-model="deductionEditor.skipped" />
+                                <span>Skip deduction this week</span>
+                            </label>
+                        </div>
+                        <div v-else class="sc-deduction-published-wrap">
+                            <span class="sc-deduction-label">Deducted this week</span>
+                            <div class="sc-deduction-balance">
+                                {{ formatMoney(deductionEditor.totalAmount) }}
+                                <span v-if="deductionEditor.skipped" class="sc-badge-skipped">Skipped</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── Advances breakdown table ── -->
+                <div v-if="allocatedBreakdown.length > 0" class="sc-section-subtitle">
+                    <span>Advances Breakdown ({{ allocatedBreakdown.length }})</span>
+                </div>
                 <div class="sc-table-scroll">
                 <table class="sc-mini-table">
                     <thead>
                         <tr>
                             <th>Taken</th>
-                            <th>Amount</th>
+                            <th>Note</th>
+                            <th>Original</th>
                             <th>Balance</th>
-                            <th>Deduct this week</th>
-                            <th>Skip</th>
-                            <th></th>
+                            <th>This week's deduction</th>
+                            <th>Remaining</th>
+                            <th v-if="!isPublished"></th>
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="entry in deductionEditor.entries" :key="entry.advance.id">
-                            <td>{{ shortDate(entry.advance.takenOn) }}</td>
-                            <td>{{ formatMoney(entry.advance.amount) }}</td>
-                            <td :class="{ 'sc-muted': entry.advance.balance === 0 }">{{ formatMoney(entry.advance.balance) }}</td>
-                            <td>
-                                <input
-                                    type="number"
-                                    min="0"
-                                    step="0.01"
-                                    class="sc-input sc-input--num"
-                                    v-model.number="entry.amount"
-                                    :disabled="entry.skipped"
-                                />
+                        <tr v-for="item in allocatedBreakdown" :key="item.advance.id">
+                            <td>{{ shortDate(item.advance.takenOn) }}</td>
+                            <td class="sc-muted">{{ item.advance.note || '—' }}</td>
+                            <td>{{ formatMoney(item.advance.amount) }}</td>
+                            <td>{{ formatMoney(item.available) }}</td>
+                            <td :class="{ 'sc-deducting-active': item.allocated > 0 }">
+                                {{ formatMoney(item.allocated) }}
                             </td>
-                            <td><input type="checkbox" v-model="entry.skipped" /></td>
-                            <td class="sc-advance-actions">
-                                <button class="secondary-button button-compact" @click="guard(() => saveDeduction(entry))">Save</button>
+                            <td :class="{ 'sc-muted': item.balanceAfter === 0 }">{{ formatMoney(item.balanceAfter) }}</td>
+                            <td v-if="!isPublished" class="sc-advance-actions">
                                 <button
                                     class="sc-icon-button"
-                                    :disabled="entry.advance.deducted > 0"
-                                    :title="entry.advance.deducted > 0
+                                    :disabled="!item.canDelete"
+                                    :title="!item.canDelete
                                         ? 'This advance already has deductions against it'
                                         : 'Delete this advance'"
-                                    @click="guard(() => removeAdvance(entry))"
+                                    @click="guard(() => removeAdvance(item))"
                                 >
                                     <mdicon name="delete-outline" size="16" />
                                 </button>
                             </td>
                         </tr>
-                        <tr v-if="deductionEditor.entries.length === 0">
-                            <td colspan="6" class="sc-muted">No cash advances on record.</td>
+                        <tr v-if="allocatedBreakdown.length === 0">
+                            <td :colspan="isPublished ? 6 : 7" class="sc-muted">No cash advances on record.</td>
                         </tr>
                     </tbody>
                 </table>
                 </div>
 
-                <div class="sc-inline-form">
+                <div v-if="!isPublished" class="sc-inline-form">
                     <span class="sc-inline-form-label">New advance</span>
                     <input type="number" min="0" step="0.01" v-model.number="newAdvance.amount" class="sc-input sc-input--num" placeholder="Amount" />
                     <input type="date" v-model="newAdvance.takenOn" class="sc-input" />
@@ -680,7 +731,7 @@
                 </div>
 
                 <div class="sc-modal-actions">
-                    <button class="primary-button" @click="guard(closeDeductions)">Done</button>
+                    <button class="secondary-button" @click="guard(closeDeductions)">Done</button>
                 </div>
             </div>
         </Modal>
@@ -720,6 +771,7 @@ import {
     publishScheduleWeek,
     saveScheduleWeek,
     setRowDeduction,
+    setRowTotalDeduction,
     setStaffRate,
 } from '@/api/schedule';
 import ScheduleAttendance from '@/views/Schedule/ScheduleAttendance.vue';
@@ -918,7 +970,9 @@ watch(weekStart, (next, previous) => {
         weekStart.value = previous;
         return;
     }
-    guard(loadWeek);
+    guard(async () => {
+        await Promise.all([loadWeek(), loadAdvances()]);
+    });
 });
 // reload() already fetches members; this only covers a canEdit flip on a week
 // change, and is guarded so a failure surfaces instead of escaping.
@@ -984,7 +1038,7 @@ const emptyPay = () => ({
 const addRow = () => {
     const member = members.value.find((m) => m.storeMemberId === memberToAdd.value);
     if (!member || !week.value) return;
-    week.value.rows.push({
+    const newRow: ScheduleRow = {
         id: '',
         storeMemberId: member.storeMemberId,
         userId: member.userId,
@@ -994,7 +1048,9 @@ const addRow = () => {
         isSelf: false,
         shifts: [],
         pay: emptyPay(),
-    });
+    };
+    syncCaBalance(newRow);
+    week.value.rows.push(newRow);
     memberToAdd.value = '';
     isDirty.value = true;
 };
@@ -1438,32 +1494,118 @@ const saveRate = async (rate: RateDraft) => {
 
 // ── Cash advances ────────────────────────────────────────────────────────────
 
-type DeductionEntry = { advance: CashAdvance; amount: number; skipped: boolean };
-type DeductionEditor = { rowId: string; storeMemberId: string; rowName: string; entries: DeductionEntry[] };
+type DeductionEntry = {
+    advance: CashAdvance;
+    amount: number;
+    skipped: boolean;
+    priorDeducted: number;
+    available: number;
+};
+type DeductionEditor = {
+    rowId: string;
+    storeMemberId: string;
+    rowName: string;
+    entries: DeductionEntry[];
+    totalAmount: number;
+    skipped: boolean;
+};
 
 const deductionEditor = ref<DeductionEditor | null>(null);
+const isSavingDeduction = ref(false);
 const newAdvance = reactive({ amount: null as number | null, takenOn: '', note: '' });
 
-const buildEntries = (row: ScheduleRow): DeductionEntry[] =>
-    advances.value
-        .filter((a) => a.storeMemberId === row.storeMemberId)
+const buildEntries = (row: ScheduleRow): DeductionEntry[] => {
+    const currentWeekStart = weekStart.value;
+    const currentWeekEnd = addDays(currentWeekStart, 6);
+
+    return advances.value
+        .filter((a) => a.storeMemberId === row.storeMemberId && a.takenOn <= currentWeekEnd)
         .map((advance) => {
             const existing = row.pay?.deductions.find((d) => d.cashAdvanceId === advance.id);
+            const amount = existing?.amount ?? 0;
+            const skipped = existing?.skipped ?? false;
+
+            let priorDeducted = 0;
+            if (advance.deductions) {
+                priorDeducted = advance.deductions
+                    .filter((d) => d.weekStart < currentWeekStart)
+                    .reduce((sum, d) => sum + d.amount, 0);
+            } else {
+                priorDeducted = Math.max(0, advance.deducted - amount);
+            }
+
+            const available = Math.max(0, advance.amount - priorDeducted);
+
             return {
                 advance,
-                amount: existing?.amount ?? 0,
-                skipped: existing?.skipped ?? false,
+                amount,
+                skipped,
+                priorDeducted,
+                available,
             };
-        });
-
-// The row's "ca bal" is the member's outstanding total across every advance.
-// Recomputed from the freshly loaded list rather than adjusted by hand.
-const syncCaBalance = (row: ScheduleRow | undefined) => {
-    if (!row?.pay) return;
-    row.pay.caBalance = advances.value
-        .filter((a) => a.storeMemberId === row.storeMemberId)
-        .reduce((sum, a) => sum + a.balance, 0);
+        })
+        .filter((entry) => entry.available > 0 || entry.amount > 0);
 };
+
+// Total available balance for this row as of this week
+const totalAvailableBalance = computed(() => {
+    if (!deductionEditor.value) return 0;
+    return deductionEditor.value.entries.reduce((sum, entry) => sum + entry.available, 0);
+});
+
+// Live breakdown showing how the single deduction amount is allocated FIFO across advances
+const allocatedBreakdown = computed(() => {
+    if (!deductionEditor.value) return [];
+    let remainingToDeduct = deductionEditor.value.skipped ? 0 : (Number(deductionEditor.value.totalAmount) || 0);
+
+    const sorted = [...deductionEditor.value.entries].sort(
+        (a, b) => a.advance.takenOn.localeCompare(b.advance.takenOn)
+    );
+
+    return sorted.map((entry) => {
+        const available = entry.available;
+        const allocated = Math.min(remainingToDeduct, available);
+        remainingToDeduct -= allocated;
+        const balanceAfter = Math.max(0, available - allocated);
+        const canDelete = entry.priorDeducted === 0 && entry.amount === 0;
+
+        return {
+            ...entry,
+            available,
+            allocated,
+            balanceAfter,
+            canDelete,
+        };
+    });
+});
+
+// The row's "ca bal" is the member's outstanding total as of this specific week.
+function syncCaBalance(row: ScheduleRow | undefined) {
+    if (!row?.pay) return;
+    const currentWeekStart = weekStart.value;
+    const currentWeekEnd = addDays(currentWeekStart, 6);
+
+    const memberAdvances = advances.value.filter(
+        (a) => a.storeMemberId === row.storeMemberId && a.takenOn <= currentWeekEnd
+    );
+
+    let total = 0;
+    for (const advance of memberAdvances) {
+        let priorDeducted = 0;
+        if (advance.deductions) {
+            priorDeducted = advance.deductions
+                .filter((d) => d.weekStart < currentWeekStart)
+                .reduce((sum, d) => sum + d.amount, 0);
+        } else {
+            const thisDeduction = row.pay.deductions?.find((d) => d.cashAdvanceId === advance.id)?.amount ?? 0;
+            priorDeducted = Math.max(0, advance.deducted - thisDeduction);
+        }
+        const thisDeduction = row.pay.deductions?.find((d) => d.cashAdvanceId === advance.id)?.amount ?? 0;
+        const bal = Math.max(0, advance.amount - priorDeducted - thisDeduction);
+        total += bal;
+    }
+    row.pay.caBalance = total;
+}
 
 const openDeductions = (row: ScheduleRow) => {
     if (!row.id) {
@@ -1473,45 +1615,74 @@ const openDeductions = (row: ScheduleRow) => {
     newAdvance.amount = null;
     newAdvance.takenOn = weekStart.value;
     newAdvance.note = '';
+
+    const entries = buildEntries(row);
+    const existingDeduction = row.pay?.lessCa ?? 0;
+    const isSkipped = (row.pay?.deductions?.length ?? 0) > 0 && row.pay!.deductions.every((d) => d.skipped);
+
     deductionEditor.value = {
         rowId: row.id,
         storeMemberId: row.storeMemberId,
         rowName: row.name,
-        entries: buildEntries(row),
+        entries,
+        totalAmount: isSkipped ? 0 : existingDeduction,
+        skipped: isSkipped,
     };
 };
 
-const saveDeduction = async (entry: DeductionEntry) => {
+const saveTotalDeduction = async () => {
     if (!storeId.value || !deductionEditor.value) return;
-    // v-model.number hands back the raw string when parseFloat gives NaN, so an
-    // emptied field would post amount: "" and trip backend validation.
-    const amount = Number(entry.amount) || 0;
-    const applied = entry.skipped ? 0 : amount;
-    const { deduction } = await setRowDeduction(storeId.value, deductionEditor.value.rowId, {
-        cashAdvanceId: entry.advance.id,
-        amount: applied,
-        skipped: entry.skipped,
-    });
+    const editor = deductionEditor.value;
+    const amount = Number(editor.totalAmount) || 0;
 
-    // Fold the saved deduction into the grid row. `closeDeductions` reloads the
-    // week only when there is nothing unsaved to lose, so without this the
-    // less CA and Payout columns sit stale behind the modal.
-    const row = rows.value.find((r) => r.storeMemberId === deductionEditor.value?.storeMemberId);
-    if (row?.pay) {
-        const existing = row.pay.deductions.find((d) => d.cashAdvanceId === deduction.cashAdvanceId);
-        if (existing) Object.assign(existing, deduction);
-        else row.pay.deductions.push(deduction);
-        row.pay.lessCa = row.pay.deductions.reduce((sum, d) => sum + d.amount, 0);
-        recalcRow(row);
+    if (amount < 0) {
+        showToast('Deduction cannot be negative', 'error');
+        return;
     }
 
-    // Advance balances are derived from every week's deductions, so the
-    // modal's Balance column and the row's "ca bal" need the server's figures.
-    advances.value = (await listCashAdvances(storeId.value)).advances;
-    syncCaBalance(row);
-    if (row) deductionEditor.value.entries = buildEntries(row);
+    if (!editor.skipped && amount > totalAvailableBalance.value) {
+        showToast(`Deduction cannot exceed total balance (${formatMoney(totalAvailableBalance.value)})`, 'error');
+        return;
+    }
 
-    showToast('Deduction saved', 'success');
+    isSavingDeduction.value = true;
+    try {
+        const { deductions, lessCa, caBalance } = await setRowTotalDeduction(storeId.value, editor.rowId, {
+            amount: editor.skipped ? 0 : amount,
+            skipped: editor.skipped,
+        });
+
+        // Fold the saved deduction into the grid row.
+        const row = rows.value.find((r) => r.storeMemberId === editor.storeMemberId);
+        if (row?.pay) {
+            row.pay.deductions = deductions;
+            row.pay.lessCa = lessCa;
+            if (caBalance !== undefined) {
+                row.pay.caBalance = caBalance;
+            }
+            recalcRow(row);
+        }
+
+        // Refresh advances from server and update local editor state
+        advances.value = (await listCashAdvances(storeId.value)).advances;
+        syncCaBalance(row);
+        if (row) {
+            editor.entries = buildEntries(row);
+            editor.totalAmount = lessCa;
+            editor.skipped = editor.skipped && lessCa === 0;
+        }
+
+        showToast(
+            editor.skipped
+                ? 'Deduction skipped for this week'
+                : `Deduction of ${formatMoney(lessCa)} saved`,
+            'success'
+        );
+    } catch (err: any) {
+        showToast(err.message || 'Could not save deduction', 'error');
+    } finally {
+        isSavingDeduction.value = false;
+    }
 };
 
 const addAdvance = async () => {
@@ -2272,6 +2443,125 @@ thead .sc-col-staff {
     gap: 0.3rem;
     align-items: center;
     white-space: nowrap;
+}
+
+.sc-deduction-card {
+    background: var(--surface-secondary, #f9fafb);
+    border: 1px solid var(--border-color, #e5e7eb);
+    border-radius: 0.5rem;
+    padding: 0.85rem 1rem;
+    margin-bottom: 1rem;
+}
+
+.sc-deduction-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.sc-deduction-label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--text-muted, #6b7280);
+    letter-spacing: 0.03em;
+}
+
+.sc-deduction-balance {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--text-primary, #111827);
+    margin-top: 0.15rem;
+}
+
+.sc-deduction-action-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.35rem;
+}
+
+.sc-deduction-field {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.25rem;
+}
+
+.sc-deduction-input-label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--text-secondary, #4b5563);
+}
+
+.sc-deduction-input-group {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.sc-deduction-input {
+    width: 7.5rem !important;
+    text-align: right;
+    font-weight: 600;
+}
+
+.sc-deduction-skip {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.75rem;
+    color: var(--text-muted, #6b7280);
+    cursor: pointer;
+}
+
+.sc-deduction-published-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.15rem;
+}
+
+.sc-badge-published {
+    display: inline-block;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 0.15rem 0.5rem;
+    border-radius: 999px;
+    background: #d1fae5;
+    color: #065f46;
+    margin-left: 0.5rem;
+    vertical-align: middle;
+}
+
+.sc-badge-skipped {
+    display: inline-block;
+    font-size: 0.65rem;
+    font-weight: 600;
+    padding: 0.1rem 0.4rem;
+    border-radius: 4px;
+    background: #fee2e2;
+    color: #991b1b;
+    margin-left: 0.4rem;
+    vertical-align: middle;
+}
+
+.sc-section-subtitle {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--text-muted, #6b7280);
+    letter-spacing: 0.03em;
+    margin-bottom: 0.4rem;
+}
+
+.sc-deducting-active {
+    font-weight: 700;
+    color: #047857;
 }
 
 .sc-ot-cell {
