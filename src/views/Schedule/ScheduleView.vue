@@ -703,9 +703,8 @@
                             <td v-if="!isPublished" class="sc-advance-actions">
                                 <button
                                     class="sc-icon-button"
-                                    :disabled="!item.canDelete"
-                                    :title="!item.canDelete
-                                        ? 'This advance already has deductions against it'
+                                    :title="item.publishedWeeks.length > 0
+                                        ? 'Deducted in a published week — unpublish it to delete this advance'
                                         : 'Delete this advance'"
                                     @click="guard(() => removeAdvance(item))"
                                 >
@@ -1567,14 +1566,22 @@ const allocatedBreakdown = computed(() => {
         const allocated = Math.min(remainingToDeduct, available);
         remainingToDeduct -= allocated;
         const balanceAfter = Math.max(0, available - allocated);
-        const canDelete = entry.priorDeducted === 0 && entry.amount === 0;
+        // Mirrors the backend rule: only a real deduction in a published week
+        // blocks deletion. Draft-week deductions are removed along with it.
+        const publishedWeeks = [
+            ...new Set(
+                (entry.advance.deductions ?? [])
+                    .filter((d) => d.weekPublished && d.amount > 0)
+                    .map((d) => d.weekStart)
+            ),
+        ].sort();
 
         return {
             ...entry,
             available,
             allocated,
             balanceAfter,
-            canDelete,
+            publishedWeeks,
         };
     });
 });
@@ -1707,19 +1714,38 @@ const addAdvance = async () => {
     showToast('Cash advance recorded', 'success');
 };
 
-const removeAdvance = async (entry: DeductionEntry) => {
+const removeAdvance = async (entry: DeductionEntry & { publishedWeeks: string[] }) => {
     if (!storeId.value) return;
+    if (entry.publishedWeeks.length > 0) {
+        const weeks = entry.publishedWeeks.map(shortDate).join(', ');
+        showToast(
+            `This advance was deducted in published week${entry.publishedWeeks.length === 1 ? '' : 's'} (${weeks}). Unpublish to delete it.`,
+            'error'
+        );
+        return;
+    }
+
+    const draftDeducted = (entry.advance.deductions ?? []).filter((d) => d.amount > 0);
     askConfirm(
         `Delete the ${formatMoney(entry.advance.amount)} advance?`,
-        `Taken ${shortDate(entry.advance.takenOn)}. This cannot be undone.`,
+        draftDeducted.length > 0
+            ? `Taken ${shortDate(entry.advance.takenOn)}. Its ${formatMoney(entry.advance.deducted)} in deductions from draft weeks will be removed too. This cannot be undone.`
+            : `Taken ${shortDate(entry.advance.takenOn)}. This cannot be undone.`,
         'Delete',
         async () => {
-            if (!storeId.value || !deductionEditor.value) return;
+            if (!storeId.value) return;
             await deleteCashAdvance(storeId.value, entry.advance.id);
             advances.value = (await listCashAdvances(storeId.value)).advances;
-            const row = rows.value.find((r) => r.storeMemberId === deductionEditor.value?.storeMemberId);
+            const row = rows.value.find((r) => r.storeMemberId === entry.advance.storeMemberId);
+            // Its deductions are gone server-side; drop them from this week's row too.
+            if (row?.pay) {
+                row.pay.deductions = row.pay.deductions.filter((d) => d.cashAdvanceId !== entry.advance.id);
+                row.pay.lessCa = row.pay.deductions.reduce((sum, d) => sum + d.amount, 0);
+                recalcRow(row);
+                if (deductionEditor.value) deductionEditor.value.totalAmount = row.pay.lessCa;
+            }
             syncCaBalance(row);
-            if (row) deductionEditor.value.entries = buildEntries(row);
+            if (row && deductionEditor.value) deductionEditor.value.entries = buildEntries(row);
             showToast('Cash advance deleted', 'success');
         }
     );

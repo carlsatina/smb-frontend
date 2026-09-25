@@ -122,6 +122,7 @@ export type CashAdvance = {
         skipped: boolean;
         reason?: string | null;
         weekStart: string;
+        weekPublished: boolean;
     }[];
 };
 

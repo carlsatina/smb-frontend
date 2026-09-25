@@ -34,9 +34,11 @@ export default {
         const modal = ref(null)
         
 
+        // A ConfirmModal opened from inside this modal is teleported to <body>,
+        // so its clicks land "outside" — ignore them or confirming closes us.
         onClickOutside(modal, (event) => {
             emit("close")
-        })
+        }, { ignore: ['.confirm-overlay'] })
 
         const close = () => {
             emit("close")
