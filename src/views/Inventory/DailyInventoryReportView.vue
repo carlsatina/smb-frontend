@@ -2,7 +2,10 @@
     <div class="daily-inv-shell">
         <!-- ── HEADER & CONTROLS ── -->
         <div class="daily-inv-header">
-            <h2 class="daily-inv-heading">Daily Inventory Report</h2>
+            <!-- A host with its own tab strip puts it here, level with the actions. -->
+            <slot name="tabs">
+                <h2 class="daily-inv-heading">Daily Inventory Report</h2>
+            </slot>
 
             <!-- Top Actions -->
             <div class="daily-inv-actions">
@@ -52,19 +55,6 @@
                     </template>
                 </div>
             </div>
-        </div>
-
-        <div class="daily-inv-meta">
-            <span
-                class="role-indicator"
-                :class="isOwnerOrAdmin ? 'role-indicator--admin' : 'role-indicator--staff'"
-            >
-                <mdicon :name="isOwnerOrAdmin ? 'shield-account' : 'account-tie'" size="15" />
-                {{ isOwnerOrAdmin ? 'Owner / Admin Mode (Full Access)' : 'Store Staff Mode (Ending Inventory Only)' }}
-            </span>
-            <p class="daily-inv-sub">
-                Daily tracking for {{ currentStoreName }} · Opening inventory rolls over from previous day
-            </p>
         </div>
 
         <!-- ── CONTROLS STRIP (Template selector + Date Nav) ── -->
@@ -208,6 +198,7 @@
                             <th class="col-reminders">REMINDERS / NOTES</th>
                             <th class="col-unit2">UNIT</th>
                             <th class="col-used">TOTAL USED</th>
+                            <th class="col-home">HOME STOCK</th>
                             <th v-if="isOwnerOrAdmin" class="col-actions"></th>
                         </tr>
                     </thead>
@@ -217,7 +208,7 @@
                         <template v-for="sec in groupedSections" :key="sec.name">
                             <!-- Section Header Bar (styled identically to image) -->
                             <tr v-if="sec.name && sec.name !== 'Main'" class="section-header-row" :class="sectionHeaderClass(sec.name)">
-                                <td :colspan="isOwnerOrAdmin ? 10 : 9" class="section-header-cell">
+                                <td :colspan="isOwnerOrAdmin ? 11 : 10" class="section-header-cell">
                                     <span class="section-title">{{ sec.name }}</span>
                                 </td>
                             </tr>
@@ -356,6 +347,36 @@
                                     </span>
                                 </td>
 
+                                <!-- Home Stock (count at the house, less today's delivery) -->
+                                <td class="col-home">
+                                    <!-- Editable for Owner/Admin -->
+                                    <input
+                                        v-if="isOwnerOrAdmin"
+                                        :value="computeHomeStock(item)"
+                                        type="number"
+                                        step="any"
+                                        class="cell-input cell-input--home"
+                                        :class="{ 'cell-input--short': isHomeStockShort(item) }"
+                                        :title="isHomeStockShort(item) ? 'Delivery is more than the stock at home.' : undefined"
+                                        placeholder="—"
+                                        @input="onHomeStockInput(item, $event)"
+                                        @focus="selectOnFocus"
+                                        @mouseup="keepSelectionOnClick"
+                                    />
+                                    <!-- Locked for Store Staff -->
+                                    <div
+                                        v-else
+                                        class="cell-locked"
+                                        :class="{ 'cell-locked--short': isHomeStockShort(item) }"
+                                        :title="isHomeStockShort(item)
+                                            ? 'Delivery is more than the stock at home.'
+                                            : 'Home stock is set by the owner/admin and goes down as you enter deliveries.'"
+                                    >
+                                        <mdicon name="lock" size="13" class="lock-icon" />
+                                        <span>{{ computeHomeStock(item) !== null ? formatNumber(computeHomeStock(item)) : '—' }}</span>
+                                    </div>
+                                </td>
+
                                 <!-- Remove row action (Owner/Admin only) -->
                                 <td v-if="isOwnerOrAdmin" class="col-actions">
                                     <button
@@ -443,6 +464,18 @@
                                     placeholder="0"
                                 />
                             </div>
+                        </div>
+
+                        <div class="form-field">
+                            <label>Home Stock</label>
+                            <input
+                                v-model.number="newItem.homeStock"
+                                type="number"
+                                step="any"
+                                min="0"
+                                class="form-input"
+                                placeholder="Leave blank if not kept at home"
+                            />
                         </div>
 
                         <div class="form-field">
@@ -564,6 +597,7 @@ const newItem = ref({
     section: 'Main',
     openingInventory: 0,
     delivery: 0,
+    homeStock: '' as number | '',
     reminders: '',
 });
 
@@ -582,8 +616,6 @@ const getTodayDateStr = () => {
     });
     return `${p.year}-${p.month}-${p.day}`;
 };
-
-const currentStoreName = computed(() => storeContext.currentStore?.name || 'Store');
 
 const isOwnerOrAdmin = computed(() =>
     ['OWNER', 'ADMIN'].includes(storeContext.currentStore?.role || '')
@@ -738,6 +770,17 @@ const computeTotalUsed = (item: SheetItem): number | null => {
     return Math.max(0, total - end);
 };
 
+// What is left at the house: the day's starting home stock less today's delivery.
+const computeHomeStock = (item: SheetItem): number | null => {
+    if (item.homeStockOpening === null || item.homeStockOpening === undefined) return null;
+    return Number(item.homeStockOpening) - (Number(item.delivery) || 0);
+};
+
+const isHomeStockShort = (item: SheetItem): boolean => {
+    const remaining = computeHomeStock(item);
+    return remaining !== null && remaining < 0;
+};
+
 const formatNumber = (val: number | null | undefined): string => {
     if (val === null || val === undefined || isNaN(val)) return '0';
     return Number(val).toLocaleString(undefined, { maximumFractionDigits: 4 });
@@ -810,6 +853,15 @@ const onNumberInput = (
     markChanged();
 };
 
+// The owner types what is at the house now, after today's delivery. The starting
+// count is what gets stored, so later delivery edits keep deducting from it.
+const onHomeStockInput = (item: SheetItem, event: Event) => {
+    const raw = (event.target as HTMLInputElement).value;
+    const parsed = raw === '' ? null : Number(raw);
+    item.homeStockOpening = parsed === null || isNaN(parsed) ? null : parsed + (Number(item.delivery) || 0);
+    markChanged();
+};
+
 // Counting a shelf means replacing numbers, not editing them, so a cell arrives
 // selected and the first keystroke overwrites it.
 let selectedOnFocus = false;
@@ -874,6 +926,10 @@ const persistReport = async (): Promise<void> => {
             endingInventory:
                 item.endingInventory !== null && item.endingInventory !== undefined && !isNaN(Number(item.endingInventory))
                     ? Number(item.endingInventory)
+                    : null,
+            homeStockOpening:
+                item.homeStockOpening !== null && item.homeStockOpening !== undefined
+                    ? Number(item.homeStockOpening)
                     : null,
             reminders: item.reminders || null,
             sortOrder: idx + 1,
@@ -1002,6 +1058,9 @@ const loadReport = async () => {
             reminders: i.reminders || null,
             sortOrder: i.sortOrder,
             totalUsed: i.totalUsed !== null && i.totalUsed !== undefined ? Number(i.totalUsed) : null,
+            homeStockOpening:
+                i.homeStockOpening !== null && i.homeStockOpening !== undefined ? Number(i.homeStockOpening) : null,
+            homeStock: i.homeStock !== null && i.homeStock !== undefined ? Number(i.homeStock) : null,
             itemType: i.itemType,
             itemId: i.itemId,
         }));
@@ -1032,6 +1091,11 @@ const confirmAddItem = () => {
         reminders: newItem.value.reminders.trim() || null,
         sortOrder: items.value.length + 1,
         totalUsed: null,
+        homeStockOpening:
+            newItem.value.homeStock === ''
+                ? null
+                : Number(newItem.value.homeStock) + (Number(newItem.value.delivery) || 0),
+        homeStock: newItem.value.homeStock === '' ? null : Number(newItem.value.homeStock),
     });
 
     newItem.value = {
@@ -1040,6 +1104,7 @@ const confirmAddItem = () => {
         section: selectedTemplate.value === 'TAKOYAKI' ? 'Others' : 'Main',
         openingInventory: 0,
         delivery: 0,
+        homeStock: '',
         reminders: '',
     };
     showAddModal.value = false;
@@ -1119,18 +1184,10 @@ watch(
     justify-content: space-between;
     flex-wrap: wrap;
     gap: 0.6rem;
-    padding: 0.5rem 0;
+    /* No bottom padding: tabs in the slot sit directly on the border. */
+    padding: 0.35rem 0 0;
     background: #ffffff;
     border-bottom: 1px solid #e2e8f0;
-}
-
-/* Role badge and store line: on screen when you arrive, gone once you start
-   counting. */
-.daily-inv-meta {
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-    flex-wrap: wrap;
 }
 
 .daily-inv-heading {
@@ -1139,41 +1196,26 @@ watch(
     color: #0f172a;
     letter-spacing: -0.02em;
     margin: 0;
+    padding-bottom: 0.35rem;
 }
 
-.role-indicator {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.3rem;
-    padding: 0.15rem 0.5rem;
-    border-radius: 9999px;
-    font-size: 0.7rem;
-    font-weight: 600;
-}
 
-.role-indicator--admin {
-    background: #ecfdf5;
-    color: #065f46;
-    border: 1px solid #a7f3d0;
-}
 
-.role-indicator--staff {
-    background: #eff6ff;
-    color: #1e40af;
-    border: 1px solid #bfdbfe;
-}
 
-.daily-inv-sub {
-    font-size: 0.78rem;
-    color: #64748b;
-    margin: 0;
-}
 
 .daily-inv-actions {
     display: flex;
     align-items: center;
     gap: 0.4rem;
     flex-shrink: 0;
+    padding-bottom: 0.35rem;
+}
+
+@media (max-width: 640px) {
+    .daily-inv-actions {
+        flex-wrap: wrap;
+        flex-shrink: 1;
+    }
 }
 
 /* ── CONTROLS CARD ── */
@@ -1632,6 +1674,22 @@ watch(
     min-width: 140px;
 }
 
+.cell-input--home {
+    font-weight: 600;
+}
+
+.cell-input--short {
+    border-color: #f87171;
+    background: #fef2f2;
+    color: #dc2626;
+}
+
+.cell-locked.cell-locked--short {
+    border-color: #fecaca;
+    background: #fef2f2;
+    color: #dc2626;
+}
+
 .cell-input--urgent {
     color: #dc2626;
     font-weight: 700;
@@ -1670,7 +1728,8 @@ watch(
 }
 
 .col-total,
-.col-used {
+.col-used,
+.col-home {
     width: 88px;
     text-align: right;
     padding-right: 0.6rem !important;

@@ -14,6 +14,10 @@ export interface DailyInventoryReportItem {
     reminders: string | null;
     sortOrder: number;
     totalUsed: number | null;
+    // Count at the house before today's delivery; null means not tracked
+    homeStockOpening: number | null;
+    // homeStockOpening - delivery
+    homeStock: number | null;
     itemType?: 'PRODUCT' | 'INGREDIENT' | null;
     itemId?: string | null;
 }
@@ -38,6 +42,7 @@ export interface SaveDailyInventoryItemPayload {
     openingInventory: number;
     delivery: number;
     endingInventory?: number | null;
+    homeStockOpening?: number | null;
     reminders?: string | null;
     sortOrder?: number;
     itemType?: 'PRODUCT' | 'INGREDIENT' | null;
