@@ -257,8 +257,12 @@
                                 <td :class="(inlineEdit.rowId === row.id ? inlineEditKulangRemit : row.kulangRemit) > 0 ? 'text-danger' : ''">
                                     {{ inlineEdit.rowId === row.id ? formatMoney(inlineEditKulangRemit) : formatMoney(row.kulangRemit) }}
                                 </td>
-                                <td :class="row.shortIf < 0 ? 'text-danger' : 'text-success'">{{ formatMoney(row.shortIf) }}</td>
-                                <td :class="row.salesNeeded < 0 ? 'text-success' : 'text-danger'">{{ formatMoney(row.salesNeeded) }}</td>
+                                <td :class="(inlineEdit.rowId === row.id ? inlineEditShortIf : row.shortIf) < 0 ? 'text-danger' : 'text-success'">
+                                    {{ inlineEdit.rowId === row.id ? formatMoney(inlineEditShortIf) : formatMoney(row.shortIf) }}
+                                </td>
+                                <td :class="(inlineEdit.rowId === row.id ? inlineEditSalesNeeded : row.salesNeeded) < 0 ? 'text-success' : 'text-danger'">
+                                    {{ inlineEdit.rowId === row.id ? formatMoney(inlineEditSalesNeeded) : formatMoney(row.salesNeeded) }}
+                                </td>
                             </template>
 
                             <!-- Actions — always rendered to keep column count consistent -->
@@ -433,6 +437,12 @@
                                     </div>
                                     <div class="ds-card-summary-row" :class="inlineEditKulangRemit > 0 ? 'text-danger' : ''">
                                         <span>Kulang Remit</span><span>{{ formatMoney(inlineEditKulangRemit) }}</span>
+                                    </div>
+                                    <div class="ds-card-summary-row" :class="inlineEditShortIf < 0 ? 'text-danger' : 'text-success'">
+                                        <span>Short if (-)</span><span>{{ formatMoney(inlineEditShortIf) }}</span>
+                                    </div>
+                                    <div class="ds-card-summary-row" :class="inlineEditSalesNeeded < 0 ? 'text-success' : 'text-danger'">
+                                        <span>Sales Needed</span><span>{{ formatMoney(inlineEditSalesNeeded) }}</span>
                                     </div>
                                 </template>
                             </div>
@@ -761,6 +771,23 @@ const loadMembers = async () => {
     if (!storeId) return;
     const res = await listStoreMembers(storeId);
     allMembers.value = res.members;
+
+    // Give any newly added cashier a draft in an open add/edit row, in the same
+    // tick, so their inputs bind and they count toward the row's totals.
+    const editingRow = rows.value.find((r) => r.id === inlineEdit.rowId);
+    cashierMembers.value.forEach((m) => {
+        if (isAdding.value && !addForm.cashiers[m.userId]) {
+            addForm.cashiers[m.userId] = defaultDraft();
+        }
+        if (editingRow && !inlineEdit.cashiers[m.userId]) {
+            inlineEdit.cashiers[m.userId] = draftFromRow(editingRow, m.userId);
+        }
+    });
+};
+
+// Pick up staff added since the page opened (another tab, an accepted invite).
+const refreshMembers = () => {
+    loadMembers().catch(() => { /* keep the current list */ });
 };
 
 onMounted(async () => {
@@ -905,6 +932,7 @@ const startAdding = () => {
     addForm.saving = false;
     isAdding.value = true;
     fetchPos();
+    refreshMembers();
 };
 
 const cancelAdding = () => { isAdding.value = false; };
@@ -1024,28 +1052,31 @@ const inlineEdit = reactive({
     saving: false,
 });
 
+const draftFromRow = (row: DailySalesRow, userId: string): CashierDraft => {
+    const existing = getCashierEntry(row, userId);
+    return existing
+        ? {
+            denom1000: existing.denom1000,
+            denom500: existing.denom500,
+            denom200: existing.denom200,
+            denom100: existing.denom100,
+            denom50: existing.denom50,
+            denom20: existing.denom20,
+            coins: existing.coins,
+            gcashAmount: existing.gcashAmount,
+          }
+        : defaultDraft();
+};
+
 const openInlineEdit = (row: DailySalesRow) => {
     const draft: Record<string, CashierDraft> = {};
-    cashierMembers.value.forEach((m) => {
-        const existing = getCashierEntry(row, m.userId);
-        draft[m.userId] = existing
-            ? {
-                denom1000: existing.denom1000,
-                denom500: existing.denom500,
-                denom200: existing.denom200,
-                denom100: existing.denom100,
-                denom50: existing.denom50,
-                denom20: existing.denom20,
-                coins: existing.coins,
-                gcashAmount: existing.gcashAmount,
-              }
-            : defaultDraft();
-    });
+    cashierMembers.value.forEach((m) => { draft[m.userId] = draftFromRow(row, m.userId); });
     inlineEdit.rowId = row.id;
     inlineEdit.expense = row.expense;
     inlineEdit.actualCoh = row.actualCoh;
     inlineEdit.cashiers = draft;
     inlineEdit.saving = false;
+    refreshMembers();
 };
 
 const cancelInlineEdit = () => { inlineEdit.rowId = null; };
@@ -1072,6 +1103,19 @@ const inlineEditKulangRemit = computed(() => inlineEditTotalCoh.value - inlineEd
 const inlineEditTotalSales = computed(() => {
     const row = rows.value.find(r => r.id === inlineEdit.rowId);
     return inlineEditTotalCoh.value + inlineEditTotalGcash.value + (row?.totalSenior ?? 0) + inlineEdit.expense;
+});
+
+const inlineEditShortIf = computed(() => {
+    const row = rows.value.find(r => r.id === inlineEdit.rowId);
+    return inlineEditTotalSales.value - (row?.pos ?? 0);
+});
+
+// Sales Needed is cumulative (prev + goal − totalSales), so shift the saved value
+// by however much this row's Total Sales has changed in the draft.
+const inlineEditSalesNeeded = computed(() => {
+    const row = rows.value.find(r => r.id === inlineEdit.rowId);
+    if (!row) return 0;
+    return row.salesNeeded - (inlineEditTotalSales.value - row.totalSales);
 });
 
 const openInlineEditDenomModal = (m: StoreMember) => {
