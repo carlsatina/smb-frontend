@@ -1,7 +1,7 @@
 <template>
-    <div class="daily-inv-shell">
+    <div class="daily-inv-shell" :style="{ '--pinned-header-height': `${pinnedHeaderHeight}px` }">
         <!-- ── HEADER & CONTROLS ── -->
-        <div class="daily-inv-header">
+        <div ref="pinnedHeader" class="daily-inv-header">
             <!-- A host with its own tab strip puts it here, level with the actions. -->
             <slot name="tabs">
                 <h2 class="daily-inv-heading">Daily Inventory Report</h2>
@@ -198,7 +198,7 @@
                             <th class="col-reminders">REMINDERS / NOTES</th>
                             <th class="col-unit2">UNIT</th>
                             <th class="col-used">TOTAL USED</th>
-                            <th class="col-home">HOME STOCK</th>
+                            <th v-if="canSeeHomeStock" class="col-home">HOME STOCK</th>
                             <th v-if="isOwnerOrAdmin" class="col-actions"></th>
                         </tr>
                     </thead>
@@ -208,7 +208,7 @@
                         <template v-for="sec in groupedSections" :key="sec.name">
                             <!-- Section Header Bar (styled identically to image) -->
                             <tr v-if="sec.name && sec.name !== 'Main'" class="section-header-row" :class="sectionHeaderClass(sec.name)">
-                                <td :colspan="isOwnerOrAdmin ? 11 : 10" class="section-header-cell">
+                                <td :colspan="sheetColumnCount" class="section-header-cell">
                                     <span class="section-title">{{ sec.name }}</span>
                                 </td>
                             </tr>
@@ -348,7 +348,7 @@
                                 </td>
 
                                 <!-- Home Stock (count at the house, less today's delivery) -->
-                                <td class="col-home">
+                                <td v-if="canSeeHomeStock" class="col-home">
                                     <!-- Editable for Owner/Admin -->
                                     <input
                                         v-if="isOwnerOrAdmin"
@@ -544,6 +544,7 @@ import {
     saveDailyInventoryReport,
 } from '@/api/dailyInventory';
 import { useToast } from '@/composables/useToast';
+import { useElementHeight } from '@/composables/useElementHeight';
 
 const storeContext = useStoreContextStore();
 const toast = useToast();
@@ -617,8 +618,20 @@ const getTodayDateStr = () => {
     return `${p.year}-${p.month}-${p.day}`;
 };
 
+// The sheet scrolls in the space the pinned bar leaves, so it needs that bar's live height.
+const pinnedHeader = ref<HTMLElement | null>(null);
+const pinnedHeaderHeight = useElementHeight(pinnedHeader);
+
 const isOwnerOrAdmin = computed(() =>
     ['OWNER', 'ADMIN'].includes(storeContext.currentStore?.role || '')
+);
+
+// Cashiers don't see home stock at all; other store staff see it read-only.
+const canSeeHomeStock = computed(() => storeContext.currentStore?.role !== 'CASHIER');
+
+// 9 fixed columns, plus Home Stock and the Owner/Admin remove-row column when shown.
+const sheetColumnCount = computed(() =>
+    9 + (canSeeHomeStock.value ? 1 : 0) + (isOwnerOrAdmin.value ? 1 : 0)
 );
 
 const isSelectedToday = computed(() => selectedDate.value === getTodayDateStr());
@@ -1473,9 +1486,16 @@ watch(
     }
 }
 
+/* The sheet is its own scroll area, sized to the viewport below the pinned bar,
+   so the column headers can stick to its top. Sticky headers can't follow the
+   page here: the horizontal scroll a wide sheet needs makes this the nearest
+   scroll container either way. The extra 2rem leaves room for the host page's
+   bottom padding, so scrolling the page to its end never tucks the header row
+   under the pinned bar. */
 .sheet-table-wrap {
-    overflow-x: auto;
+    overflow: auto;
     max-width: 100%;
+    max-height: max(16rem, calc(100dvh - var(--topnav-height) - var(--pinned-header-height, 0px) - 0.7rem - 2rem));
 }
 
 .sheet-table {
@@ -1488,6 +1508,12 @@ watch(
 
 /* ── TABLE HEADERS ── */
 .header-main-row th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    /* Collapsed borders stay behind in some browsers when a cell sticks; this
+       keeps the header's bottom rule on it. */
+    box-shadow: inset 0 -1px 0 #cbd5e1;
     padding: 0.4rem 0.55rem;
     font-size: 0.68rem;
     font-weight: 800;

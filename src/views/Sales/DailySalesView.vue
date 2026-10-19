@@ -9,8 +9,8 @@
         </DailyInventoryReportView>
 
         <!-- SALES & CASH REMITTANCE TAB -->
-        <div v-else class="ds-sales-section">
-            <div class="ds-header">
+        <div v-else class="ds-sales-section" :style="{ '--pinned-header-height': `${pinnedHeaderHeight}px` }">
+            <div ref="pinnedHeader" class="ds-header">
             <DailySalesTabs :active="activeTab" @select="setTab" />
             <div class="ds-header-actions">
                 <button v-if="!isCashierRole" class="secondary-button button-compact" @click="openGoalModal">
@@ -696,6 +696,7 @@ import ConfirmModal from '@/components/ConfirmModal.vue';
 import CsvActionsMenu from '@/components/CsvActionsMenu.vue';
 import CsvImportPreviewModal from '@/components/CsvImportPreviewModal.vue';
 import { useToast } from '@/composables/useToast';
+import { useElementHeight } from '@/composables/useElementHeight';
 
 const storeContext = useStoreContextStore();
 const { showToast } = useToast();
@@ -729,6 +730,10 @@ const monthLabel = computed(() => {
     const d = new Date(Date.UTC(year.value, month.value - 1, 1));
     return d.toLocaleString('default', { timeZone: storeTimezone.value, month: 'long', year: 'numeric' });
 });
+
+// The table scrolls in the space the pinned header leaves, so it needs that header's live height.
+const pinnedHeader = ref<HTMLElement | null>(null);
+const pinnedHeaderHeight = useElementHeight(pinnedHeader);
 
 const cashierMembers = computed(() => allMembers.value.filter(m => m.role === 'CASHIER'));
 
@@ -1727,8 +1732,13 @@ const saveGoal = async () => {
 .ds-sales-section {
     display: flex;
     flex-direction: column;
+    /* The app's sticky TopNav: 56px tall plus its 1px bottom border. */
+    --topnav-height: 57px;
 }
 
+/* Pinned under the TopNav like the Daily Inventory Sheet's bar, so the tabs and
+   actions stay put on both tabs. Under the TopNav's 100, above the table. */
+.ds-header { position: sticky; top: var(--topnav-height); z-index: 20; background: #ffffff; }
 .ds-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; gap: 1rem; flex-wrap: nowrap; border-bottom: 1px solid #e2e8f0; padding-top: 0.25rem; }
 .ds-header-actions { padding-bottom: 0.35rem; }
 .ds-header-actions { display: flex; gap: 0.5rem; align-items: center; flex-shrink: 0; white-space: nowrap; }
@@ -1752,9 +1762,13 @@ const saveGoal = async () => {
 .ds-month-label { font-weight: 600; min-width: 120px; text-align: center; }
 .ds-record-count { font-size: 0.82rem; color: #6b7280; }
 
-.ds-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; border: 1px solid #e5e7eb; border-radius: 8px; }
+/* Its own scroll area, sized to the viewport below the pinned header, so the
+   column headers can stick to its top (the horizontal scroll makes this the
+   nearest scroll container either way). The 2rem covers the page's bottom
+   padding, so the header row never ends up under the pinned header. */
+.ds-table-wrap { overflow: auto; -webkit-overflow-scrolling: touch; border: 1px solid #e5e7eb; border-radius: 8px; max-height: max(16rem, calc(100dvh - var(--topnav-height) - var(--pinned-header-height, 0px) - 0.75rem - 2rem)); }
 .ds-table { width: 100%; min-width: 860px; border-collapse: collapse; font-size: 0.8rem; }
-.ds-table th { background: #0d9488; border-bottom: 2px solid #0f766e; padding: 0.5rem 0.4rem; text-align: left; font-size: 0.68rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: #fff; word-break: break-word; line-height: 1.3; }
+.ds-table th { position: sticky; top: 0; z-index: 3; background: #0d9488; border-bottom: 2px solid #0f766e; box-shadow: inset 0 -2px 0 #0f766e; padding: 0.5rem 0.4rem; text-align: left; font-size: 0.68rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: #fff; word-break: break-word; line-height: 1.3; }
 .ds-table td { padding: 0.35rem 0.4rem; border-bottom: 1px solid #f3f4f6; vertical-align: middle; white-space: nowrap; }
 .ds-table tbody tr:hover { background: #f9fafb; }
 .col-date { min-width: 90px; white-space: normal; }
@@ -1875,7 +1889,8 @@ const saveGoal = async () => {
         /* shadow to hint scrollability */
         box-shadow: 2px 0 4px rgba(0,0,0,0.06);
     }
-    .ds-table th.col-date { background: #f0fdfa; }
+    /* Sticks on both axes, so it sits above the other headers and the date cells. */
+    .ds-table th.col-date { z-index: 4; background: #f0fdfa; color: #0f766e; }
     .ds-table td.col-date { background: #ffffff; }
     .ds-add-row td.col-date { background: #eff6ff !important; }
     .ds-editing-row td.col-date { background: #fefce8 !important; }
