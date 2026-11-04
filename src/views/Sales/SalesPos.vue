@@ -121,7 +121,7 @@
                     </div>
 
                     <div
-                        v-if="storeContext.currentStoreId && categoryList.length > 0"
+                        v-if="storeContext.currentStoreId"
                         class="category-filters"
                     >
                         <button
@@ -131,6 +131,17 @@
                             @click="activeCategory = 'ALL'"
                         >
                             All
+                        </button>
+                        <button
+                            type="button"
+                            class="category-pill category-pill--recent"
+                            :class="{ active: activeCategory === 'RECENT' }"
+                            title="Show up to 10 recently ordered products"
+                            @click="activeCategory = 'RECENT'"
+                        >
+                            <mdicon name="history" size="13" class="recent-icon" />
+                            <span>Recent</span>
+                            <span v-if="recentProducts.length > 0" class="recent-count-badge">{{ recentProducts.length }}</span>
                         </button>
                         <button
                             v-for="category in categoryList"
@@ -362,8 +373,9 @@
                                         <!-- Empty Search State -->
                                         <tr v-if="sortedTableProducts.length === 0">
                                             <td :colspan="tableColumnCount" class="pos-table-empty">
-                                                <mdicon name="magnify" size="32" class="empty-icon" />
-                                                <p>No products match your search or filter.</p>
+                                                <mdicon :name="activeCategory === 'RECENT' ? 'history' : 'magnify'" size="32" class="empty-icon" />
+                                                <p v-if="activeCategory === 'RECENT'">No recently ordered products yet. Products from finalized sales will appear here.</p>
+                                                <p v-else>No products match your search or filter.</p>
                                                 <button
                                                     v-if="searchQuery || activeCategory !== 'ALL'"
                                                     type="button"
@@ -491,7 +503,12 @@
                                     </div>
                                 </div>
                                 <div v-if="filteredProducts.length === 0" class="panel-state">
-                                    No active products match your search.
+                                    <template v-if="activeCategory === 'RECENT'">
+                                        No recently ordered products yet. Products from finalized sales will appear here.
+                                    </template>
+                                    <template v-else>
+                                        No active products match your search.
+                                    </template>
                                 </div>
                             </div>
 
@@ -538,7 +555,12 @@
                                     </div>
                                 </button>
                                 <div v-if="filteredProducts.length === 0" class="panel-state">
-                                    No active products match your search.
+                                    <template v-if="activeCategory === 'RECENT'">
+                                        No recently ordered products yet. Products from finalized sales will appear here.
+                                    </template>
+                                    <template v-else>
+                                        No active products match your search.
+                                    </template>
                                 </div>
                             </div>
                         </template>
@@ -744,6 +766,57 @@ const products = ref<Product[]>([]);
 const cartItems = ref<CartItem[]>([]);
 const searchQuery = ref('');
 const activeCategory = ref('ALL');
+
+const recentProductIds = ref<string[]>([]);
+
+const recentStorageKey = computed(() => {
+    const storeId = storeContext.currentStoreId;
+    return storeId ? `posRecentProducts:${storeId}` : 'posRecentProducts';
+});
+
+const loadRecentProducts = () => {
+    const raw = localStorage.getItem(recentStorageKey.value);
+    if (!raw) {
+        recentProductIds.value = [];
+        return;
+    }
+    try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+            recentProductIds.value = parsed.filter((id) => typeof id === 'string').slice(0, 10);
+        }
+    } catch {
+        recentProductIds.value = [];
+    }
+};
+
+const recordRecentProducts = (newProductIds: string[]) => {
+    if (!newProductIds.length) return;
+    const seen = new Set<string>();
+    const orderedIncoming: string[] = [];
+    for (const id of newProductIds) {
+        if (!seen.has(id)) {
+            seen.add(id);
+            orderedIncoming.push(id);
+        }
+    }
+    const filteredExisting = recentProductIds.value.filter((id) => !seen.has(id));
+    const combined = [...orderedIncoming, ...filteredExisting].slice(0, 10);
+    recentProductIds.value = combined;
+    try {
+        localStorage.setItem(recentStorageKey.value, JSON.stringify(combined));
+    } catch {
+        // Ignore localStorage quota errors
+    }
+};
+
+const recentProducts = computed(() => {
+    if (recentProductIds.value.length === 0) return [];
+    const productMap = new Map(products.value.map((p) => [p.id, p]));
+    return recentProductIds.value
+        .map((id) => productMap.get(id))
+        .filter((p): p is Product => Boolean(p && p.active !== false));
+});
 const paymentMethod = computed({
     get: () => _paymentMethod.value,
     set: (v: string) => { _paymentMethod.value = v; },
@@ -895,14 +968,17 @@ const orderedProducts = computed(() => {
 
 const filteredProducts = computed(() => {
     const query = searchQuery.value.trim().toLowerCase();
-    return orderedProducts.value.filter((product) => {
+    const baseList = activeCategory.value === 'RECENT' ? recentProducts.value : orderedProducts.value;
+    return baseList.filter((product) => {
         const matchesCategory =
-            activeCategory.value === 'ALL' || product.category === activeCategory.value;
+            activeCategory.value === 'ALL' ||
+            activeCategory.value === 'RECENT' ||
+            product.category === activeCategory.value;
         const matchesQuery =
             !query ||
             product.name.toLowerCase().includes(query) ||
             (product.sku || '').toLowerCase().includes(query) ||
-            (product.category || '').toLowerCase().includes(query)
+            (product.category || '').toLowerCase().includes(query);
         return matchesCategory && matchesQuery;
     });
 });
@@ -910,7 +986,7 @@ const filteredProducts = computed(() => {
 const groupedFilteredProducts = computed(() => {
     const groups = new Map<string, Product[]>();
     for (const product of filteredProducts.value) {
-        const key = product.category || 'Uncategorized';
+        const key = activeCategory.value === 'RECENT' ? 'Recently Ordered' : (product.category || 'Uncategorized');
         if (!groups.has(key)) groups.set(key, []);
         groups.get(key)!.push(product);
     }
@@ -942,7 +1018,10 @@ const tableSortDirection = ref<'asc' | 'desc'>('asc');
 const tablePage = ref(1);
 const tablePageSize = ref<number | 'all'>(50);
 
+const isTableExplicitlySorted = ref(false);
+
 const handleSort = (column: 'name' | 'sku' | 'category' | 'price') => {
+    isTableExplicitlySorted.value = true;
     if (tableSortColumn.value === column) {
         tableSortDirection.value = tableSortDirection.value === 'asc' ? 'desc' : 'asc';
     } else {
@@ -954,6 +1033,9 @@ const handleSort = (column: 'name' | 'sku' | 'category' | 'price') => {
 
 const sortedTableProducts = computed(() => {
     const list = [...filteredProducts.value];
+    if (activeCategory.value === 'RECENT' && !isTableExplicitlySorted.value) {
+        return list;
+    }
     const col = tableSortColumn.value;
     const isAsc = tableSortDirection.value === 'asc';
     const mult = isAsc ? 1 : -1;
@@ -1184,10 +1266,20 @@ const clearSearch = () => {
 const clearFilters = () => {
     searchQuery.value = '';
     activeCategory.value = 'ALL';
+    isTableExplicitlySorted.value = false;
     tablePage.value = 1;
     selectedRowIndex.value = -1;
     searchInputRef.value?.focus();
 };
+
+watch(
+    () => activeCategory.value,
+    (cat) => {
+        if (cat === 'RECENT') {
+            isTableExplicitlySorted.value = false;
+        }
+    }
+);
 
 watch(
     () => [searchQuery.value, activeCategory.value, tablePageSize.value, activeViewMode.value],
@@ -1457,7 +1549,9 @@ const finalizeTicket = async () => {
             paymentMethod: paymentMethod.value,
             orderType: orderType.value,
         };
+        const purchasedIds = cartItems.value.map((item) => item.productId);
         const { sale } = await finalizeSale(storeId, payload);
+        recordRecentProducts(purchasedIds);
         const receiptLabel = sale.receiptNumber ? `Receipt #${sale.receiptNumber}` : 'Sale finalized';
         showToast(`${receiptLabel} logged.`, 'success');
         clearCart();
@@ -1495,6 +1589,7 @@ onMounted(async () => {
     }
     loadDisplaySettings();
     loadProductOrder();
+    loadRecentProducts();
     await loadProducts();
 });
 
@@ -1509,6 +1604,7 @@ watch(
         productOrder.value = [];
         loadDisplaySettings();
         loadProductOrder();
+        loadRecentProducts();
         await loadProducts();
     }
 );
@@ -1517,7 +1613,7 @@ watch(
     () => categoryList.value,
     (categories) => {
         seedCategoryColors(categories);
-        if (activeCategory.value !== 'ALL' && !categories.includes(activeCategory.value)) {
+        if (activeCategory.value !== 'ALL' && activeCategory.value !== 'RECENT' && !categories.includes(activeCategory.value)) {
             activeCategory.value = 'ALL';
         }
     },
@@ -2034,6 +2130,52 @@ watch(
     background: var(--c-accent);
     border-color: var(--c-accent);
     color: white;
+}
+
+.category-pill--recent {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    background: #f1f5f9;
+    border-color: #cbd5e1;
+    color: #475569;
+}
+
+.category-pill--recent:hover {
+    border-color: var(--c-accent);
+    color: var(--c-accent-dark);
+}
+
+.category-pill--recent.active {
+    background: #0f172a;
+    border-color: #0f172a;
+    color: #ffffff;
+}
+
+.category-pill--recent .recent-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.recent-count-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 14px;
+    height: 14px;
+    padding: 0 0.25rem;
+    border-radius: 999px;
+    font-size: 0.6rem;
+    font-weight: 700;
+    line-height: 1;
+    background: rgba(15, 23, 42, 0.08);
+    color: inherit;
+}
+
+.category-pill--recent.active .recent-count-badge {
+    background: rgba(255, 255, 255, 0.22);
+    color: #ffffff;
 }
 
 /* ============================================================
