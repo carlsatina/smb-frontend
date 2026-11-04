@@ -210,7 +210,7 @@ const storeContext = useStoreContextStore();
 const { showToast } = useToast();
 
 const suppliers = ref<Supplier[]>([]);
-const isLoading = ref(false);
+const isLoading = ref(true);
 const isSaving = ref(false);
 const isDeleting = ref<string | null>(null);
 const searchQuery = ref('');
@@ -290,6 +290,7 @@ const loadSuppliers = async () => {
     const storeId = storeContext.currentStoreId;
     if (!storeId) {
         suppliers.value = [];
+        isLoading.value = false;
         return;
     }
     isLoading.value = true;
@@ -438,13 +439,20 @@ watch(
 );
 
 onMounted(async () => {
-    await storeContext.fetchStores();
-    const routeStoreId = route.params.storeId as string | undefined;
-    if (routeStoreId && routeStoreId !== storeContext.currentStoreId) {
-        storeContext.setCurrentStore(routeStoreId);
+    try {
+        await storeContext.fetchStores();
+        const routeStoreId = route.params.storeId as string | undefined;
+        if (routeStoreId && routeStoreId !== storeContext.currentStoreId) {
+            storeContext.setCurrentStore(routeStoreId);
+        }
+        if (isPlanLocked.value || !storeContext.currentStoreId) {
+            isLoading.value = false;
+            return;
+        }
+        await loadSuppliers();
+    } catch {
+        isLoading.value = false;
     }
-    if (isPlanLocked.value) return;
-    await loadSuppliers();
 });
 
 watch(

@@ -288,7 +288,7 @@ const storeContext = useStoreContextStore();
 const { showToast } = useToast();
 
 const ingredients = ref<IngredientResponse[]>([]);
-const isLoading = ref(false);
+const isLoading = ref(true);
 const searchQuery = ref('');
 const statusFilter = ref<'ALL' | 'INACTIVE'>('ALL');
 const categoryFilter = ref<'ALL' | 'RAW_MATERIAL' | 'PACKAGING'>('ALL');
@@ -427,8 +427,9 @@ const loadIngredients = async () => {
         return;
     }
     const storeId = storeContext.currentStoreId;
-    if (!storeId) {
+    if (!storeId || isPlanLocked.value) {
         ingredients.value = [];
+        isLoading.value = false;
         return;
     }
 
@@ -578,13 +579,19 @@ const formatMoney = (value: number) => {
 };
 
 onMounted(async () => {
-    await storeContext.fetchStores();
-    const routeStoreId = route.params.storeId as string | undefined;
-    if (routeStoreId && routeStoreId !== storeContext.currentStoreId) {
-        storeContext.setCurrentStore(routeStoreId);
-    }
-    if (!isPlanLocked.value) {
-        await loadIngredients();
+    try {
+        await storeContext.fetchStores();
+        const routeStoreId = route.params.storeId as string | undefined;
+        if (routeStoreId && routeStoreId !== storeContext.currentStoreId) {
+            storeContext.setCurrentStore(routeStoreId);
+        }
+        if (!isPlanLocked.value && storeContext.currentStoreId) {
+            await loadIngredients();
+        } else {
+            isLoading.value = false;
+        }
+    } catch {
+        isLoading.value = false;
     }
 });
 

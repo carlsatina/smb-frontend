@@ -240,8 +240,8 @@ const { showToast } = useToast();
 const receipts = ref<PurchaseReceiptSummary[]>([]);
 const suppliers = ref<Supplier[]>([]);
 const summary = ref<PurchaseReceiptAnalytics | null>(null);
-const isLoading = ref(false);
-const isSummaryLoading = ref(false);
+const isLoading = ref(true);
+const isSummaryLoading = ref(true);
 const isExporting = ref(false);
 const searchQuery = ref('');
 const fromDate = ref('');
@@ -279,12 +279,14 @@ const loadReceipts = async () => {
     if (isPlanLocked.value) {
         receipts.value = [];
         total.value = 0;
+        isLoading.value = false;
         return;
     }
     const storeId = storeContext.currentStoreId;
     if (!storeId) {
         receipts.value = [];
         total.value = 0;
+        isLoading.value = false;
         return;
     }
     isLoading.value = true;
@@ -317,11 +319,13 @@ const loadReceipts = async () => {
 const loadSummary = async () => {
     if (isPlanLocked.value) {
         summary.value = null;
+        isSummaryLoading.value = false;
         return;
     }
     const storeId = storeContext.currentStoreId;
     if (!storeId) {
         summary.value = null;
+        isSummaryLoading.value = false;
         return;
     }
     isSummaryLoading.value = true;
@@ -549,16 +553,25 @@ const exportReceipts = async () => {
 };
 
 onMounted(async () => {
-    await storeContext.fetchStores();
-    const routeStoreId = route.params.storeId as string | undefined;
-    if (routeStoreId && routeStoreId !== storeContext.currentStoreId) {
-        storeContext.setCurrentStore(routeStoreId);
-    }
-    if (isPlanLocked.value) return;
-    const applied = await applyQueryFilters();
-    await Promise.all([loadSuppliers()]);
-    if (!applied) {
-        await Promise.all([loadReceipts(), loadSummary()]);
+    try {
+        await storeContext.fetchStores();
+        const routeStoreId = route.params.storeId as string | undefined;
+        if (routeStoreId && routeStoreId !== storeContext.currentStoreId) {
+            storeContext.setCurrentStore(routeStoreId);
+        }
+        if (isPlanLocked.value || !storeContext.currentStoreId) {
+            isLoading.value = false;
+            isSummaryLoading.value = false;
+            return;
+        }
+        const applied = await applyQueryFilters();
+        await Promise.all([loadSuppliers()]);
+        if (!applied) {
+            await Promise.all([loadReceipts(), loadSummary()]);
+        }
+    } catch {
+        isLoading.value = false;
+        isSummaryLoading.value = false;
     }
 });
 

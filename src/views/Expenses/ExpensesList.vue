@@ -201,7 +201,7 @@ const storeContext = useStoreContextStore();
 const { showToast } = useToast();
 
 const expenses = ref<Expense[]>([]);
-const isLoading = ref(false);
+const isLoading = ref(true);
 
 const storeId = computed(() => storeContext.currentStoreId);
 const canWrite = computed(() => canAccess(storeContext.currentStore?.role, 'expensesWrite'));
@@ -272,6 +272,7 @@ const formatDate = (d: string) => {
 const loadExpenses = async () => {
     if (!storeId.value) {
         expenses.value = [];
+        isLoading.value = false;
         return;
     }
     isLoading.value = true;

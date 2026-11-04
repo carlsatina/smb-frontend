@@ -113,7 +113,7 @@
                 </div>
             </header>
 
-            <SkeletonLoader v-if="storeContext.isLoading" variant="kpi" :count="3" />
+            <SkeletonLoader v-if="isStoresLoading" variant="kpi" :count="3" />
             <div v-else class="stat-strip">
                 <div class="stat">
                     <span class="stat-value">{{ storeCount }}</span>
@@ -138,7 +138,7 @@
                         </div>
                     </div>
 
-                    <SkeletonLoader v-if="storeContext.isLoading" :rows="4" label="Loading stores…" />
+                    <SkeletonLoader v-if="isStoresLoading" :rows="4" label="Loading stores…" />
                     <div v-else-if="storeContext.stores.length === 0" class="empty-state">
                         <mdicon name="storefront-outline" size="34" class="empty-icon" />
                         <p class="empty-heading">No stores yet</p>
@@ -335,6 +335,7 @@ const baseCurrencyOptions = [
 
 const subscriptionActive = computed(() => userContext.subscriptionActive);
 const isSubscriptionLoading = computed(() => userContext.isLoading && !userContext.hasLoaded);
+const isStoresLoading = computed(() => storeContext.isLoading || !storeContext.hasLoaded);
 const isEmailVerified = computed(() => userContext.profile?.emailVerified === true);
 const storeNameInputRef = ref<HTMLInputElement | null>(null);
 const isResendingVerification = ref(false);

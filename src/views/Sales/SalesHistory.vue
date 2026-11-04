@@ -367,7 +367,7 @@ const finishImportProgress = () =>
     });
 
 const sales = ref<SaleSummary[]>([]);
-const isLoading = ref(false);
+const isLoading = ref(true);
 const isFilterOptionsLoading = ref(false);
 const isResettingFilters = ref(false);
 const printingSaleId = ref<string | null>(null);
@@ -606,6 +606,7 @@ const loadSales = async () => {
     if (!storeId) {
         sales.value = [];
         total.value = 0;
+        isLoading.value = false;
         return;
     }
 
@@ -918,16 +919,24 @@ const handleExport = async () => {
 };
 
 onMounted(async () => {
-    await storeContext.fetchStores();
-    const routeStoreId = route.params.storeId as string | undefined;
-    let storeChangedFromRoute = false;
-    if (routeStoreId && routeStoreId !== storeContext.currentStoreId) {
-        storeChangedFromRoute = true;
-        storeContext.setCurrentStore(routeStoreId);
+    try {
+        await storeContext.fetchStores();
+        const routeStoreId = route.params.storeId as string | undefined;
+        let storeChangedFromRoute = false;
+        if (routeStoreId && routeStoreId !== storeContext.currentStoreId) {
+            storeChangedFromRoute = true;
+            storeContext.setCurrentStore(routeStoreId);
+        }
+        if (storeChangedFromRoute) return;
+        if (!storeContext.currentStoreId) {
+            isLoading.value = false;
+            return;
+        }
+        await loadFilterOptions();
+        await loadSales();
+    } catch {
+        isLoading.value = false;
     }
-    if (storeChangedFromRoute) return;
-    await loadFilterOptions();
-    await loadSales();
 });
 
 watch(

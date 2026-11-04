@@ -289,7 +289,7 @@ const route = useRoute();
 const storeContext = useStoreContextStore();
 const userContext = useUserContextStore();
 const products = ref<ProductRow[]>([]);
-const isLoading = ref(false);
+const isLoading = ref(true);
 const searchQuery = ref('');
 const catalogFilter = ref<'ALL' | 'READY_MADE' | 'RECIPE' | 'MISSING_RECIPE'>('ALL');
 const activeOnly = ref(false);
@@ -409,7 +409,7 @@ const confirmImport = async () => {
 
 const loadProducts = async () => {
     const storeId = storeContext.currentStoreId;
-    if (!storeId) { products.value = []; return; }
+    if (!storeId) { products.value = []; isLoading.value = false; return; }
     isLoading.value = true;
     try {
         const data = await listProducts(storeId);
@@ -554,15 +554,16 @@ const formatMoney = (value: number) => {
 };
 
 onMounted(async () => {
-    // Show the skeleton from the first frame so the store fetch doesn't briefly
-    // flash the empty-state table before the first load kicks in.
-    isLoading.value = true;
-    await storeContext.fetchStores();
-    const routeStoreId = route.params.storeId as string | undefined;
-    if (routeStoreId && routeStoreId !== storeContext.currentStoreId) {
-        storeContext.setCurrentStore(routeStoreId);
+    try {
+        await storeContext.fetchStores();
+        const routeStoreId = route.params.storeId as string | undefined;
+        if (routeStoreId && routeStoreId !== storeContext.currentStoreId) {
+            storeContext.setCurrentStore(routeStoreId);
+        }
+        await loadProducts();
+    } catch {
+        isLoading.value = false;
     }
-    await loadProducts();
 });
 
 watch(() => route.params.storeId, (value) => {

@@ -33,6 +33,7 @@ export const useStoreContextStore = defineStore('storeContext', {
         stores: [] as StoreSummary[],
         currentStoreId: localStorage.getItem('currentStoreId'),
         isLoading: false,
+        hasLoaded: false,
     }),
     getters: {
         currentStore(state) {
@@ -61,6 +62,7 @@ export const useStoreContextStore = defineStore('storeContext', {
                 this.stores = [];
             } finally {
                 this.isLoading = false;
+                this.hasLoaded = true;
             }
         },
         setCurrentStore(storeId: string) {

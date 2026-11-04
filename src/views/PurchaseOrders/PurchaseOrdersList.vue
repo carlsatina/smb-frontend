@@ -210,7 +210,7 @@ const storeContext = useStoreContextStore();
 
 const purchaseOrders = ref<PurchaseOrderSummary[]>([]);
 const suppliers = ref<Supplier[]>([]);
-const isLoading = ref(false);
+const isLoading = ref(true);
 const searchQuery = ref('');
 const statusFilter = ref('ALL');
 const supplierFilter = ref('');
@@ -266,9 +266,9 @@ const emptyMessage = computed(() =>
 );
 
 const loadOrders = async () => {
-    if (isPlanLocked.value) { purchaseOrders.value = []; totalCount.value = 0; openCountValue.value = 0; receivedCountValue.value = 0; return; }
+    if (isPlanLocked.value) { purchaseOrders.value = []; totalCount.value = 0; openCountValue.value = 0; receivedCountValue.value = 0; isLoading.value = false; return; }
     const storeId = storeContext.currentStoreId;
-    if (!storeId) { purchaseOrders.value = []; totalCount.value = 0; openCountValue.value = 0; receivedCountValue.value = 0; return; }
+    if (!storeId) { purchaseOrders.value = []; totalCount.value = 0; openCountValue.value = 0; receivedCountValue.value = 0; isLoading.value = false; return; }
     isLoading.value = true;
     try {
         const timeZone = storeContext.currentStore?.timezone || 'Asia/Manila';
@@ -396,17 +396,27 @@ const applyQueryFilters = async () => {
 };
 
 onMounted(async () => {
-    await storeContext.fetchStores();
-    const routeStoreId = route.params.storeId as string | undefined;
-    if (routeStoreId && routeStoreId !== storeContext.currentStoreId) storeContext.setCurrentStore(routeStoreId);
-    if (isPlanLocked.value) return;
-    await loadSuppliers();
-    const applied = await applyQueryFilters();
-    if (!applied) await loadOrders();
+    try {
+        await storeContext.fetchStores();
+        const routeStoreId = route.params.storeId as string | undefined;
+        if (routeStoreId && routeStoreId !== storeContext.currentStoreId) storeContext.setCurrentStore(routeStoreId);
+        if (isPlanLocked.value || !storeContext.currentStoreId) {
+            isLoading.value = false;
+            return;
+        }
+        await loadSuppliers();
+        const applied = await applyQueryFilters();
+        if (!applied) await loadOrders();
+    } catch {
+        isLoading.value = false;
+    }
 });
 
 watch(() => storeContext.currentStoreId, async () => {
-    if (isPlanLocked.value) return;
+    if (isPlanLocked.value || !storeContext.currentStoreId) {
+        isLoading.value = false;
+        return;
+    }
     supplierFilter.value = '';
     page.value = 1;
     await loadSuppliers();

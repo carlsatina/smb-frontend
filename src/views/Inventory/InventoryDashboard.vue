@@ -367,7 +367,7 @@ const setView = (v: 'stock' | 'daily-report') => {
 };
 
 const stockItems = ref<StockItem[]>([]);
-const isLoading = ref(false);
+const isLoading = ref(true);
 const searchQuery = ref('');
 const statusFilter = ref<'ALL' | 'LOW' | 'OUT'>('ALL');
 const typeFilter = ref<'ALL' | 'PRODUCT' | 'INGREDIENT'>('ALL');
@@ -382,7 +382,7 @@ const showIngredients = computed(() => !planKnown.value || canUseIngredients.val
 
 const loadStock = async () => {
     const storeId = storeContext.currentStoreId;
-    if (!storeId) { stockItems.value = []; return; }
+    if (!storeId) { stockItems.value = []; isLoading.value = false; return; }
     isLoading.value = true;
     try {
         const data = await listStock(storeId);
@@ -638,21 +638,22 @@ const goToMovements = () => {
 };
 
 onMounted(async () => {
-    // Show the skeleton from the first frame so the store fetch doesn't briefly
-    // flash the empty-state table before the first load kicks in.
-    isLoading.value = true;
-    if (!userContext.hasLoaded) {
-        await userContext.fetchMe();
+    try {
+        if (!userContext.hasLoaded) {
+            await userContext.fetchMe();
+        }
+        await storeContext.fetchStores();
+        const routeStoreId = route.params.storeId as string | undefined;
+        if (routeStoreId && routeStoreId !== storeContext.currentStoreId) {
+            storeContext.setCurrentStore(routeStoreId);
+        }
+        if (route.query.view === 'daily-report' && hasDailySales.value) {
+            activeView.value = 'daily-report';
+        }
+        await loadStock();
+    } catch {
+        isLoading.value = false;
     }
-    await storeContext.fetchStores();
-    const routeStoreId = route.params.storeId as string | undefined;
-    if (routeStoreId && routeStoreId !== storeContext.currentStoreId) {
-        storeContext.setCurrentStore(routeStoreId);
-    }
-    if (route.query.view === 'daily-report' && hasDailySales.value) {
-        activeView.value = 'daily-report';
-    }
-    await loadStock();
 });
 
 watch(
