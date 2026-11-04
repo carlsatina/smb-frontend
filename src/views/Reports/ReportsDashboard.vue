@@ -112,7 +112,7 @@
 
             <template v-else>
                 <!-- ── Business pulse hero ── -->
-                <div v-if="!hasLoaded" class="pulse pulse--skeleton" aria-hidden="true">
+                <div v-if="isLoading || !hasLoaded" class="pulse pulse--skeleton" aria-hidden="true">
                     <div class="pulse-top">
                         <div class="pulse-headline">
                             <span class="skeleton-pulse-eyebrow"></span>
@@ -188,7 +188,7 @@
                 </section>
 
                 <!-- ── Insight chips ── -->
-                <div v-if="hasLoaded && insights.length" :key="`insights-${revealKey}`" class="insight-strip reveal-item">
+                <div v-if="!isLoading && hasLoaded && insights.length" :key="`insights-${revealKey}`" class="insight-strip reveal-item">
                     <template v-for="chip in insights" :key="chip.id">
                         <button
                             v-if="chip.tab"
@@ -882,7 +882,7 @@ const TABS: { id: TabId; label: string; icon: string }[] = [
 
 const activeTab = ref<TabId>('overview');
 
-const isLoading = ref(false);
+const isLoading = ref(true);
 // Bumped after every load so the hero and report cards re-trigger their
 // staggered entrance animation each time fresh data arrives.
 const revealKey = ref(0);
@@ -955,6 +955,7 @@ const closeDatePopover = () => { showDatePopover.value = false; };
 
 const applyQuickRange = async (range: 'TODAY' | 'LAST_7' | 'LAST_30' | 'THIS_MONTH') => {
     closeDatePopover();
+    isLoading.value = true;
     await setQuickRange(range);
 };
 
@@ -962,6 +963,7 @@ const applyCustomRange = () => {
     if (!draftFrom.value || !draftTo.value) return;
     if (draftTo.value < draftFrom.value) return;
     closeDatePopover();
+    isLoading.value = true;
     isSettingRange.value = true;
     activeRange.value = null;
     filters.from = draftFrom.value;
@@ -983,6 +985,7 @@ const traverseRange = (direction: 1 | -1) => {
         const isCurrentMonth =
             target.getFullYear() === now.getFullYear() && target.getMonth() === now.getMonth();
         const end = isCurrentMonth ? now : new Date(target.getFullYear(), target.getMonth() + 1, 0);
+        isLoading.value = true;
         isSettingRange.value = true;
         filters.from = buildDateInput(target);
         filters.to = buildDateInput(end);
@@ -994,6 +997,7 @@ const traverseRange = (direction: 1 | -1) => {
     const toDate = new Date(filters.to + 'T00:00:00');
     const daysInRange = Math.round((toDate.getTime() - fromDate.getTime()) / MS_PER_DAY) + 1;
     const shift = direction * daysInRange * MS_PER_DAY;
+    isLoading.value = true;
     isSettingRange.value = true;
     activeRange.value = null;
     filters.from = buildDateInput(new Date(fromDate.getTime() + shift));
@@ -1058,6 +1062,7 @@ const loadReports = async () => {
         prevSalesSummary.value = null;
         prevProfitTotal.value = null;
         prevExpenseTotal.value = null;
+        isLoading.value = false;
         hasLoaded.value = true;
         return;
     }
@@ -1535,13 +1540,18 @@ const openSupplierSpend = (supplier: PurchaseSpendRecord) => {
 };
 
 onMounted(async () => {
-    document.addEventListener('click', onClickOutsidePopover, true);
-    await storeContext.fetchStores();
-    const routeStoreId = route.params.storeId as string | undefined;
-    if (routeStoreId && routeStoreId !== storeContext.currentStoreId) {
-        storeContext.setCurrentStore(routeStoreId);
+    try {
+        document.addEventListener('click', onClickOutsidePopover, true);
+        await storeContext.fetchStores();
+        const routeStoreId = route.params.storeId as string | undefined;
+        if (routeStoreId && routeStoreId !== storeContext.currentStoreId) {
+            storeContext.setCurrentStore(routeStoreId);
+        }
+        await loadReports();
+    } catch {
+        isLoading.value = false;
+        hasLoaded.value = true;
     }
-    await loadReports();
 });
 
 onUnmounted(() => {
