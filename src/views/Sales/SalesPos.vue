@@ -288,7 +288,7 @@
                                                         ↵
                                                     </span>
                                                     <div class="td-product-info">
-                                                        <span class="td-product-title">{{ product.name }}</span>
+                                                        <span class="td-product-title" :title="product.name">{{ product.name }}</span>
                                                         <div class="td-product-sub">
                                                             <span v-if="displaySettings.showType || product.type" class="td-type-badge">
                                                                 {{ formatProductType(product.type) }}
@@ -466,6 +466,7 @@
                                             class="product-card"
                                             :class="{ 'product-card--in-cart': cartQtyMap[product.id] }"
                                             :style="getCardStyle(product)"
+                                            :title="product.name"
                                             @click="addToCart(product)"
                                         >
                                             <span v-if="cartQtyMap[product.id]" class="in-cart-badge">×{{ cartQtyMap[product.id] }}</span>
@@ -478,7 +479,7 @@
                                                     {{ product.category }}
                                                 </span>
                                             </div>
-                                            <h3>{{ product.name }}</h3>
+                                            <h3 :title="product.name">{{ product.name }}</h3>
                                             <p v-if="displaySettings.showSku" class="product-sub">
                                                 {{ product.sku ? `SKU ${product.sku}` : product.unit }}
                                             </p>
@@ -508,6 +509,7 @@
                                         'product-card--drag-over': dragOverId === product.id,
                                     }"
                                     :style="getCardStyle(product)"
+                                    :title="product.name"
                                     :draggable="isRearranging"
                                     @click="isRearranging ? undefined : addToCart(product)"
                                     @dragstart="onDragStart($event, product.id)"
@@ -526,7 +528,7 @@
                                             {{ product.category }}
                                         </span>
                                     </div>
-                                    <h3>{{ product.name }}</h3>
+                                    <h3 :title="product.name">{{ product.name }}</h3>
                                     <p v-if="displaySettings.showSku" class="product-sub">
                                         {{ product.sku ? `SKU ${product.sku}` : product.unit }}
                                     </p>
@@ -1564,7 +1566,7 @@ watch(
        in fullscreen, where the nav isn't rendered. */
     --nav-h: 57px;
     min-height: calc(100vh - var(--nav-h));
-    padding: 1.5rem;
+    padding: 0.85rem 1.25rem 1.25rem;
     background: #f8fafc;
     color: var(--c-text);
     font-family: var(--app-font-sans);
@@ -1577,7 +1579,7 @@ watch(
     width: 100%;
     display: flex;
     flex-direction: column;
-    gap: 1.25rem;
+    gap: 0.75rem;
     animation: riseIn 0.35s ease-out both;
 }
 
@@ -1592,7 +1594,7 @@ watch(
 .pos-content {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 356px;
-    gap: 1.25rem;
+    gap: 0.85rem;
     align-items: start;
 }
 
@@ -1602,22 +1604,22 @@ watch(
 .pos-panel,
 .cart-panel {
     background: white;
-    border-radius: 16px;
+    border-radius: 14px;
     border: 1px solid var(--c-border);
-    padding: 1.25rem;
+    padding: 0.85rem 1rem;
     box-shadow: var(--shadow-sm);
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: 0.65rem;
 }
 
 .pos-panel,
 .cart-panel {
     position: sticky;
-    top: calc(var(--nav-h) + 1.5rem);
+    top: calc(var(--nav-h) + 0.85rem);
     /* Cap each column to the space below the nav so neither grows past the
        screen and the page itself never scrolls. */
-    max-height: calc(100vh - var(--nav-h) - 3rem);
+    max-height: calc(100vh - var(--nav-h) - 1.7rem);
 }
 
 /* Catalog: header + filters stay pinned, only the products (.catalog-scroll)
@@ -1680,25 +1682,26 @@ watch(
 
 .panel-title {
     display: grid;
-    gap: 0.2rem;
+    gap: 0.15rem;
 }
 
 .pos-eyebrow {
     display: inline-flex;
     align-items: center;
-    padding: 0.28rem 0.75rem;
+    padding: 0.15rem 0.55rem;
     border-radius: 999px;
-    font-size: 0.68rem;
+    font-size: 0.62rem;
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.1em;
+    letter-spacing: 0.08em;
     background: var(--c-accent-soft);
     color: var(--c-accent);
+    width: fit-content;
 }
 
 .panel-header h2 {
     margin: 0;
-    font-size: 1.1rem;
+    font-size: 0.98rem;
     font-weight: 700;
     letter-spacing: -0.02em;
     color: var(--c-text);
@@ -1707,7 +1710,7 @@ watch(
 .panel-header p {
     margin: 0;
     color: var(--c-muted);
-    font-size: 0.82rem;
+    font-size: 0.76rem;
 }
 
 .cart-count-label {
@@ -1997,7 +2000,7 @@ watch(
 .category-filters {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.4rem;
+    gap: 0.3rem;
 }
 
 .category-pill {
@@ -2005,8 +2008,8 @@ watch(
     border: 1.5px solid var(--pill-border, var(--c-border));
     background: var(--pill-bg, white);
     color: var(--pill-text, var(--c-muted));
-    padding: 0.3rem 0.8rem;
-    font-size: 0.72rem;
+    padding: 0.22rem 0.6rem;
+    font-size: 0.7rem;
     font-weight: 600;
     font-family: var(--app-font-sans);
     cursor: pointer;
@@ -2037,12 +2040,12 @@ watch(
    PANEL STATE (empty / loading)
 ============================================================ */
 .panel-state {
-    padding: 1.5rem 1rem;
+    padding: 1.25rem 1rem;
     text-align: center;
     color: var(--c-muted);
     background: #f8fafc;
     border-radius: 10px;
-    font-size: 0.875rem;
+    font-size: 0.85rem;
     border: 1px dashed var(--c-border);
 }
 
@@ -2054,13 +2057,13 @@ watch(
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 0.6rem;
-    padding: 2rem 1rem;
-    border-radius: 10px;
+    gap: 0.35rem;
+    padding: 1.25rem 0.75rem;
+    border-radius: 8px;
     border: 1.5px dashed var(--c-border);
     background: #f8fafc;
     color: var(--c-muted);
-    font-size: 0.875rem;
+    font-size: 0.8rem;
     text-align: center;
 }
 
@@ -2069,22 +2072,22 @@ watch(
 ============================================================ */
 .product-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(155px, 1fr));
-    gap: 0.7rem;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 0.5rem;
 }
 
 .product-card {
     position: relative;
     border: 1.5px solid var(--c-border);
-    border-radius: 12px;
-    padding: 0.85rem 0.9rem;
+    border-radius: 9px;
+    padding: 0.5rem 0.6rem;
     text-align: left;
     background: white;
     display: flex;
     flex-direction: column;
-    gap: 0.4rem;
+    gap: 0.22rem;
     overflow: hidden;
-    min-height: 56px;
+    min-height: 48px;
     transition: border-color 0.15s, box-shadow 0.15s, transform 0.12s;
     cursor: pointer;
 }
@@ -2094,24 +2097,33 @@ watch(
     background: rgba(13, 148, 136, 0.03);
 }
 
+.product-card--in-cart .product-card-top,
+.product-card--in-cart h3 {
+    padding-right: 1.35rem;
+}
+
+.product-card--in-cart .product-card-top + h3 {
+    padding-right: 0;
+}
+
 .in-cart-badge {
     position: absolute;
-    top: 0.45rem;
-    right: 0.45rem;
+    top: 0.32rem;
+    right: 0.32rem;
     background: var(--c-accent);
     color: white;
     border-radius: 999px;
-    font-size: 0.6rem;
+    font-size: 0.58rem;
     font-weight: 700;
-    padding: 0.1rem 0.38rem;
-    line-height: 1.4;
+    padding: 0.08rem 0.32rem;
+    line-height: 1.35;
     letter-spacing: 0.02em;
     pointer-events: none;
 }
 
 .product-card:hover {
     border-color: var(--c-accent);
-    box-shadow: 0 4px 16px rgba(13, 148, 136, 0.12);
+    box-shadow: 0 3px 12px rgba(13, 148, 136, 0.12);
     transform: translateY(-1px);
 }
 
@@ -2124,27 +2136,27 @@ watch(
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 0.4rem;
-    min-height: 18px;
+    gap: 0.25rem;
+    min-height: 15px;
     overflow: hidden;
 }
 
 .product-pill {
-    font-size: 0.6rem;
+    font-size: 0.56rem;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.1em;
+    letter-spacing: 0.08em;
     color: var(--c-accent);
     background: var(--c-accent-soft);
-    padding: 0.18rem 0.45rem;
+    padding: 0.1rem 0.35rem;
     border-radius: 999px;
     flex-shrink: 0;
 }
 
 .product-tag {
-    font-size: 0.6rem;
+    font-size: 0.56rem;
     font-weight: 600;
-    padding: 0.18rem 0.45rem;
+    padding: 0.1rem 0.35rem;
     border-radius: 999px;
     background: #fef3c7;
     color: #92400e;
@@ -2153,38 +2165,42 @@ watch(
 
 .product-card h3 {
     margin: 0;
-    font-size: 0.875rem;
+    font-size: 0.78rem;
     font-weight: 600;
     color: var(--c-text);
-    line-height: 1.3;
+    line-height: 1.25;
     display: -webkit-box;
-    -webkit-line-clamp: 2;
+    -webkit-line-clamp: 3;
     -webkit-box-orient: vertical;
     overflow: hidden;
+    word-break: break-word;
+    overflow-wrap: break-word;
+    hyphens: auto;
 }
 
 .product-sub {
     margin: 0;
     color: var(--c-muted);
-    font-size: 0.7rem;
+    font-size: 0.65rem;
+    line-height: 1.2;
 }
 
 .product-price-row {
     display: flex;
     align-items: baseline;
-    gap: 0.35rem;
+    gap: 0.25rem;
     margin-top: auto;
-    padding-top: 0.25rem;
+    padding-top: 0.15rem;
 }
 
 .product-price {
     font-weight: 700;
-    font-size: 0.95rem;
+    font-size: 0.86rem;
     color: var(--c-text);
 }
 
 .product-unit {
-    font-size: 0.68rem;
+    font-size: 0.64rem;
     color: var(--c-muted);
 }
 
@@ -2194,7 +2210,7 @@ watch(
 .cart-list {
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
+    gap: 0.2rem;
     /* Natural height — the whole .cart-panel scrolls, not this list on its own. */
     flex: 0 0 auto;
 }
@@ -2202,9 +2218,9 @@ watch(
 .cart-row {
     display: flex;
     flex-direction: column;
-    gap: 0.3rem;
-    padding: 0.6rem 0.5rem;
-    border-radius: 8px;
+    gap: 0.2rem;
+    padding: 0.35rem 0.45rem;
+    border-radius: 7px;
     border-bottom: 1px solid var(--c-border);
     transition: background 0.12s;
 }
@@ -2221,12 +2237,12 @@ watch(
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 0.5rem;
+    gap: 0.35rem;
     min-width: 0;
 }
 
 .cart-item-name {
-    font-size: 0.875rem;
+    font-size: 0.82rem;
     font-weight: 600;
     color: var(--c-text);
     flex: 1;
@@ -2234,39 +2250,40 @@ watch(
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    line-height: 1.25;
 }
 
 .cart-row-bottom {
     display: flex;
     align-items: center;
-    gap: 0.4rem;
+    gap: 0.35rem;
 }
 
 .cart-item-price {
-    font-size: 0.78rem;
+    font-size: 0.74rem;
     color: var(--c-muted);
     white-space: nowrap;
 }
 
 .cart-item-times {
-    font-size: 0.72rem;
+    font-size: 0.68rem;
     color: var(--c-muted);
 }
 
 .cart-qty-stepper {
     display: flex;
     align-items: center;
-    gap: 0.2rem;
+    gap: 0.15rem;
 }
 
 .qty-btn {
-    width: 22px;
-    height: 22px;
-    border-radius: 6px;
-    border: 1.5px solid var(--c-border);
+    width: 20px;
+    height: 20px;
+    border-radius: 5px;
+    border: 1px solid var(--c-border);
     background: white;
     font-weight: 700;
-    font-size: 0.7rem;
+    font-size: 0.72rem;
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -2283,12 +2300,14 @@ watch(
 }
 
 .qty-input {
-    width: 30px;
-    border: 1.5px solid var(--c-border);
-    border-radius: 6px;
-    padding: 0.1rem;
+    width: 26px;
+    height: 20px;
+    border: 1px solid var(--c-border);
+    border-radius: 5px;
+    padding: 0;
     text-align: center;
-    font-size: 0.72rem;
+    font-size: 0.74rem;
+    font-weight: 600;
     font-family: var(--app-font-sans);
     background: white;
     color: var(--c-text);
@@ -2302,31 +2321,33 @@ watch(
 
 .cart-item-total {
     margin-left: auto;
-    font-size: 0.875rem;
+    font-size: 0.82rem;
     font-weight: 700;
     white-space: nowrap;
     color: var(--c-text);
 }
 
 .remove-btn {
-    width: 22px;
-    height: 22px;
-    border-radius: 6px;
+    width: 18px;
+    height: 18px;
+    border-radius: 5px;
     border: 1px solid #fecaca;
     background: #fef2f2;
     color: #b91c1c;
-    font-size: 0.9rem;
+    font-size: 0.8rem;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
     line-height: 1;
     flex-shrink: 0;
-    transition: background 0.12s;
+    opacity: 0.75;
+    transition: background 0.12s, opacity 0.12s;
 }
 
 .remove-btn:hover {
     background: #fecaca;
+    opacity: 1;
 }
 
 /* ============================================================
@@ -2334,21 +2355,21 @@ watch(
 ============================================================ */
 .cart-summary {
     border-top: 1px solid var(--c-border);
-    padding-top: 0.85rem;
+    padding-top: 0.5rem;
     display: grid;
-    gap: 0.55rem;
+    gap: 0.28rem;
 }
 
 .cart-summary .summary-row:first-child {
     color: var(--c-muted);
-    font-size: 0.875rem;
+    font-size: 0.8rem;
 }
 
 .summary-row {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    font-size: 0.875rem;
+    font-size: 0.8rem;
     color: var(--c-muted);
 }
 
@@ -2358,26 +2379,26 @@ watch(
 }
 
 .summary-row.total {
-    font-size: 1.05rem;
+    font-size: 0.98rem;
     font-weight: 800;
     color: var(--c-text);
-    padding-top: 0.5rem;
-    margin-top: 0.1rem;
+    padding-top: 0.35rem;
+    margin-top: 0.05rem;
     border-top: 1px solid var(--c-border);
 }
 
 .discount-toggle {
     display: inline-flex;
     align-items: center;
-    gap: 0.4rem;
+    gap: 0.35rem;
     cursor: pointer;
-    font-size: 0.875rem;
+    font-size: 0.8rem;
     color: var(--c-muted);
 }
 
 .discount-toggle input {
-    width: 14px;
-    height: 14px;
+    width: 13px;
+    height: 13px;
     cursor: pointer;
     accent-color: var(--c-accent);
 }
@@ -2392,26 +2413,26 @@ watch(
 ============================================================ */
 .checkout-controls {
     display: grid;
-    gap: 0.6rem;
-    padding-top: 0.25rem;
+    gap: 0.35rem;
+    padding-top: 0.15rem;
 }
 
 .order-type-toggle {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 0.35rem;
-    padding: 0.25rem;
+    gap: 0.25rem;
+    padding: 0.18rem;
     background: var(--c-border);
-    border-radius: 10px;
+    border-radius: 8px;
 }
 
 .order-type-option {
     border: none;
-    border-radius: 8px;
-    padding: 0.55rem 0.5rem;
+    border-radius: 6px;
+    padding: 0.32rem 0.45rem;
     background: transparent;
     color: var(--c-text);
-    font-size: 0.84rem;
+    font-size: 0.78rem;
     font-weight: 600;
     font-family: var(--app-font-sans);
     cursor: pointer;
@@ -2426,18 +2447,18 @@ watch(
 
 .select-field {
     display: grid;
-    gap: 0.4rem;
-    font-size: 0.8rem;
+    gap: 0.2rem;
+    font-size: 0.72rem;
     font-weight: 600;
     color: var(--c-text);
 }
 
 .select-field select {
-    border: 1.5px solid var(--c-border);
-    border-radius: 8px;
-    padding: 0.6rem 0.85rem;
+    border: 1px solid var(--c-border);
+    border-radius: 7px;
+    padding: 0.38rem 0.65rem;
     background: white;
-    font-size: 0.875rem;
+    font-size: 0.8rem;
     font-family: var(--app-font-sans);
     color: var(--c-text);
     transition: border-color 0.15s;
@@ -2446,15 +2467,15 @@ watch(
 .select-field select:focus {
     outline: none;
     border-color: var(--c-accent);
-    box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.12);
+    box-shadow: 0 0 0 2px rgba(13, 148, 136, 0.12);
 }
 
 /* Finalize sale — primary action */
 .primary-button {
     border: none;
-    border-radius: 8px;
-    padding: 0.85rem 1rem;
-    font-size: 1rem;
+    border-radius: 7px;
+    padding: 0.55rem 0.9rem;
+    font-size: 0.88rem;
     font-weight: 700;
     font-family: var(--app-font-sans);
     background: var(--c-accent);
@@ -2462,13 +2483,13 @@ watch(
     cursor: pointer;
     width: 100%;
     transition: background 0.15s, box-shadow 0.15s, transform 0.15s;
-    box-shadow: 0 4px 14px rgba(13, 148, 136, 0.3);
+    box-shadow: 0 2px 8px rgba(13, 148, 136, 0.25);
 }
 
 .primary-button:hover:not(:disabled) {
     background: var(--c-accent-dark);
     transform: translateY(-1px);
-    box-shadow: 0 6px 20px rgba(13, 148, 136, 0.4);
+    box-shadow: 0 4px 12px rgba(13, 148, 136, 0.35);
 }
 
 .primary-button:disabled {
@@ -2480,10 +2501,10 @@ watch(
 
 /* Clear ticket — secondary action */
 .secondary-button {
-    border: 1.5px solid var(--c-border);
-    border-radius: 8px;
-    padding: 0.6rem 1rem;
-    font-size: 0.875rem;
+    border: 1px solid var(--c-border);
+    border-radius: 7px;
+    padding: 0.35rem 0.75rem;
+    font-size: 0.78rem;
     font-weight: 600;
     font-family: var(--app-font-sans);
     background: transparent;
@@ -2511,13 +2532,13 @@ watch(
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 1rem;
+    gap: 0.75rem;
     flex-wrap: wrap;
-    padding: 0.6rem 0.9rem;
+    padding: 0.45rem 0.75rem;
     background: rgba(13, 148, 136, 0.07);
     border: 1px solid rgba(13, 148, 136, 0.25);
-    border-radius: 10px;
-    font-size: 0.8rem;
+    border-radius: 8px;
+    font-size: 0.76rem;
     color: var(--c-accent-dark);
     font-weight: 500;
 }
@@ -2578,23 +2599,23 @@ watch(
 .product-sections {
     display: flex;
     flex-direction: column;
-    gap: 1.5rem;
+    gap: 0.85rem;
 }
 
 .category-section {
     display: flex;
     flex-direction: column;
-    gap: 0.65rem;
+    gap: 0.5rem;
 }
 
 .category-section-title {
     margin: 0;
-    font-size: 0.7rem;
+    font-size: 0.68rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.12em;
     color: var(--c-muted);
-    padding-bottom: 0.4rem;
+    padding-bottom: 0.25rem;
     border-bottom: 1px solid var(--c-border);
 }
 
@@ -2849,6 +2870,8 @@ watch(
     font-weight: 600;
     color: var(--c-text);
     line-height: 1.25;
+    word-break: break-word;
+    overflow-wrap: break-word;
 }
 
 .td-product-sub {
@@ -3114,11 +3137,11 @@ watch(
 
 @media (max-width: 720px) {
     .pos-page {
-        padding: 1rem;
+        padding: 0.75rem;
     }
 
     .product-grid {
-        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
     }
 
     .panel-header {
