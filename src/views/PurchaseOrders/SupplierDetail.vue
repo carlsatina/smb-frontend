@@ -31,7 +31,7 @@
                 description="Upgrade to Standard to manage supplier analytics and linked receipts."
             />
 
-            <div v-else-if="isLoading" class="panel-state">Loading supplier…</div>
+            <SkeletonLoader v-else-if="isLoading" :rows="4" label="Loading supplier…" />
 
             <div v-else-if="!supplier" class="panel-state">Supplier not found.</div>
 

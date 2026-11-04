@@ -72,7 +72,7 @@
                 description="Upgrade to Standard to review order details, update suppliers, and receive inventory."
             />
 
-            <div v-else-if="isLoading" class="panel-state">Loading purchase order…</div>
+            <SkeletonLoader v-else-if="isLoading" :rows="6" label="Loading purchase order…" />
 
             <div v-else-if="!purchaseOrder" class="panel-state">Purchase order not found.</div>
 
@@ -434,6 +434,7 @@ import { todayStr } from '@/utils/datetime';
 import { hasPlanFeature } from '@/utils/planAccess';
 import PlanGate from '@/components/PlanGate.vue';
 import ConfirmModal from '@/components/ConfirmModal.vue';
+import SkeletonLoader from '@/components/SkeletonLoader.vue';
 
 const router = useRouter();
 const route = useRoute();

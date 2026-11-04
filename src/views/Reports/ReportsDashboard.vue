@@ -113,7 +113,32 @@
             <template v-else>
                 <!-- ── Business pulse hero ── -->
                 <div v-if="!hasLoaded" class="pulse pulse--skeleton" aria-hidden="true">
-                    <SkeletonLoader :rows="3" label="Loading summary…" />
+                    <div class="pulse-top">
+                        <div class="pulse-headline">
+                            <span class="skeleton-pulse-eyebrow"></span>
+                            <span class="skeleton-pulse-val"></span>
+                            <div class="pulse-compare">
+                                <span class="skeleton-pulse-chip"></span>
+                            </div>
+                        </div>
+                        <div class="pulse-spark">
+                            <div class="skeleton-pulse-spark">
+                                <span
+                                    v-for="(h, i) in [30, 55, 40, 75, 50, 90, 65, 80]"
+                                    :key="i"
+                                    class="skeleton-pulse-bar"
+                                    :style="{ height: `${h}%` }"
+                                ></span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="pulse-kpis">
+                        <div v-for="i in 4" :key="i" class="pulse-kpi pulse-kpi--skeleton">
+                            <span class="skeleton-pulse-kpi-lbl"></span>
+                            <span class="skeleton-pulse-kpi-val"></span>
+                            <span class="skeleton-pulse-kpi-sub"></span>
+                        </div>
+                    </div>
                 </div>
 
                 <section v-else :key="`pulse-${revealKey}`" class="pulse reveal-item">
@@ -208,8 +233,35 @@
                 </nav>
 
                 <div v-if="!hasLoaded" class="reports-grid" aria-hidden="true">
-                    <section v-for="n in 4" :key="`grid-skel-${n}`" class="report-card">
-                        <SkeletonLoader :rows="4" label="Loading reports…" />
+                    <section class="report-card report-card--wide">
+                        <SkeletonLoader variant="chart" label="Loading sales charts…" />
+                    </section>
+                    <section class="report-card">
+                        <div class="card-header">
+                            <div>
+                                <h2>Payment mix</h2>
+                                <p>Where the money came in</p>
+                            </div>
+                        </div>
+                        <SkeletonLoader variant="progress" :count="4" label="Loading payment mix…" />
+                    </section>
+                    <section class="report-card">
+                        <div class="card-header">
+                            <div>
+                                <h2>Daypart mix</h2>
+                                <p>Sales share by time of day</p>
+                            </div>
+                        </div>
+                        <SkeletonLoader variant="progress" :count="4" label="Loading daypart mix…" />
+                    </section>
+                    <section class="report-card report-card--wide">
+                        <div class="card-header">
+                            <div>
+                                <h2>Best sellers</h2>
+                                <p>Top volume and revenue drivers</p>
+                            </div>
+                        </div>
+                        <SkeletonLoader variant="table" :rows="4" label="Loading best sellers…" />
                     </section>
                 </div>
 
@@ -221,7 +273,7 @@
                                 <h3>Sales by day</h3>
                                 <span class="chart-total">{{ formatMoney(salesSummary.netSales) }}</span>
                             </div>
-                            <SkeletonLoader v-if="isLoading" :rows="3" />
+                            <SkeletonLoader v-if="isLoading" variant="chart" />
                             <div v-else class="chart-with-axis">
                                 <div class="y-axis">
                                     <span>{{ formatCompactMoney(chartMax) }}</span>
@@ -259,7 +311,7 @@
                                 <h3>Sales by hour</h3>
                                 <span class="chart-total">{{ salesSummary.orderCount }} orders</span>
                             </div>
-                            <SkeletonLoader v-if="isLoading" :rows="3" />
+                            <SkeletonLoader v-if="isLoading" variant="chart" />
                             <div v-else class="chart-with-axis">
                                 <div class="y-axis">
                                     <span>{{ formatCompactMoney(hourlyMax) }}</span>
@@ -303,7 +355,7 @@
                             </div>
                         </div>
 
-                        <SkeletonLoader v-if="isLoading" :rows="4" label="Loading payment mix…" />
+                        <SkeletonLoader v-if="isLoading" variant="progress" :count="4" label="Loading payment mix…" />
                         <div v-else-if="paymentMethods.length === 0" class="panel-state panel-state--small">
                             Payments appear here once sales are finalized in this range.
                         </div>
@@ -341,7 +393,7 @@
                             </div>
                         </div>
 
-                        <SkeletonLoader v-if="isLoading" :rows="4" label="Loading daypart mix…" />
+                        <SkeletonLoader v-if="isLoading" variant="progress" :count="4" label="Loading daypart mix…" />
                         <div v-else-if="daypartSummary.length === 0" class="panel-state panel-state--small">
                             Sales by time of day appear here once orders come in.
                         </div>
@@ -642,7 +694,16 @@
                             </div>
                         </div>
 
-                        <SkeletonLoader v-if="isLoading" :rows="4" label="Loading purchasing…" />
+                        <template v-if="isLoading">
+                            <div class="supplier-metrics">
+                                <div v-for="i in 2" :key="i" class="metric-card metric-card--skeleton">
+                                    <span class="skeleton-metric-lbl"></span>
+                                    <span class="skeleton-metric-val"></span>
+                                    <span class="skeleton-metric-sub"></span>
+                                </div>
+                            </div>
+                            <SkeletonLoader :rows="4" label="Loading purchasing…" />
+                        </template>
                         <template v-else>
                             <div class="supplier-metrics">
                                 <div class="metric-card">
@@ -1843,10 +1904,81 @@ watch(
 }
 
 .pulse--skeleton {
-    background: var(--c-surface);
-    border: 1px solid var(--c-border);
     min-height: 220px;
+}
+
+.pulse--skeleton .skeleton-pulse-eyebrow {
+    width: 140px;
+    height: 12px;
+    border-radius: 4px;
+    background: rgba(94, 234, 212, 0.16);
+    animation: shimmer-pulse 1.4s ease-in-out infinite;
+}
+
+.pulse--skeleton .skeleton-pulse-val {
+    width: 220px;
+    height: 38px;
+    border-radius: 8px;
+    background: rgba(94, 234, 212, 0.22);
+    animation: shimmer-pulse 1.4s ease-in-out infinite;
+}
+
+.pulse--skeleton .skeleton-pulse-chip {
+    width: 110px;
+    height: 18px;
+    border-radius: 999px;
+    background: rgba(94, 234, 212, 0.14);
+    animation: shimmer-pulse 1.4s ease-in-out infinite;
+}
+
+.pulse--skeleton .skeleton-pulse-spark {
+    height: 80px;
+    display: flex;
+    align-items: flex-end;
+    gap: 0.5rem;
+    justify-content: flex-end;
+    padding: 0.5rem 0;
+}
+
+.pulse--skeleton .skeleton-pulse-bar {
+    width: 12px;
+    border-radius: 3px 3px 0 0;
+    background: rgba(94, 234, 212, 0.18);
+    animation: shimmer-pulse 1.4s ease-in-out infinite;
+}
+
+.pulse-kpi--skeleton {
     justify-content: center;
+    gap: 0.4rem;
+}
+
+.pulse-kpi--skeleton .skeleton-pulse-kpi-lbl {
+    width: 65px;
+    height: 10px;
+    border-radius: 3px;
+    background: rgba(94, 234, 212, 0.16);
+    animation: shimmer-pulse 1.4s ease-in-out infinite;
+}
+
+.pulse-kpi--skeleton .skeleton-pulse-kpi-val {
+    width: 95px;
+    height: 20px;
+    border-radius: 5px;
+    background: rgba(94, 234, 212, 0.24);
+    animation: shimmer-pulse 1.4s ease-in-out infinite;
+}
+
+.pulse-kpi--skeleton .skeleton-pulse-kpi-sub {
+    width: 50px;
+    height: 9px;
+    border-radius: 3px;
+    background: rgba(94, 234, 212, 0.12);
+    animation: shimmer-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes shimmer-pulse {
+    0%, 100% { opacity: 0.45; }
+    50% { opacity: 0.95; }
 }
 
 .pulse-top {
@@ -2678,6 +2810,33 @@ watch(
     background: #f8fafc;
     border: 1px solid var(--c-border);
     border-radius: 10px;
+}
+
+.metric-card--skeleton {
+    justify-content: center;
+    gap: 0.35rem;
+}
+
+.metric-card--skeleton span {
+    border-radius: 4px;
+    background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.4s ease-in-out infinite;
+}
+
+.metric-card--skeleton .skeleton-metric-lbl {
+    width: 60px;
+    height: 11px;
+}
+
+.metric-card--skeleton .skeleton-metric-val {
+    width: 100px;
+    height: 20px;
+}
+
+.metric-card--skeleton .skeleton-metric-sub {
+    width: 75px;
+    height: 10px;
 }
 
 .metric-label {

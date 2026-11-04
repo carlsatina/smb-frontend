@@ -40,7 +40,8 @@
 
             <template v-else>
                 <!-- STAT STRIP -->
-                <div class="stat-strip">
+                <SkeletonLoader v-if="isLoading" variant="kpi" :count="3" />
+                <div v-else class="stat-strip">
                     <div class="stat">
                         <span class="stat-value">{{ totalCount }}</span>
                         <span class="stat-label">Orders</span>

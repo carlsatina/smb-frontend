@@ -113,7 +113,8 @@
                 </div>
             </header>
 
-            <div class="stat-strip">
+            <SkeletonLoader v-if="storeContext.isLoading" variant="kpi" :count="3" />
+            <div v-else class="stat-strip">
                 <div class="stat">
                     <span class="stat-value">{{ storeCount }}</span>
                     <span class="stat-label">Total stores</span>

@@ -68,7 +68,8 @@
 
             <template v-else>
                 <!-- STAT STRIP (doubles as catalog filter) -->
-                <div class="stat-strip" role="group" aria-label="Filter by product type">
+                <SkeletonLoader v-if="isLoading" variant="kpi" :count="showRecipeStats ? 3 : 2" />
+                <div v-else class="stat-strip" role="group" aria-label="Filter by product type">
                     <button
                         type="button"
                         class="stat"

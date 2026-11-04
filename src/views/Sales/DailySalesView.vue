@@ -182,7 +182,9 @@
 
                     <!-- ── Loading / empty ── -->
                     <tr v-if="isLoading">
-                        <td :colspan="headerCount" class="ds-empty">Loading…</td>
+                        <td :colspan="headerCount" class="ds-skeleton-td">
+                            <SkeletonLoader :rows="4" label="Loading sales entries…" />
+                        </td>
                     </tr>
                     <tr v-else-if="rows.length === 0 && !isAdding">
                         <td :colspan="headerCount" class="ds-empty">No entries for this month.</td>
@@ -693,6 +695,7 @@ import { listExpenses, createExpense, updateExpense, deleteExpense, type Expense
 import { listStoreMembers, type StoreMember } from '@/api/storeMembers';
 import DenominationModal from '@/components/DenominationModal.vue';
 import ConfirmModal from '@/components/ConfirmModal.vue';
+import SkeletonLoader from '@/components/SkeletonLoader.vue';
 import CsvActionsMenu from '@/components/CsvActionsMenu.vue';
 import CsvImportPreviewModal from '@/components/CsvImportPreviewModal.vue';
 import { useToast } from '@/composables/useToast';
@@ -1775,6 +1778,7 @@ const saveGoal = async () => {
 .col-highlight { background: #f0fdf4; }
 .col-actions { display: flex; gap: 0.25rem; align-items: center; }
 .ds-empty { text-align: center; color: #9ca3af; padding: 2rem; }
+.ds-skeleton-td { padding: 1rem; background: #ffffff; }
 .ds-total-row td { background: #f9fafb; border-top: 2px solid #e5e7eb; }
 .fw-bold { font-weight: 700; }
 .text-danger { color: #dc2626; }

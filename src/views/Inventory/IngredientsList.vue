@@ -81,7 +81,8 @@
 
             <template v-else>
                 <!-- STAT STRIP (doubles as filters) -->
-                <div class="stat-strip" role="group" aria-label="Filter ingredients">
+                <SkeletonLoader v-if="isLoading" variant="kpi" :count="3" />
+                <div v-else class="stat-strip" role="group" aria-label="Filter ingredients">
                     <button
                         type="button"
                         class="stat"

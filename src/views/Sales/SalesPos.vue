@@ -161,7 +161,13 @@
                         Select or create a store to start selling.
                     </div>
 
-                    <div v-else-if="isLoading" class="panel-state">Loading products...</div>
+                    <SkeletonLoader
+                        v-else-if="isLoading"
+                        :variant="activeViewMode === 'cards' ? 'cards' : 'table'"
+                        :count="12"
+                        :rows="8"
+                        label="Loading products…"
+                    />
 
                     <template v-else>
                         <!-- ==========================================
@@ -683,6 +689,7 @@ import { listProducts } from '@/api/products';
 import { finalizeSale } from '@/api/sales';
 import { useToast } from '@/composables/useToast';
 import { useStoreContextStore } from '@/stores/storeContext';
+import SkeletonLoader from '@/components/SkeletonLoader.vue';
 
 type Product = {
     id: string;

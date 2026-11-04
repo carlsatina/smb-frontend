@@ -41,7 +41,7 @@
                 description="Upgrade to Standard to review receipts, suppliers, and receiving history."
             />
 
-            <div v-else-if="isLoading" class="panel-state">Loading receipt…</div>
+            <SkeletonLoader v-else-if="isLoading" :rows="5" label="Loading receipt…" />
 
             <div v-else-if="!receipt" class="panel-state">Receipt not found.</div>
 
@@ -134,6 +134,7 @@ import { useToast } from '@/composables/useToast';
 import { useStoreContextStore } from '@/stores/storeContext';
 import { hasPlanFeature } from '@/utils/planAccess';
 import PlanGate from '@/components/PlanGate.vue';
+import SkeletonLoader from '@/components/SkeletonLoader.vue';
 
 const route = useRoute();
 const router = useRouter();

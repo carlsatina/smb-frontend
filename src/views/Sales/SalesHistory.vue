@@ -21,26 +21,34 @@
                     <p>Track finalized tickets, receipts, and cashier performance for {{ currentStoreLabel }}.</p>
                 </div>
                 <div class="sales-kpis">
-                    <div class="kpi-card">
-                        <span class="kpi-label">Transactions</span>
-                        <span class="kpi-value">{{ salesCount }}</span>
-                        <span class="kpi-sub">This period</span>
-                    </div>
-                    <div class="kpi-card">
-                        <span class="kpi-label">Total sales</span>
-                        <span class="kpi-value">{{ formatMoney(totalSales) }}</span>
-                    </div>
-                    <div class="kpi-card">
-                        <span class="kpi-label">Avg ticket</span>
-                        <span class="kpi-value">{{ formatMoney(avgTicket) }}</span>
-                    </div>
-                    <div class="kpi-card" :class="{ 'kpi-card--warn': voidedCount > 0 }">
-                        <span class="kpi-label">
-                            <span v-if="voidedCount > 0" class="kpi-dot kpi-dot--warn"></span>
-                            Voided
-                        </span>
-                        <span class="kpi-value">{{ voidedCount }}</span>
-                    </div>
+                    <template v-if="isLoading">
+                        <div v-for="i in 4" :key="i" class="kpi-card kpi-card--skeleton">
+                            <span class="skeleton-cell skeleton-cell--kpi-lbl"></span>
+                            <span class="skeleton-cell skeleton-cell--kpi-val"></span>
+                        </div>
+                    </template>
+                    <template v-else>
+                        <div class="kpi-card">
+                            <span class="kpi-label">Transactions</span>
+                            <span class="kpi-value">{{ salesCount }}</span>
+                            <span class="kpi-sub">This period</span>
+                        </div>
+                        <div class="kpi-card">
+                            <span class="kpi-label">Total sales</span>
+                            <span class="kpi-value">{{ formatMoney(totalSales) }}</span>
+                        </div>
+                        <div class="kpi-card">
+                            <span class="kpi-label">Avg ticket</span>
+                            <span class="kpi-value">{{ formatMoney(avgTicket) }}</span>
+                        </div>
+                        <div class="kpi-card" :class="{ 'kpi-card--warn': voidedCount > 0 }">
+                            <span class="kpi-label">
+                                <span v-if="voidedCount > 0" class="kpi-dot kpi-dot--warn"></span>
+                                Voided
+                            </span>
+                            <span class="kpi-value">{{ voidedCount }}</span>
+                        </div>
+                    </template>
                 </div>
             </header>
 
@@ -1098,6 +1106,28 @@ watch(
 .kpi-card--warn {
     border-color: #fbbf24;
     background: #fffbeb;
+}
+
+.kpi-card--skeleton {
+    justify-content: center;
+    gap: 0.35rem;
+}
+
+.kpi-card--skeleton .skeleton-cell {
+    border-radius: 4px;
+    background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.4s ease-in-out infinite;
+}
+
+.kpi-card--skeleton .skeleton-cell--kpi-lbl {
+    width: 50%;
+    height: 10px;
+}
+
+.kpi-card--skeleton .skeleton-cell--kpi-val {
+    width: 75%;
+    height: 18px;
 }
 
 .kpi-label {

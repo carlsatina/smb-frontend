@@ -69,7 +69,8 @@
 
             <template v-else>
                 <!-- STAT STRIP (doubles as status filter) -->
-                <div class="stat-strip" role="group" aria-label="Filter by stock status">
+                <SkeletonLoader v-if="isLoading" variant="kpi" :count="3" />
+                <div v-else class="stat-strip" role="group" aria-label="Filter by stock status">
                     <button
                         type="button"
                         class="stat"
