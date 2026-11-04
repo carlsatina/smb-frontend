@@ -519,7 +519,7 @@ watch(
     --c-surface: #ffffff;
     --c-bg: #f6f8f9;
     min-height: 100vh;
-    padding: 2rem 1.5rem 3rem;
+    padding: 1rem 1.5rem 2rem;
     background: var(--c-bg);
     color: var(--c-text);
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -529,11 +529,11 @@ watch(
    SHELL & HEADER
 ============================================================ */
 .suppliers-shell {
-    max-width: 1000px;
+    max-width: 1280px;
     margin: 0 auto;
     display: flex;
     flex-direction: column;
-    gap: 1.25rem;
+    gap: 0.85rem;
 }
 
 .list-header {
@@ -545,12 +545,12 @@ watch(
 .back-link {
     display: inline-flex;
     align-items: center;
-    gap: 0.3rem;
+    gap: 0.25rem;
     border: none;
     background: none;
     padding: 0;
-    margin-bottom: 0.75rem;
-    font-size: 0.82rem;
+    margin-bottom: 0.2rem;
+    font-size: 0.78rem;
     font-weight: 600;
     font-family: inherit;
     color: var(--c-muted);
@@ -565,29 +565,29 @@ watch(
     display: flex;
     flex-wrap: wrap;
     gap: 1rem;
-    align-items: flex-start;
+    align-items: center;
     justify-content: space-between;
 }
 
 .list-title h1 {
-    font-size: 1.9rem;
+    font-size: 1.35rem;
     font-weight: 800;
-    letter-spacing: -0.03em;
-    margin: 0 0 0.35rem;
+    letter-spacing: -0.025em;
+    margin: 0 0 0.15rem;
     color: var(--c-text);
 }
 
 .list-title p {
     color: var(--c-muted);
     max-width: 480px;
-    line-height: 1.55;
+    line-height: 1.4;
     margin: 0;
-    font-size: 0.92rem;
+    font-size: 0.82rem;
 }
 
 .header-actions {
     display: flex;
-    gap: 0.6rem;
+    gap: 0.5rem;
     align-items: center;
     flex-wrap: wrap;
 }
@@ -707,7 +707,7 @@ watch(
 .suppliers-table tbody tr.row-clickable { cursor: pointer; }
 
 .suppliers-table tbody td {
-    padding: 0.85rem 0.9rem;
+    padding: 0.55rem 0.75rem;
     vertical-align: middle;
 }
 

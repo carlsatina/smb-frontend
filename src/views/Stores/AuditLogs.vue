@@ -708,18 +708,18 @@ watch(
     --accent: #0f766e;
     --accent-strong: #0f4c5c;
     min-height: 100vh;
-    padding: 1.5rem;
+    padding: 1rem 1.5rem 2rem;
     background: #f8fafc;
     color: var(--ink);
 }
 
 .audit-shell {
     width: 100%;
-    max-width: 1440px;
+    max-width: 1280px;
     margin: 0 auto;
     display: flex;
     flex-direction: column;
-    gap: 1.25rem;
+    gap: 0.85rem;
 }
 
 /* Header */
@@ -737,14 +737,16 @@ watch(
 }
 
 .audit-header h1 {
-    font-size: 1.5rem;
-    margin: 0;
-    letter-spacing: -0.02em;
+    font-size: 1.35rem;
+    font-weight: 800;
+    margin: 0 0 0.15rem;
+    letter-spacing: -0.025em;
 }
 
 .audit-header p {
     margin: 0;
-    font-size: 0.8rem;
+    font-size: 0.82rem;
+    line-height: 1.4;
     color: var(--muted);
 }
 
@@ -752,10 +754,10 @@ watch(
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 36px;
-    height: 36px;
+    width: 32px;
+    height: 32px;
     border: 1px solid #e2e8f0;
-    border-radius: 10px;
+    border-radius: 7px;
     background: #fff;
     color: var(--muted);
     cursor: pointer;
@@ -771,12 +773,12 @@ watch(
     display: flex;
     align-items: center;
     gap: 0.35rem;
-    padding: 0.5rem 0.85rem;
+    padding: 0.45rem 0.9rem;
     border: 1px solid #e2e8f0;
-    border-radius: 10px;
+    border-radius: 7px;
     background: #fff;
     color: var(--ink);
-    font-size: 0.8rem;
+    font-size: 0.82rem;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.15s ease;

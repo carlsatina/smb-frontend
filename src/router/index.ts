@@ -117,6 +117,7 @@ const routes: Array<RouteRecordRaw> = [
   },
   {
     path: '/stores/:storeId/pos',
+    alias: ['/stores/:storeId/pos/table', '/stores/:storeId/pos/cards'],
     name: 'pos',
     component: SalesPos,
     meta: { requiresAuth: true, feature: 'salesPos' }

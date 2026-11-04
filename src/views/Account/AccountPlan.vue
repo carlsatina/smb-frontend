@@ -218,17 +218,17 @@ onMounted(async () => {
     --c-bg: #f8fafc;
     font-family: 'Inter', sans-serif;
     min-height: 100vh;
-    padding: 2.5rem 1.5rem 4rem;
+    padding: 1rem 1.5rem 2rem;
     background: var(--c-bg);
     color: var(--c-text);
 }
 
 .ap-shell {
-    max-width: 1100px;
+    max-width: 1280px;
     margin: 0 auto;
     display: flex;
     flex-direction: column;
-    gap: 1.75rem;
+    gap: 0.85rem;
 }
 
 /* ── Header ── */
@@ -236,43 +236,44 @@ onMounted(async () => {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    gap: 1.25rem;
+    gap: 1rem;
     flex-wrap: wrap;
 }
 
 .ap-header-left {
     display: flex;
     flex-direction: column;
-    gap: 0.3rem;
+    gap: 0.2rem;
 }
 
 .ap-eyebrow {
     display: inline-flex;
     align-items: center;
-    padding: 0.2rem 0.65rem;
+    padding: 0.2rem 0.6rem;
     border-radius: 999px;
     font-size: 0.65rem;
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.14em;
+    letter-spacing: 0.08em;
     background: rgba(13, 148, 136, 0.1);
     color: var(--c-accent);
     width: fit-content;
 }
 
 .ap-title {
-    font-size: 2rem;
+    font-size: 1.35rem;
     font-weight: 800;
     margin: 0;
     color: var(--c-text);
-    letter-spacing: -0.03em;
-    line-height: 1.15;
+    letter-spacing: -0.025em;
+    line-height: 1.2;
 }
 
 .ap-subtitle {
     margin: 0;
     color: var(--c-muted);
-    font-size: 0.9rem;
+    font-size: 0.82rem;
+    line-height: 1.4;
 }
 
 .ap-header-right {
@@ -596,9 +597,9 @@ onMounted(async () => {
     justify-content: center;
     background: transparent;
     border: 1px solid var(--c-border);
-    border-radius: 8px;
-    padding: 0.55rem 1rem;
-    font-size: 0.875rem;
+    border-radius: 7px;
+    padding: 0.45rem 0.9rem;
+    font-size: 0.82rem;
     font-weight: 600;
     color: #475569;
     cursor: pointer;

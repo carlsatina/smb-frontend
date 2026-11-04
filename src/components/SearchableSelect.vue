@@ -9,21 +9,24 @@
             @click="open"
         >
             <span class="ss-value">{{ selectedLabel || placeholder }}</span>
-            <span class="ss-caret" aria-hidden="true">▾</span>
+            <mdicon name="chevron-down" size="16" class="ss-chevron" />
         </button>
 
         <div v-else class="ss-open">
-            <input
-                ref="searchRef"
-                v-model="search"
-                type="text"
-                class="ss-search"
-                :placeholder="searchPlaceholder"
-                @keydown.down.prevent="move(1)"
-                @keydown.up.prevent="move(-1)"
-                @keydown.enter.prevent="selectHighlighted"
-                @keydown.esc.prevent="close"
-            />
+            <div class="ss-search-wrap">
+                <input
+                    ref="searchRef"
+                    v-model="search"
+                    type="text"
+                    class="ss-search"
+                    :placeholder="searchPlaceholder"
+                    @keydown.down.prevent="move(1)"
+                    @keydown.up.prevent="move(-1)"
+                    @keydown.enter.prevent="selectHighlighted"
+                    @keydown.esc.prevent="close"
+                />
+                <mdicon name="chevron-up" size="16" class="ss-chevron ss-chevron--search" />
+            </div>
             <Teleport to="body">
                 <ul
                     ref="menuRef"
@@ -188,9 +191,9 @@ defineExpose({ open });
     justify-content: space-between;
     gap: 0.5rem;
     width: 100%;
-    padding: 0.45rem 0.6rem;
+    padding: 0.5rem 0.85rem;
     border: 1.5px solid var(--c-border);
-    border-radius: 6px;
+    border-radius: 8px;
     background: var(--c-surface, #fff);
     color: var(--c-text);
     font-size: 0.85rem;
@@ -218,22 +221,34 @@ defineExpose({ open });
     white-space: nowrap;
 }
 
-.ss-caret {
+.ss-chevron {
     flex-shrink: 0;
-    font-size: 0.7rem;
     color: var(--c-text-muted, #94a3b8);
+}
+
+.ss-search-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+    width: 100%;
 }
 
 .ss-search {
     width: 100%;
-    padding: 0.45rem 0.6rem;
+    padding: 0.5rem 2.25rem 0.5rem 0.85rem;
     border: 1.5px solid var(--c-accent);
-    border-radius: 6px;
+    border-radius: 8px;
     background: var(--c-surface, #fff);
     color: var(--c-text);
     font-size: 0.85rem;
     font-family: inherit;
     outline: none;
+}
+
+.ss-chevron--search {
+    position: absolute;
+    right: 0.85rem;
+    pointer-events: none;
 }
 
 .ss-menu {

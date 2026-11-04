@@ -322,17 +322,17 @@ onMounted(() => loadPage(1));
 <style scoped>
 .au { width: 100%; }
 
-.au-header { margin-bottom: 1.75rem; }
+.au-header { margin-bottom: 0.85rem; }
 
 .au-title {
-    font-size: 1.6rem;
+    font-size: 1.35rem;
     font-weight: 800;
     color: #0f172a;
-    margin: 0 0 0.25rem;
-    letter-spacing: -0.02em;
+    margin: 0 0 0.15rem;
+    letter-spacing: -0.025em;
 }
 
-.au-sub { color: #64748b; font-size: 0.875rem; margin: 0; }
+.au-sub { color: #64748b; font-size: 0.82rem; line-height: 1.4; margin: 0; }
 
 .au-state {
     padding: 1rem 1.25rem;
@@ -370,7 +370,7 @@ onMounted(() => loadPage(1));
 }
 
 .au-table td {
-    padding: 0.75rem 1rem;
+    padding: 0.55rem 0.75rem;
     border-bottom: 1px solid #f1f5f9;
     vertical-align: middle;
 }

@@ -6,9 +6,9 @@
     align-items: center;
     justify-content: center;
     gap: 0.35rem;
-    border-radius: 8px;
-    padding: 0.5rem 1rem;
-    font-size: 0.875rem;
+    border-radius: 7px;
+    padding: 0.45rem 0.9rem;
+    font-size: 0.82rem;
     font-weight: 600;
     cursor: pointer;
     transition: background 0.15s, border-color 0.15s, color 0.15s;

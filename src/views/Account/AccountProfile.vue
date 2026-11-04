@@ -186,7 +186,7 @@ const goBack = () => {
 <style scoped>
 .apf-page {
     min-height: 100%;
-    padding: 32px 16px 64px;
+    padding: 1rem 1.5rem 2rem;
     background: #f6f7f9;
 }
 
@@ -195,45 +195,58 @@ const goBack = () => {
     margin: 0 auto;
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 0.85rem;
 }
 
 .apf-header {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    gap: 16px;
+    gap: 1rem;
+}
+
+.apf-header-left {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
 }
 
 .apf-eyebrow {
-    font-size: 12px;
+    font-size: 0.65rem;
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: #6b7280;
+    letter-spacing: 0.08em;
+    background: rgba(13, 148, 136, 0.1);
+    color: #0d9488;
+    padding: 0.2rem 0.6rem;
+    border-radius: 999px;
+    width: fit-content;
+    margin-bottom: 0.15rem;
 }
 
 .apf-title {
-    margin: 4px 0 2px;
-    font-size: 24px;
-    font-weight: 700;
+    margin: 0 0 0.15rem;
+    font-size: 1.35rem;
+    font-weight: 800;
+    letter-spacing: -0.025em;
     color: #111827;
 }
 
 .apf-subtitle {
     margin: 0;
     color: #6b7280;
-    font-size: 14px;
+    font-size: 0.82rem;
+    line-height: 1.4;
 }
 
 .apf-btn-ghost {
     border: 1px solid #d1d5db;
     background: #fff;
     color: #374151;
-    border-radius: 8px;
-    padding: 8px 14px;
-    font-size: 14px;
-    font-weight: 500;
+    border-radius: 7px;
+    padding: 0.45rem 0.9rem;
+    font-size: 0.82rem;
+    font-weight: 600;
     cursor: pointer;
     white-space: nowrap;
 }
@@ -324,9 +337,9 @@ const goBack = () => {
     background: #4f46e5;
     color: #fff;
     border: none;
-    border-radius: 8px;
-    padding: 10px 18px;
-    font-size: 14px;
+    border-radius: 7px;
+    padding: 0.45rem 0.9rem;
+    font-size: 0.82rem;
     font-weight: 600;
     cursor: pointer;
 }

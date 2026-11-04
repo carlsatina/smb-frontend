@@ -722,7 +722,7 @@ watch(
     --c-surface: #ffffff;
     --c-bg: #f6f8f9;
     min-height: 100vh;
-    padding: 2rem 1.5rem 3rem;
+    padding: 1rem 1.5rem 2rem;
     background: var(--c-bg);
     color: var(--c-text);
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -736,7 +736,7 @@ watch(
     margin: 0 auto;
     display: flex;
     flex-direction: column;
-    gap: 1.25rem;
+    gap: 0.85rem;
 }
 
 /* View Tabs */
@@ -791,31 +791,31 @@ watch(
 
 .inventory-eyebrow {
     display: inline-block;
-    font-size: 0.68rem;
-    font-weight: 700;
+    font-size: 0.65rem;
+    font-weight: 750;
     text-transform: uppercase;
-    letter-spacing: 0.12em;
+    letter-spacing: 0.08em;
     color: var(--c-accent);
     background: rgba(13, 148, 136, 0.08);
-    padding: 0.28rem 0.75rem;
+    padding: 0.2rem 0.6rem;
     border-radius: 999px;
-    margin-bottom: 0.6rem;
+    margin-bottom: 0.25rem;
 }
 
 .inventory-title h1 {
-    font-size: 1.9rem;
+    font-size: 1.35rem;
     font-weight: 800;
-    letter-spacing: -0.03em;
-    margin: 0 0 0.35rem;
+    letter-spacing: -0.025em;
+    margin: 0 0 0.15rem;
     color: var(--c-text);
 }
 
 .inventory-title p {
     color: var(--c-muted);
     max-width: 480px;
-    line-height: 1.55;
+    line-height: 1.4;
     margin: 0;
-    font-size: 0.92rem;
+    font-size: 0.82rem;
 }
 
 .header-actions {
@@ -1021,7 +1021,7 @@ watch(
 .inventory-table tbody tr:hover { background: #f8fafc; }
 
 .inventory-table tbody td {
-    padding: 0.85rem 0.9rem;
+    padding: 0.55rem 0.75rem;
     vertical-align: middle;
 }
 
@@ -1188,12 +1188,12 @@ watch(
     display: inline-flex;
     align-items: center;
     gap: 0.4rem;
-    padding: 0.6rem 1.1rem;
-    border-radius: 9px;
+    padding: 0.45rem 0.9rem;
+    border-radius: 7px;
     border: none;
     background: var(--c-accent);
     color: #ffffff;
-    font-size: 0.875rem;
+    font-size: 0.82rem;
     font-weight: 600;
     font-family: 'Inter', -apple-system, sans-serif;
     cursor: pointer;
@@ -1214,12 +1214,12 @@ watch(
     display: inline-flex;
     align-items: center;
     gap: 0.4rem;
-    padding: 0.58rem 1rem;
-    border-radius: 9px;
+    padding: 0.45rem 0.9rem;
+    border-radius: 7px;
     border: 1.5px solid var(--c-border);
     background: var(--c-surface);
     color: var(--c-text);
-    font-size: 0.875rem;
+    font-size: 0.82rem;
     font-weight: 600;
     font-family: 'Inter', -apple-system, sans-serif;
     cursor: pointer;

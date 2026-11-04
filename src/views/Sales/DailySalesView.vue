@@ -1726,7 +1726,7 @@ const saveGoal = async () => {
 </script>
 
 <style scoped>
-.ds-page { padding: 1.5rem; max-width: 100%; font-family: var(--app-font-sans); }
+.ds-page { padding: 1rem 1.5rem 2rem; max-width: 100%; font-family: var(--app-font-sans); }
 .ds-page input, .ds-page select, .ds-page button { font-family: inherit; }
 
 .ds-sales-section {

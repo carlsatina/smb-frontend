@@ -358,19 +358,19 @@ onMounted(loadStores);
 </script>
 
 <style scoped>
-.ab-page { display: flex; flex-direction: column; gap: 1.5rem; font-family: 'Inter', sans-serif; }
+.ab-page { display: flex; flex-direction: column; gap: 0.85rem; font-family: 'Inter', sans-serif; }
 
 /* Header */
 .ab-header { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 1rem; }
-.ab-title { font-size: 1.4rem; font-weight: 800; color: #0f172a; margin: 0 0 0.2rem; }
-.ab-sub { font-size: 0.875rem; color: #64748b; margin: 0; }
-.ab-header-kpis { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+.ab-title { font-size: 1.35rem; font-weight: 800; color: #0f172a; margin: 0 0 0.15rem; letter-spacing: -0.025em; }
+.ab-sub { font-size: 0.82rem; line-height: 1.4; color: #64748b; margin: 0; }
+.ab-header-kpis { display: flex; gap: 0.5rem; flex-wrap: wrap; }
 .ab-kpi {
     display: flex; flex-direction: column; align-items: flex-end; gap: 0.1rem;
-    background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 0.65rem 1rem; min-width: 120px;
+    background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.45rem 0.8rem; min-width: 100px;
 }
 .ab-kpi--accent { border-color: rgba(13, 148, 136, 0.3); background: rgba(13, 148, 136, 0.04); }
-.ab-kpi-value { font-size: 1.35rem; font-weight: 800; color: #0f172a; letter-spacing: -0.02em; }
+.ab-kpi-value { font-size: 1.15rem; font-weight: 800; color: #0f172a; letter-spacing: -0.02em; }
 .ab-kpi--accent .ab-kpi-value { color: #0f766e; }
 .ab-kpi-label { font-size: 0.68rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: #94a3b8; text-align: right; }
 
@@ -430,7 +430,7 @@ onMounted(loadStores);
 .ab-table tbody tr { border-bottom: 1px solid #f1f5f9; }
 .ab-table tbody tr:last-child { border-bottom: none; }
 .ab-table tbody tr:hover { background: #f8fafc; }
-.ab-table tbody td { padding: 0.8rem 1rem; vertical-align: middle; }
+.ab-table tbody td { padding: 0.55rem 0.75rem; vertical-align: middle; }
 .ab-td-num { text-align: right; }
 .ab-td-action { text-align: right; }
 

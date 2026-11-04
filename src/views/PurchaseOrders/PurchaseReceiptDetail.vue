@@ -286,7 +286,7 @@ watch(
     --c-surface: #ffffff;
     --c-bg: #f6f8f9;
     min-height: 100vh;
-    padding: 2rem 1.5rem 3rem;
+    padding: 1rem 1.5rem 2rem;
     background: var(--c-bg);
     color: var(--c-text);
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -296,29 +296,29 @@ watch(
    SHELL & HEADER
 ============================================================ */
 .receipt-shell {
-    max-width: 860px;
+    max-width: 1280px;
     margin: 0 auto;
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: 0.85rem;
 }
 
 .detail-header {
     display: flex;
     flex-direction: column;
     align-items: stretch;
-    margin-bottom: 0.25rem;
+    margin-bottom: 0.15rem;
 }
 
 .back-link {
     display: inline-flex;
     align-items: center;
-    gap: 0.3rem;
+    gap: 0.25rem;
     border: none;
     background: none;
     padding: 0;
-    margin-bottom: 0.75rem;
-    font-size: 0.82rem;
+    margin-bottom: 0.2rem;
+    font-size: 0.78rem;
     font-weight: 600;
     font-family: inherit;
     color: var(--c-muted);
@@ -342,10 +342,10 @@ watch(
     align-items: center;
     gap: 0.65rem;
     flex-wrap: wrap;
-    font-size: 1.7rem;
+    font-size: 1.35rem;
     font-weight: 800;
-    letter-spacing: -0.03em;
-    margin: 0 0 0.35rem;
+    letter-spacing: -0.025em;
+    margin: 0 0 0.15rem;
     color: var(--c-text);
 }
 
@@ -365,9 +365,9 @@ watch(
 
 .detail-title p {
     color: var(--c-muted);
-    line-height: 1.55;
+    line-height: 1.4;
     margin: 0;
-    font-size: 0.92rem;
+    font-size: 0.82rem;
 }
 
 .header-actions {
@@ -516,7 +516,7 @@ watch(
 .lines-table tbody tr:hover { background: #f8fafc; }
 
 .lines-table tbody td {
-    padding: 0.8rem 0.9rem;
+    padding: 0.55rem 0.75rem;
     vertical-align: middle;
 }
 
@@ -569,12 +569,12 @@ watch(
     display: inline-flex;
     align-items: center;
     gap: 0.4rem;
-    padding: 0.58rem 1rem;
-    border-radius: 9px;
+    padding: 0.45rem 0.9rem;
+    border-radius: 7px;
     border: 1.5px solid var(--c-border);
     background: var(--c-surface);
     color: var(--c-text);
-    font-size: 0.875rem;
+    font-size: 0.82rem;
     font-weight: 600;
     font-family: 'Inter', -apple-system, sans-serif;
     cursor: pointer;

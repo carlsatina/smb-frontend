@@ -243,7 +243,7 @@ onMounted(() => loadPage(1));
 .as-page {
     display: flex;
     flex-direction: column;
-    gap: 1.5rem;
+    gap: 0.85rem;
     font-family: 'Inter', sans-serif;
 }
 
@@ -257,21 +257,23 @@ onMounted(() => loadPage(1));
 }
 
 .as-title {
-    font-size: 1.4rem;
+    font-size: 1.35rem;
     font-weight: 800;
     color: #0f172a;
-    margin: 0 0 0.2rem;
+    margin: 0 0 0.15rem;
+    letter-spacing: -0.025em;
 }
 
 .as-sub {
-    font-size: 0.875rem;
+    font-size: 0.82rem;
+    line-height: 1.4;
     color: #64748b;
     margin: 0;
 }
 
 .as-header-kpis {
     display: flex;
-    gap: 0.75rem;
+    gap: 0.5rem;
     flex-wrap: wrap;
 }
 
@@ -282,9 +284,9 @@ onMounted(() => loadPage(1));
     gap: 0.1rem;
     background: #fff;
     border: 1px solid #e2e8f0;
-    border-radius: 10px;
-    padding: 0.65rem 1rem;
-    min-width: 110px;
+    border-radius: 8px;
+    padding: 0.45rem 0.8rem;
+    min-width: 100px;
 }
 
 .as-kpi--accent {
@@ -293,7 +295,7 @@ onMounted(() => loadPage(1));
 }
 
 .as-kpi-value {
-    font-size: 1.35rem;
+    font-size: 1.15rem;
     font-weight: 800;
     color: #0f172a;
     letter-spacing: -0.02em;
@@ -473,7 +475,7 @@ onMounted(() => loadPage(1));
 
 .as-table tbody tr:last-child { border-bottom: none; }
 .as-table tbody tr:hover { background: #f8fafc; }
-.as-table tbody td { padding: 0.8rem 1rem; vertical-align: middle; }
+.as-table tbody td { padding: 0.55rem 0.75rem; vertical-align: middle; }
 .as-td-num { text-align: right; }
 
 /* Cell contents */

@@ -2,12 +2,20 @@
     <section class="product-page">
         <div class="product-shell">
             <header class="form-header">
-                <button type="button" class="back-link" @click="goBack">
-                    <mdicon name="arrow-left" size="15" />
-                    Products
-                </button>
-                <h1>{{ isEdit ? 'Edit product' : 'New product' }}</h1>
-                <p>Pricing, stock behavior, and recipes for {{ currentStoreLabel }}.</p>
+                <div class="form-header-main">
+                    <button type="button" class="back-link" @click="goBack">
+                        <mdicon name="arrow-left" size="15" />
+                        Products
+                    </button>
+                    <h1>{{ isEdit ? 'Edit product' : 'New product' }}</h1>
+                    <p>Pricing, stock behavior, and recipes for {{ currentStoreLabel }}.</p>
+                </div>
+                <div class="form-header-actions">
+                    <button type="button" class="ghost-button ghost-button--sm" @click="goBack">Cancel</button>
+                    <button class="primary-button primary-button--sm" type="button" :disabled="saveDisabled" @click="save">
+                        {{ isSaving ? 'Saving…' : isEdit ? 'Save changes' : 'Create product' }}
+                    </button>
+                </div>
             </header>
 
             <form class="product-form" @submit.prevent="save">
@@ -21,8 +29,11 @@
                     Finish or remove incomplete recipe lines before saving.
                 </div>
 
-                <!-- ── Details ── -->
-                <div class="form-card">
+                <div class="product-form-layout">
+                    <!-- ── Left Column: Details & Pricing ── -->
+                    <div class="product-form-column">
+                        <!-- ── Details ── -->
+                        <div class="form-card">
                     <div class="card-title">
                         <h2>Details</h2>
                     </div>
@@ -65,23 +76,125 @@
                     </div>
 
                     <div class="form-grid">
-                        <label class="field">
-                            <span>Category</span>
-                            <select v-model="form.category">
+                        <div class="field">
+                            <div class="field-header">
+                                <span>Category</span>
+                                <button
+                                    v-if="!isAddingCategory"
+                                    type="button"
+                                    class="field-action-btn"
+                                    @click="startAddCategory"
+                                >
+                                    <mdicon name="plus" size="13" />
+                                    <span>Add category</span>
+                                </button>
+                            </div>
+                            <div v-if="isAddingCategory" class="inline-create-box">
+                                <div class="inline-create-input-wrap">
+                                    <input
+                                        ref="newCategoryInputRef"
+                                        v-model="newCategoryName"
+                                        type="text"
+                                        class="inline-create-input"
+                                        placeholder="New category name..."
+                                        :disabled="isSavingCategory"
+                                        @keydown.enter.prevent="submitNewCategory"
+                                        @keydown.esc.prevent="cancelAddCategory"
+                                    />
+                                </div>
+                                <div class="inline-create-actions">
+                                    <button
+                                        type="button"
+                                        class="inline-create-btn inline-create-btn--save"
+                                        :disabled="!newCategoryName.trim() || isSavingCategory"
+                                        @click="submitNewCategory"
+                                    >
+                                        {{ isSavingCategory ? 'Adding...' : 'Add' }}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        class="inline-create-btn inline-create-btn--cancel"
+                                        :disabled="isSavingCategory"
+                                        @click="cancelAddCategory"
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            </div>
+                            <select
+                                v-else
+                                v-model="form.category"
+                                @change="onCategorySelectChange"
+                            >
                                 <option value="">Uncategorized</option>
                                 <option v-for="category in categoryOptions" :key="category" :value="category">
                                     {{ category }}
                                 </option>
+                                <option value="__ADD_NEW_CATEGORY__" class="select-option-add">
+                                    + Add new category...
+                                </option>
                             </select>
-                        </label>
-                        <label class="field">
-                            <span>Unit</span>
-                            <select v-model="form.unit" required>
+                        </div>
+
+                        <div class="field">
+                            <div class="field-header">
+                                <span>Unit</span>
+                                <button
+                                    v-if="!isAddingUnit"
+                                    type="button"
+                                    class="field-action-btn"
+                                    @click="startAddUnit"
+                                >
+                                    <mdicon name="plus" size="13" />
+                                    <span>Add unit</span>
+                                </button>
+                            </div>
+                            <div v-if="isAddingUnit" class="inline-create-box">
+                                <div class="inline-create-input-wrap">
+                                    <input
+                                        ref="newUnitInputRef"
+                                        v-model="newUnitName"
+                                        type="text"
+                                        class="inline-create-input"
+                                        placeholder="New unit (e.g. bottle, pack)..."
+                                        :disabled="isSavingUnit"
+                                        @keydown.enter.prevent="submitNewUnit"
+                                        @keydown.esc.prevent="cancelAddUnit"
+                                    />
+                                </div>
+                                <div class="inline-create-actions">
+                                    <button
+                                        type="button"
+                                        class="inline-create-btn inline-create-btn--save"
+                                        :disabled="!newUnitName.trim() || isSavingUnit"
+                                        @click="submitNewUnit"
+                                    >
+                                        {{ isSavingUnit ? 'Adding...' : 'Add' }}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        class="inline-create-btn inline-create-btn--cancel"
+                                        :disabled="isSavingUnit"
+                                        @click="cancelAddUnit"
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            </div>
+                            <select
+                                v-else
+                                v-model="form.unit"
+                                required
+                                @change="onUnitSelectChange"
+                            >
                                 <option v-for="unit in unitOptions" :key="unit" :value="unit">
                                     {{ unit }}
                                 </option>
+                                <option value="__ADD_NEW_UNIT__" class="select-option-add">
+                                    + Add new unit...
+                                </option>
                             </select>
-                        </label>
+                        </div>
                         <label class="field">
                             <span>SKU <em>optional</em></span>
                             <input v-model="form.sku" type="text" />
@@ -133,7 +246,10 @@
                     <p v-if="marginPct !== null && marginPct < 0" class="margin-note margin-note--bad">Cost exceeds selling price.</p>
                     <p v-else-if="marginPct !== null && marginPct < 30" class="margin-note margin-note--warn">Below 30% — consider adjusting pricing.</p>
                 </div>
+            </div>
 
+            <!-- ── Right Column: Configuration, Inventory & Actions ── -->
+            <div class="product-form-column">
                 <!-- ── Recipe ── -->
                 <div v-if="form.type === 'RECIPE'" class="form-card">
                     <div class="card-title card-title--row">
@@ -352,8 +468,8 @@
                     </label>
                 </div>
 
-                <!-- ── Sticky actions ── -->
-                <div class="actions-bar">
+                <!-- ── Save actions ── -->
+                <div class="actions-card">
                     <span v-if="formError" class="actions-error">{{ formError }}</span>
                     <div class="actions-buttons">
                         <button type="button" class="ghost-button" @click="goBack">Cancel</button>
@@ -362,7 +478,9 @@
                         </button>
                     </div>
                 </div>
-            </form>
+            </div>
+        </div>
+    </form>
         </div>
 
         <IngredientModal
@@ -399,6 +517,7 @@ import { listStock, StockItem } from '@/api/inventory';
 import { createProduct, getProduct, updateProduct } from '@/api/products';
 import { listRecipeLines, updateRecipeLines } from '@/api/recipes';
 import { listPackagingLines, updatePackagingLines } from '@/api/productPackaging';
+import { updateStore } from '@/api/stores';
 import { useToast } from '@/composables/useToast';
 import { useStoreContextStore } from '@/stores/storeContext';
 import { useUserContextStore } from '@/stores/userContext';
@@ -681,6 +800,156 @@ const categoryOptions = computed(() => {
     }
     return all;
 });
+
+// ── Inline category creation ──
+const previousCategory = ref('');
+const isAddingCategory = ref(false);
+const newCategoryName = ref('');
+const isSavingCategory = ref(false);
+const newCategoryInputRef = ref<HTMLInputElement | null>(null);
+
+const startAddCategory = () => {
+    previousCategory.value = form.value.category;
+    isAddingCategory.value = true;
+    newCategoryName.value = '';
+    nextTick(() => {
+        newCategoryInputRef.value?.focus();
+    });
+};
+
+const cancelAddCategory = () => {
+    isAddingCategory.value = false;
+    newCategoryName.value = '';
+    form.value.category = previousCategory.value;
+};
+
+const onCategorySelectChange = () => {
+    if (form.value.category === '__ADD_NEW_CATEGORY__') {
+        startAddCategory();
+    }
+};
+
+const submitNewCategory = async () => {
+    const value = newCategoryName.value.trim();
+    if (!value) return;
+
+    const existing = categoryOptions.value.find(
+        (c) => c.toLowerCase() === value.toLowerCase()
+    );
+    if (existing) {
+        form.value.category = existing;
+        isAddingCategory.value = false;
+        newCategoryName.value = '';
+        showToast(`Category "${existing}" already exists. Selected.`, 'info');
+        return;
+    }
+
+    isSavingCategory.value = true;
+    try {
+        const storeId = storeContext.currentStoreId;
+        const currentStoreCategories = storeContext.currentStore?.categoryOptions ?? DEFAULT_CATEGORY_OPTIONS;
+        const updatedCategories = normalizeOptions([...currentStoreCategories, value]);
+
+        if (storeId) {
+            await updateStore(storeId, {
+                categoryOptions: updatedCategories,
+            });
+            await storeContext.fetchStores();
+        }
+
+        form.value.category = value;
+        showToast(`Category "${value}" added successfully.`, 'success');
+        isAddingCategory.value = false;
+        newCategoryName.value = '';
+    } catch (error: any) {
+        form.value.category = value;
+        const msg = error?.body?.error?.message;
+        if (msg) {
+            showToast(`Category applied to this product, but could not save store default: ${msg}`, 'warning');
+        } else {
+            showToast(`Category "${value}" added.`, 'success');
+        }
+        isAddingCategory.value = false;
+        newCategoryName.value = '';
+    } finally {
+        isSavingCategory.value = false;
+    }
+};
+
+// ── Inline unit creation ──
+const previousUnit = ref('');
+const isAddingUnit = ref(false);
+const newUnitName = ref('');
+const isSavingUnit = ref(false);
+const newUnitInputRef = ref<HTMLInputElement | null>(null);
+
+const startAddUnit = () => {
+    previousUnit.value = form.value.unit;
+    isAddingUnit.value = true;
+    newUnitName.value = '';
+    nextTick(() => {
+        newUnitInputRef.value?.focus();
+    });
+};
+
+const cancelAddUnit = () => {
+    isAddingUnit.value = false;
+    newUnitName.value = '';
+    form.value.unit = previousUnit.value || (unitOptions.value[0] ?? DEFAULT_UNIT_OPTIONS[0]);
+};
+
+const onUnitSelectChange = () => {
+    if (form.value.unit === '__ADD_NEW_UNIT__') {
+        startAddUnit();
+    }
+};
+
+const submitNewUnit = async () => {
+    const value = newUnitName.value.trim();
+    if (!value) return;
+
+    const existing = unitOptions.value.find(
+        (u) => u.toLowerCase() === value.toLowerCase()
+    );
+    if (existing) {
+        form.value.unit = existing;
+        isAddingUnit.value = false;
+        newUnitName.value = '';
+        showToast(`Unit "${existing}" already exists. Selected.`, 'info');
+        return;
+    }
+
+    isSavingUnit.value = true;
+    try {
+        const storeId = storeContext.currentStoreId;
+        const currentStoreUnits = storeContext.currentStore?.unitOptions ?? DEFAULT_UNIT_OPTIONS;
+        const updatedUnits = normalizeOptions([...currentStoreUnits, value]);
+
+        if (storeId) {
+            await updateStore(storeId, {
+                unitOptions: updatedUnits,
+            });
+            await storeContext.fetchStores();
+        }
+
+        form.value.unit = value;
+        showToast(`Unit "${value}" added successfully.`, 'success');
+        isAddingUnit.value = false;
+        newUnitName.value = '';
+    } catch (error: any) {
+        form.value.unit = value;
+        const msg = error?.body?.error?.message;
+        if (msg) {
+            showToast(`Unit applied to this product, but could not save store default: ${msg}`, 'warning');
+        } else {
+            showToast(`Unit "${value}" added.`, 'success');
+        }
+        isAddingUnit.value = false;
+        newUnitName.value = '';
+    } finally {
+        isSavingUnit.value = false;
+    }
+};
 
 const isNewProduct = computed(() => !productId.value);
 
@@ -1164,7 +1433,7 @@ watch(
     --c-surface: #ffffff;
     --c-bg: #f6f8f9;
     min-height: 100vh;
-    padding: 2rem 1.5rem 3rem;
+    padding: 1rem 1.5rem 1.75rem;
     background: var(--c-bg);
     color: var(--c-text);
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -1174,28 +1443,67 @@ watch(
    SHELL & HEADER
 ============================================================ */
 .product-shell {
-    max-width: 760px;
+    max-width: 1280px;
     margin: 0 auto;
     display: flex;
     flex-direction: column;
-    gap: 1.25rem;
+    gap: 0.85rem;
 }
 
 .form-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.25rem;
+    flex-wrap: wrap;
+}
+
+.form-header-main {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
 }
 
+.form-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.product-form-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+    gap: 1rem;
+    align-items: start;
+}
+
+.product-form-column {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.actions-card {
+    background: var(--c-surface);
+    border: 1px solid var(--c-border);
+    border-radius: 12px;
+    padding: 1rem 1.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    box-shadow: var(--shadow-sm);
+}
+
 .back-link {
     display: inline-flex;
     align-items: center;
-    gap: 0.3rem;
+    gap: 0.25rem;
     border: none;
     background: none;
     padding: 0;
-    margin-bottom: 0.75rem;
-    font-size: 0.82rem;
+    margin-bottom: 0.2rem;
+    font-size: 0.78rem;
     font-weight: 600;
     font-family: inherit;
     color: var(--c-muted);
@@ -1206,18 +1514,18 @@ watch(
 .back-link:hover { color: var(--c-accent-dark); }
 
 .form-header h1 {
-    font-size: 1.9rem;
+    font-size: 1.35rem;
     font-weight: 800;
-    letter-spacing: -0.03em;
-    margin: 0 0 0.35rem;
+    letter-spacing: -0.025em;
+    margin: 0 0 0.15rem;
     color: var(--c-text);
 }
 
 .form-header p {
     color: var(--c-muted);
-    line-height: 1.55;
+    line-height: 1.4;
     margin: 0;
-    font-size: 0.92rem;
+    font-size: 0.82rem;
 }
 
 /* ============================================================
@@ -1290,6 +1598,113 @@ watch(
 }
 
 .field--narrow { max-width: 320px; }
+
+.field-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.field-header span {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--c-text);
+}
+
+.field-action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    border: none;
+    background: transparent;
+    color: var(--c-accent);
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 0;
+    transition: color 0.15s;
+}
+
+.field-action-btn:hover {
+    color: var(--c-accent-dark);
+    text-decoration: underline;
+}
+
+.inline-create-box {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    width: 100%;
+}
+
+.inline-create-input-wrap {
+    flex: 1;
+    min-width: 0;
+}
+
+.inline-create-input {
+    width: 100%;
+    border: 1.5px solid var(--c-accent) !important;
+    border-radius: 9px;
+    padding: 0.58rem 0.8rem !important;
+    font-size: 0.88rem !important;
+    color: var(--c-text);
+    background: white !important;
+    box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.12) !important;
+    outline: none;
+}
+
+.inline-create-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    flex-shrink: 0;
+}
+
+.inline-create-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.58rem 0.75rem;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.12s ease;
+    white-space: nowrap;
+    border: 1px solid transparent;
+}
+
+.inline-create-btn--save {
+    background: var(--c-accent);
+    color: white;
+}
+
+.inline-create-btn--save:hover:not(:disabled) {
+    background: var(--c-accent-dark);
+}
+
+.inline-create-btn--save:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.inline-create-btn--cancel {
+    background: #f1f5f9;
+    color: var(--c-muted);
+    border-color: var(--c-border);
+}
+
+.inline-create-btn--cancel:hover {
+    background: #e2e8f0;
+    color: var(--c-text);
+}
+
+.select-option-add {
+    font-weight: 600;
+    color: var(--c-accent-dark);
+}
 
 .field > span {
     font-size: 0.8rem;
@@ -1517,6 +1932,9 @@ watch(
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
+    max-height: 260px;
+    overflow-y: auto;
+    padding-right: 4px;
 }
 
 .recipe-line-row {
@@ -1933,6 +2351,17 @@ watch(
 /* ============================================================
    RESPONSIVE
 ============================================================ */
+@media (max-width: 960px) {
+    .product-form-layout {
+        grid-template-columns: 1fr;
+    }
+    .form-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.75rem;
+    }
+}
+
 @media (max-width: 640px) {
     .product-page { padding: 1rem 0.875rem 2.5rem; }
     .product-shell { gap: 1rem; }

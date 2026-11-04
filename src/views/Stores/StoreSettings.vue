@@ -1488,7 +1488,7 @@ watch(
 .st-page {
     min-height: 100vh;
     background: var(--c-bg);
-    padding: 2.5rem 1.5rem 4rem;
+    padding: 1rem 1.5rem 2rem;
     font-family: var(--app-font-sans);
     color: var(--c-text);
 }
@@ -1498,7 +1498,7 @@ watch(
     margin: 0 auto;
     display: flex;
     flex-direction: column;
-    gap: 1.75rem;
+    gap: 0.85rem;
 }
 
 /* ── Page header ── */
@@ -1506,44 +1506,44 @@ watch(
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    gap: 1.25rem;
+    gap: 1rem;
     flex-wrap: wrap;
 }
 
 .st-header-left {
     display: flex;
     flex-direction: column;
-    gap: 0.3rem;
+    gap: 0.2rem;
 }
 
 .st-eyebrow {
     display: inline-flex;
     align-items: center;
-    padding: 0.2rem 0.65rem;
+    padding: 0.2rem 0.6rem;
     border-radius: 999px;
     font-size: 0.65rem;
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.14em;
+    letter-spacing: 0.08em;
     background: rgba(13, 148, 136, 0.1);
     color: var(--c-accent);
     width: fit-content;
 }
 
 .st-title {
-    font-size: 2rem;
+    font-size: 1.35rem;
     font-weight: 800;
     margin: 0;
     color: var(--c-text);
-    letter-spacing: -0.03em;
-    line-height: 1.15;
+    letter-spacing: -0.025em;
+    line-height: 1.2;
 }
 
 .st-subtitle {
     margin: 0;
     color: var(--c-muted);
-    font-size: 0.9rem;
-    line-height: 1.5;
+    font-size: 0.82rem;
+    line-height: 1.4;
 }
 
 .st-header-right {
@@ -1757,9 +1757,9 @@ watch(
     justify-content: center;
     background: transparent;
     border: 1px solid var(--c-border);
-    border-radius: 8px;
-    padding: 0.55rem 1rem;
-    font-size: 0.875rem;
+    border-radius: 7px;
+    padding: 0.45rem 0.9rem;
+    font-size: 0.82rem;
     font-weight: 600;
     color: #475569;
     cursor: pointer;
@@ -1794,9 +1794,9 @@ watch(
     justify-content: center;
     background: var(--c-accent);
     border: none;
-    border-radius: 8px;
-    padding: 0.55rem 1.1rem;
-    font-size: 0.875rem;
+    border-radius: 7px;
+    padding: 0.45rem 0.9rem;
+    font-size: 0.82rem;
     font-weight: 600;
     color: #ffffff;
     cursor: pointer;
@@ -1820,9 +1820,9 @@ watch(
     justify-content: center;
     background: #b91c1c;
     border: none;
-    border-radius: 8px;
-    padding: 0.55rem 1.1rem;
-    font-size: 0.875rem;
+    border-radius: 7px;
+    padding: 0.45rem 0.9rem;
+    font-size: 0.82rem;
     font-weight: 600;
     color: #ffffff;
     cursor: pointer;

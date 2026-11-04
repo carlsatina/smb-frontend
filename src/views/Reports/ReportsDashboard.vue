@@ -1537,7 +1537,7 @@ watch(
     --c-bad: #e11d48;
     --c-warn: #d97706;
     min-height: 100vh;
-    padding: 2rem 1.5rem 3rem;
+    padding: 1rem 1.5rem 2rem;
     background: var(--c-bg);
     color: var(--c-text);
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -1547,49 +1547,49 @@ watch(
    SHELL & HEADER
 ============================================================ */
 .reports-shell {
-    max-width: 1200px;
+    max-width: 1280px;
     margin: 0 auto;
     display: flex;
     flex-direction: column;
-    gap: 1.25rem;
+    gap: 0.85rem;
 }
 
 .reports-header {
     display: flex;
     flex-wrap: wrap;
-    gap: 1.25rem;
+    gap: 1rem;
     align-items: flex-start;
     justify-content: space-between;
-    margin-bottom: 0.25rem;
+    margin-bottom: 0.15rem;
 }
 
 .reports-eyebrow {
     display: inline-block;
-    font-size: 0.68rem;
-    font-weight: 700;
+    font-size: 0.65rem;
+    font-weight: 750;
     text-transform: uppercase;
-    letter-spacing: 0.12em;
+    letter-spacing: 0.08em;
     color: var(--c-accent);
     background: rgba(13, 148, 136, 0.08);
-    padding: 0.28rem 0.75rem;
+    padding: 0.2rem 0.6rem;
     border-radius: 999px;
-    margin-bottom: 0.6rem;
+    margin-bottom: 0.25rem;
 }
 
 .reports-title h1 {
-    font-size: 1.9rem;
+    font-size: 1.35rem;
     font-weight: 800;
-    letter-spacing: -0.03em;
-    margin: 0 0 0.35rem;
+    letter-spacing: -0.025em;
+    margin: 0 0 0.15rem;
     color: var(--c-text);
 }
 
 .reports-title p {
     color: var(--c-muted);
     max-width: 480px;
-    line-height: 1.55;
+    line-height: 1.4;
     margin: 0;
-    font-size: 0.92rem;
+    font-size: 0.82rem;
 }
 
 /* ============================================================
@@ -1644,8 +1644,8 @@ watch(
 .range-trigger {
     display: inline-flex;
     align-items: center;
-    gap: 0.4rem;
-    padding: 0.35rem 0.65rem;
+    gap: 0.45rem;
+    padding: 0.4rem 0.85rem;
     border-radius: 7px;
     border: none;
     background: transparent;

@@ -2,12 +2,20 @@
     <section class="po-form-page">
         <div class="po-form-shell">
             <header class="form-header">
-                <button type="button" class="back-link" @click="goBack">
-                    <mdicon name="arrow-left" size="15" />
-                    Purchase orders
-                </button>
-                <h1>New purchase order</h1>
-                <p>Select a supplier, add line items, and set an expected delivery date for {{ currentStoreLabel }}.</p>
+                <div class="form-header-main">
+                    <button type="button" class="back-link" @click="goBack">
+                        <mdicon name="arrow-left" size="15" />
+                        Purchase orders
+                    </button>
+                    <h1>New purchase order</h1>
+                    <p>Select a supplier, add line items, and set an expected delivery date for {{ currentStoreLabel }}.</p>
+                </div>
+                <div v-if="!isPlanLocked" class="form-header-actions">
+                    <button type="button" class="ghost-button ghost-button--sm" @click="goBack">Cancel</button>
+                    <button class="primary-button primary-button--sm" type="button" :disabled="isCreateDisabled" @click="createOrder">
+                        {{ isSubmitting ? 'Creating…' : 'Create purchase order' }}
+                    </button>
+                </div>
             </header>
 
             <PlanGate
@@ -18,202 +26,250 @@
             />
 
             <form v-else class="po-form" @submit.prevent="createOrder">
-                <!-- ── Supplier & delivery ── -->
-                <div class="form-card">
-                    <div class="card-title">
-                        <h2>Supplier &amp; delivery</h2>
-                    </div>
+                <div class="po-form-layout">
+                    <!-- ── Sidebar: Supplier, delivery & summary ── -->
+                    <div class="po-form-sidebar">
+                        <div class="form-card">
+                            <div class="card-title">
+                                <h2>Supplier &amp; delivery</h2>
+                            </div>
 
-                    <div class="form-grid">
-                        <label class="field">
-                            <span>Supplier</span>
-                            <div class="supplier-row">
-                                <SearchableSelect
-                                    v-model="supplierSelection"
-                                    :options="supplierOptions"
-                                    :disabled="!canWrite"
-                                    placeholder="No supplier"
-                                    search-placeholder="Search suppliers…"
-                                />
-                                <button
-                                    type="button"
-                                    class="ghost-button"
-                                    :disabled="!canWrite"
-                                    @click="toggleSupplierForm"
-                                >
-                                    {{ showSupplierForm ? 'Cancel' : 'New supplier' }}
+                            <div class="sidebar-fields">
+                                <label class="field">
+                                    <span>Supplier</span>
+                                    <div class="supplier-row">
+                                        <SearchableSelect
+                                            v-model="supplierSelection"
+                                            :options="supplierOptions"
+                                            :disabled="!canWrite"
+                                            placeholder="No supplier"
+                                            search-placeholder="Search suppliers…"
+                                        />
+                                        <button
+                                            type="button"
+                                            class="ghost-button ghost-button--compact"
+                                            :disabled="!canWrite"
+                                            @click="toggleSupplierForm"
+                                        >
+                                            {{ showSupplierForm ? 'Cancel' : 'New' }}
+                                        </button>
+                                    </div>
+                                </label>
+                                <label class="field">
+                                    <span>Expected delivery date</span>
+                                    <input v-model="formState.expectedDate" type="date" :disabled="!canWrite" />
+                                </label>
+                                <label v-if="supplierSelection === 'CUSTOM'" class="field">
+                                    <span>Supplier name</span>
+                                    <input
+                                        v-model="formState.supplierName"
+                                        type="text"
+                                        placeholder="Fresh Supplier Co"
+                                        :disabled="!canWrite"
+                                    />
+                                </label>
+                            </div>
+
+                            <!-- Inline new supplier form -->
+                            <div v-if="showSupplierForm" class="supplier-form">
+                                <div class="supplier-form-head">
+                                    <span class="supplier-form-title">New supplier</span>
+                                    <button
+                                        type="button"
+                                        class="supplier-form-close"
+                                        title="Close"
+                                        @click="toggleSupplierForm"
+                                    >×</button>
+                                </div>
+                                <label class="field">
+                                    <span>Supplier name *</span>
+                                    <input v-model="supplierForm.name" type="text" placeholder="e.g. Fresh Supplier Co" />
+                                </label>
+                                <label class="field">
+                                    <span>Email <em>optional</em></span>
+                                    <input v-model="supplierForm.email" type="email" placeholder="ops@supplier.com" />
+                                </label>
+                                <label class="field">
+                                    <span>Phone <em>optional</em></span>
+                                    <input v-model="supplierForm.phone" type="tel" placeholder="+63 900 000 0000" />
+                                </label>
+                                <div class="supplier-actions">
+                                    <span v-if="supplierFormError" class="form-error">{{ supplierFormError }}</span>
+                                    <div class="supplier-actions-btns">
+                                        <button
+                                            type="button"
+                                            class="ghost-button ghost-button--sm"
+                                            :disabled="isCreatingSupplier"
+                                            @click="toggleSupplierForm"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            type="button"
+                                            class="primary-button primary-button--sm"
+                                            :disabled="isCreatingSupplier || !supplierForm.name.trim()"
+                                            @click="createSupplierFromForm"
+                                        >
+                                            {{ isCreatingSupplier ? 'Saving…' : 'Save supplier' }}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ── Summary card ── -->
+                        <div class="form-card summary-card">
+                            <div class="card-title">
+                                <h2>Order summary</h2>
+                            </div>
+                            <div class="summary-rows">
+                                <div class="summary-row">
+                                    <span class="summary-label">Items count</span>
+                                    <span class="summary-val">{{ lineItems.length }}</span>
+                                </div>
+                                <div class="summary-row">
+                                    <span class="summary-label">Total estimated cost</span>
+                                    <span class="summary-val summary-val--highlight">{{ formatMoney(orderTotal) }}</span>
+                                </div>
+                            </div>
+                            <span v-if="formError" class="actions-error">{{ formError }}</span>
+                            <div class="summary-actions">
+                                <button type="button" class="ghost-button" @click="goBack">Cancel</button>
+                                <button class="primary-button" type="submit" :disabled="isCreateDisabled">
+                                    {{ isSubmitting ? 'Creating…' : 'Create PO' }}
                                 </button>
                             </div>
-                        </label>
-                        <label class="field">
-                            <span>Expected delivery date</span>
-                            <input v-model="formState.expectedDate" type="date" :disabled="!canWrite" />
-                        </label>
-                        <label v-if="supplierSelection === 'CUSTOM'" class="field">
-                            <span>Supplier name</span>
-                            <input
-                                v-model="formState.supplierName"
-                                type="text"
-                                placeholder="Fresh Supplier Co"
-                                :disabled="!canWrite"
-                            />
-                        </label>
-                    </div>
-
-                    <!-- Inline new supplier form -->
-                    <div v-if="showSupplierForm" class="supplier-form">
-                        <label class="field">
-                            <span>Name</span>
-                            <input v-model="supplierForm.name" type="text" placeholder="Supplier name" />
-                        </label>
-                        <label class="field">
-                            <span>Email <em>optional</em></span>
-                            <input v-model="supplierForm.email" type="email" placeholder="ops@supplier.com" />
-                        </label>
-                        <label class="field">
-                            <span>Phone <em>optional</em></span>
-                            <input v-model="supplierForm.phone" type="tel" placeholder="+63 900 000 0000" />
-                        </label>
-                        <div class="supplier-actions">
-                            <span v-if="supplierFormError" class="form-error">{{ supplierFormError }}</span>
-                            <button
-                                type="button"
-                                class="ghost-button"
-                                :disabled="isCreatingSupplier"
-                                @click="createSupplierFromForm"
-                            >
-                                {{ isCreatingSupplier ? 'Saving…' : 'Save supplier' }}
-                            </button>
                         </div>
                     </div>
-                </div>
 
-                <!-- ── Items ── -->
-                <div class="form-card">
-                    <div class="card-title">
-                        <h2>Items</h2>
-                        <p>Unit costs auto-fill from your product and ingredient records — override them per order.</p>
-                    </div>
+                    <!-- ── Main: Items list ── -->
+                    <div class="po-form-main">
+                        <div class="form-card">
+                            <div class="card-title-row">
+                                <div class="card-title">
+                                    <h2>Items</h2>
+                                    <p>Unit costs auto-fill from your records — override them per order.</p>
+                                </div>
+                                <button
+                                    v-if="canWrite && lineItems.length > 0"
+                                    type="button"
+                                    class="add-line-btn"
+                                    @click="addLine"
+                                >
+                                    + Add item
+                                </button>
+                            </div>
 
-                    <div v-if="!canWrite" class="panel-state">You have view-only access.</div>
-                    <div v-else-if="lineItems.length === 0" class="items-empty">
-                        <p>No items yet.</p>
-                        <button type="button" class="add-line-btn" @click="addLine">+ Add item</button>
-                    </div>
-                    <template v-else>
-                        <div class="table-wrap">
-                            <table class="line-items-table">
-                                <thead>
-                                    <tr>
-                                        <th>Type</th>
-                                        <th>Item</th>
-                                        <th class="num">Qty ordered</th>
-                                        <th class="num">Cost / unit</th>
-                                        <th class="num">Total</th>
-                                        <th></th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr
-                                        v-for="(line, index) in lineItems"
-                                        :key="line.key"
-                                        :class="{ 'row-incomplete': !line.itemType || !line.itemId }"
-                                    >
-                                        <td class="col-type">
-                                            <select
-                                                v-model="line.itemType"
-                                                class="line-select"
-                                                :disabled="!canWrite"
-                                                @change="resetLineItem(line)"
+                            <div v-if="!canWrite" class="panel-state">You have view-only access.</div>
+                            <div v-else-if="lineItems.length === 0" class="items-empty">
+                                <p>No items yet.</p>
+                                <button type="button" class="add-line-btn" @click="addLine">+ Add item</button>
+                            </div>
+                            <template v-else>
+                                <div class="table-wrap">
+                                    <table class="line-items-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Type</th>
+                                                <th>Item</th>
+                                                <th class="num">Qty ordered</th>
+                                                <th class="num">Cost / unit</th>
+                                                <th class="num">Total</th>
+                                                <th></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr
+                                                v-for="(line, index) in lineItems"
+                                                :key="line.key"
+                                                :class="{ 'row-incomplete': !line.itemType || !line.itemId }"
                                             >
-                                                <option value="" disabled>Type</option>
-                                                <option value="PRODUCT">Product</option>
-                                                <option value="INGREDIENT">Ingredient</option>
-                                            </select>
-                                        </td>
-                                        <td class="col-item">
-                                            <SearchableSelect
-                                                :ref="(el) => setItemRef(el, index)"
-                                                :model-value="line.itemId"
-                                                :options="lineItemOptions(line)"
-                                                :disabled="!line.itemType || !canWrite"
-                                                :placeholder="line.itemType ? 'Select item' : '—'"
-                                                search-placeholder="Search items…"
-                                                @update:model-value="(val) => onLineItemSelected(line, index, val)"
-                                            />
-                                        </td>
-                                        <td class="col-qty">
-                                            <div class="line-unit-wrap">
-                                                <input
-                                                    :ref="(el) => setQtyRef(el, index)"
-                                                    v-model.number="line.qtyOrdered"
-                                                    type="number"
-                                                    min="0"
-                                                    step="0.01"
-                                                    class="line-input"
-                                                    :disabled="!canWrite"
-                                                />
-                                                <span v-if="line.purchaseUnit" class="line-unit-tag">{{ line.purchaseUnit }}</span>
-                                            </div>
-                                            <div v-if="line.purchaseUnit && line.qtyOrdered > 0" class="line-hint">
-                                                = {{ formatQty(lineBaseQty(line)) }} {{ ingredientBaseUnit(line) }}
-                                            </div>
-                                        </td>
-                                        <td class="col-cost">
-                                            <input
-                                                v-model.number="line.unitCost"
-                                                type="number"
-                                                min="0"
-                                                step="0.01"
-                                                class="line-input"
-                                                :disabled="!canWrite"
-                                            />
-                                            <div v-if="line.purchaseUnit" class="line-hint">per {{ line.purchaseUnit }}</div>
-                                        </td>
-                                        <td class="col-total">{{ formatMoney(lineTotal(line)) }}</td>
-                                        <td class="col-remove">
-                                            <button
-                                                type="button"
-                                                class="remove-btn"
-                                                :disabled="!canWrite"
-                                                @click="removeLine(index)"
-                                                title="Remove line"
-                                            >
-                                                <mdicon name="close" size="16" />
-                                            </button>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                                <tfoot>
-                                    <tr>
-                                        <td colspan="2" class="tfoot-add">
-                                            <button
-                                                type="button"
-                                                class="add-line-btn"
-                                                :disabled="!canWrite"
-                                                @click="addLine"
-                                            >
-                                                + Add item
-                                            </button>
-                                        </td>
-                                        <td colspan="2" class="tfoot-label">Order total</td>
-                                        <td class="col-total tfoot-total">{{ formatMoney(orderTotal) }}</td>
-                                        <td></td>
-                                    </tr>
-                                </tfoot>
-                            </table>
+                                                <td class="col-type">
+                                                    <select
+                                                        v-model="line.itemType"
+                                                        class="line-select"
+                                                        :disabled="!canWrite"
+                                                        @change="resetLineItem(line)"
+                                                    >
+                                                        <option value="" disabled>Type</option>
+                                                        <option value="PRODUCT">Product</option>
+                                                        <option value="INGREDIENT">Ingredient</option>
+                                                    </select>
+                                                </td>
+                                                <td class="col-item">
+                                                    <SearchableSelect
+                                                        :ref="(el) => setItemRef(el, index)"
+                                                        :model-value="line.itemId"
+                                                        :options="lineItemOptions(line)"
+                                                        :disabled="!line.itemType || !canWrite"
+                                                        :placeholder="line.itemType ? 'Select item' : '—'"
+                                                        search-placeholder="Search items…"
+                                                        @update:model-value="(val) => onLineItemSelected(line, index, val)"
+                                                    />
+                                                </td>
+                                                <td class="col-qty">
+                                                    <div class="line-unit-wrap">
+                                                        <input
+                                                            :ref="(el) => setQtyRef(el, index)"
+                                                            v-model.number="line.qtyOrdered"
+                                                            type="number"
+                                                            min="0"
+                                                            step="0.01"
+                                                            class="line-input"
+                                                            :disabled="!canWrite"
+                                                        />
+                                                        <span v-if="line.purchaseUnit" class="line-unit-tag">{{ line.purchaseUnit }}</span>
+                                                    </div>
+                                                    <div v-if="line.purchaseUnit && line.qtyOrdered > 0" class="line-hint">
+                                                        = {{ formatQty(lineBaseQty(line)) }} {{ ingredientBaseUnit(line) }}
+                                                    </div>
+                                                </td>
+                                                <td class="col-cost">
+                                                    <input
+                                                        v-model.number="line.unitCost"
+                                                        type="number"
+                                                        min="0"
+                                                        step="0.01"
+                                                        class="line-input"
+                                                        :disabled="!canWrite"
+                                                    />
+                                                    <div v-if="line.purchaseUnit" class="line-hint">per {{ line.purchaseUnit }}</div>
+                                                </td>
+                                                <td class="col-total">{{ formatMoney(lineTotal(line)) }}</td>
+                                                <td class="col-remove">
+                                                    <button
+                                                        type="button"
+                                                        class="remove-btn"
+                                                        :disabled="!canWrite"
+                                                        @click="removeLine(index)"
+                                                        title="Remove line"
+                                                    >
+                                                        <mdicon name="close" size="16" />
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                        <tfoot>
+                                            <tr>
+                                                <td colspan="2" class="tfoot-add">
+                                                    <button
+                                                        type="button"
+                                                        class="add-line-btn"
+                                                        :disabled="!canWrite"
+                                                        @click="addLine"
+                                                    >
+                                                        + Add item
+                                                    </button>
+                                                </td>
+                                                <td colspan="2" class="tfoot-label">Order total</td>
+                                                <td class="col-total tfoot-total">{{ formatMoney(orderTotal) }}</td>
+                                                <td></td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+                            </template>
                         </div>
-                    </template>
-                </div>
-
-                <!-- ── Sticky actions ── -->
-                <div class="actions-bar">
-                    <span v-if="formError" class="actions-error">{{ formError }}</span>
-                    <div class="actions-buttons">
-                        <button type="button" class="ghost-button" @click="goBack">Cancel</button>
-                        <button class="primary-button" type="submit" :disabled="isCreateDisabled">
-                            {{ isSubmitting ? 'Creating…' : 'Create purchase order' }}
-                        </button>
                     </div>
                 </div>
             </form>
@@ -541,7 +597,7 @@ watch(() => supplierSelection.value, (v) => { if (v !== 'CUSTOM') formState.supp
     --c-surface: #ffffff;
     --c-bg: #f6f8f9;
     min-height: 100vh;
-    padding: 2rem 1.5rem 3rem;
+    padding: 1rem 1.5rem 1.75rem;
     background: var(--c-bg);
     color: var(--c-text);
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -551,28 +607,123 @@ watch(() => supplierSelection.value, (v) => { if (v !== 'CUSTOM') formState.supp
    SHELL & HEADER
 ============================================================ */
 .po-form-shell {
-    max-width: 760px;
+    max-width: 1280px;
     margin: 0 auto;
     display: flex;
     flex-direction: column;
-    gap: 1.25rem;
+    gap: 0.85rem;
 }
 
 .form-header {
     display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+}
+
+.form-header-main {
+    flex: 1;
+    min-width: 0;
+}
+
+.form-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.po-form-layout {
+    display: grid;
+    grid-template-columns: 360px minmax(0, 1fr);
+    gap: 1rem;
+    align-items: start;
+}
+
+.po-form-sidebar {
+    display: flex;
     flex-direction: column;
-    align-items: flex-start;
+    gap: 1rem;
+}
+
+.po-form-main {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    min-width: 0;
+}
+
+.sidebar-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+}
+
+.card-title-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+}
+
+.ghost-button--compact {
+    padding: 0.45rem 0.65rem;
+    font-size: 0.78rem;
+}
+
+.summary-card {
+    background: #f8fafc;
+}
+
+.summary-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+    padding: 0.35rem 0;
+}
+
+.summary-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.875rem;
+}
+
+.summary-label {
+    color: var(--c-muted);
+}
+
+.summary-val {
+    font-weight: 600;
+    color: var(--c-text);
+}
+
+.summary-val--highlight {
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: var(--c-accent-dark);
+}
+
+.summary-actions {
+    display: flex;
+    gap: 0.6rem;
+    margin-top: 0.5rem;
+}
+
+.summary-actions .ghost-button,
+.summary-actions .primary-button {
+    flex: 1;
+    justify-content: center;
 }
 
 .back-link {
     display: inline-flex;
     align-items: center;
-    gap: 0.3rem;
+    gap: 0.25rem;
     border: none;
     background: none;
     padding: 0;
-    margin-bottom: 0.75rem;
-    font-size: 0.82rem;
+    margin-bottom: 0.2rem;
+    font-size: 0.78rem;
     font-weight: 600;
     font-family: inherit;
     color: var(--c-muted);
@@ -583,18 +734,18 @@ watch(() => supplierSelection.value, (v) => { if (v !== 'CUSTOM') formState.supp
 .back-link:hover { color: var(--c-accent-dark); }
 
 .form-header h1 {
-    font-size: 1.9rem;
+    font-size: 1.35rem;
     font-weight: 800;
-    letter-spacing: -0.03em;
-    margin: 0 0 0.35rem;
+    letter-spacing: -0.025em;
+    margin: 0 0 0.15rem;
     color: var(--c-text);
 }
 
 .form-header p {
     color: var(--c-muted);
-    line-height: 1.55;
+    line-height: 1.4;
     margin: 0;
-    font-size: 0.92rem;
+    font-size: 0.82rem;
 }
 
 /* ============================================================
@@ -603,30 +754,30 @@ watch(() => supplierSelection.value, (v) => { if (v !== 'CUSTOM') formState.supp
 .po-form {
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: 0.85rem;
 }
 
 .form-card {
     background: var(--c-surface);
     border: 1px solid var(--c-border);
-    border-radius: 16px;
-    padding: 1.5rem;
+    border-radius: 12px;
+    padding: 1.15rem;
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: 0.75rem;
 }
 
 .card-title h2 {
-    font-size: 1rem;
+    font-size: 0.95rem;
     font-weight: 700;
     color: var(--c-text);
     margin: 0;
 }
 
 .card-title p {
-    margin: 0.2rem 0 0;
+    margin: 0.15rem 0 0;
     color: var(--c-muted);
-    font-size: 0.82rem;
+    font-size: 0.78rem;
 }
 
 .panel-state {
@@ -698,22 +849,64 @@ watch(() => supplierSelection.value, (v) => { if (v !== 'CUSTOM') formState.supp
 .supplier-row > :first-child { flex: 1; min-width: 0; }
 
 .supplier-form {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 1rem;
-    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    padding: 1rem 1.1rem;
     background: #f8fafc;
-    border: 1px solid var(--c-border);
+    border: 1.5px solid var(--c-border);
     border-radius: 12px;
 }
 
-.supplier-actions {
-    grid-column: 1 / -1;
+.supplier-form-head {
     display: flex;
     align-items: center;
+    justify-content: space-between;
+    padding-bottom: 0.25rem;
+    border-bottom: 1px solid var(--c-border);
+}
+
+.supplier-form-title {
+    font-size: 0.84rem;
+    font-weight: 700;
+    color: var(--c-text);
+}
+
+.supplier-form-close {
+    background: transparent;
+    border: none;
+    font-size: 1.25rem;
+    line-height: 1;
+    color: var(--c-muted);
+    cursor: pointer;
+    padding: 0 0.25rem;
+}
+
+.supplier-form-close:hover {
+    color: var(--c-text);
+}
+
+.supplier-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-top: 0.25rem;
+}
+
+.supplier-actions-btns {
+    display: flex;
     justify-content: flex-end;
-    gap: 0.75rem;
-    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.primary-button--sm {
+    padding: 0.45rem 0.85rem;
+    font-size: 0.82rem;
+}
+
+.ghost-button--sm {
+    padding: 0.42rem 0.8rem;
+    font-size: 0.82rem;
 }
 
 .form-error {
@@ -741,7 +934,12 @@ watch(() => supplierSelection.value, (v) => { if (v !== 'CUSTOM') formState.supp
     color: var(--c-muted);
 }
 
-.table-wrap { overflow-x: auto; min-width: 0; }
+.table-wrap {
+    overflow-x: auto;
+    max-height: calc(100vh - 210px);
+    overflow-y: auto;
+    min-width: 0;
+}
 
 .line-items-table {
     width: 100%;
@@ -751,9 +949,9 @@ watch(() => supplierSelection.value, (v) => { if (v !== 'CUSTOM') formState.supp
 }
 
 .line-items-table thead th {
-    padding: 0.5rem 0.6rem;
+    padding: 0.45rem 0.5rem;
     text-align: left;
-    font-size: 0.66rem;
+    font-size: 0.65rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.07em;
@@ -771,7 +969,7 @@ watch(() => supplierSelection.value, (v) => { if (v !== 'CUSTOM') formState.supp
 .line-items-table tbody tr.row-incomplete { background: #fffdf5; }
 
 .line-items-table tbody td {
-    padding: 0.6rem 0.6rem;
+    padding: 0.45rem 0.5rem;
     vertical-align: top;
 }
 
@@ -1000,6 +1198,17 @@ watch(() => supplierSelection.value, (v) => { if (v !== 'CUSTOM') formState.supp
 /* ============================================================
    RESPONSIVE
 ============================================================ */
+@media (max-width: 960px) {
+    .po-form-layout {
+        grid-template-columns: 1fr;
+    }
+    .form-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.75rem;
+    }
+}
+
 @media (max-width: 640px) {
     .po-form-page { padding: 1rem 0.875rem 2.5rem; }
     .po-form-shell { gap: 1rem; }
@@ -1007,7 +1216,6 @@ watch(() => supplierSelection.value, (v) => { if (v !== 'CUSTOM') formState.supp
 
     .form-card { padding: 1.1rem; border-radius: 12px; }
     .form-grid { grid-template-columns: 1fr; }
-    .supplier-form { grid-template-columns: 1fr; }
 
     /* ── Line items table → card rows ── */
     .line-items-table { min-width: 0; }

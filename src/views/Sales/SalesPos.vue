@@ -10,12 +10,55 @@
                             <p>{{ currentStoreLabel }}</p>
                         </div>
                         <div class="panel-actions">
-                            <input
-                                v-model="searchQuery"
-                                type="text"
-                                class="search-input"
-                                placeholder="Search name, SKU, category"
-                            />
+                            <!-- View Mode Switcher: Cards vs Table List -->
+                            <div class="view-mode-tabs" role="group" aria-label="Catalog view mode">
+                                <button
+                                    type="button"
+                                    class="view-mode-tab"
+                                    :class="{ 'view-mode-tab--active': activeViewMode === 'cards' }"
+                                    title="Cards grid view"
+                                    @click="setViewMode('cards')"
+                                >
+                                    <mdicon name="view-grid-outline" size="16" />
+                                    <span>Cards</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    class="view-mode-tab"
+                                    :class="{ 'view-mode-tab--active': activeViewMode === 'table' }"
+                                    title="Table list view (optimized for 2,000+ items)"
+                                    @click="setViewMode('table')"
+                                >
+                                    <mdicon name="table-large" size="16" />
+                                    <span>Table List</span>
+                                    <span v-if="filteredProducts.length > 0" class="tab-badge">
+                                        {{ filteredProducts.length }}
+                                    </span>
+                                </button>
+                            </div>
+
+                            <div class="search-wrapper">
+                                <mdicon name="magnify" size="17" class="search-icon" />
+                                <input
+                                    ref="searchInputRef"
+                                    v-model="searchQuery"
+                                    type="text"
+                                    class="search-input"
+                                    placeholder="Search name, SKU, or scan barcode..."
+                                    @focus="isSearchFocused = true"
+                                    @blur="isSearchFocused = false"
+                                    @keydown="onSearchKeydown"
+                                />
+                                <button
+                                    v-if="searchQuery"
+                                    type="button"
+                                    class="search-clear-btn"
+                                    title="Clear search"
+                                    @click="clearSearch"
+                                >
+                                    <mdicon name="close-circle" size="15" />
+                                </button>
+                            </div>
                             <details ref="displaySettingsRef" class="display-settings">
                                 <summary>Display</summary>
                                 <div class="display-panel">
@@ -57,6 +100,7 @@
                                 </div>
                             </details>
                             <button
+                                v-if="activeViewMode === 'cards'"
                                 class="ghost-button"
                                 :class="{ 'ghost-button--active': isRearranging }"
                                 @click="isRearranging = !isRearranging"
@@ -109,104 +153,393 @@
                     <div v-else-if="isLoading" class="panel-state">Loading products...</div>
 
                     <template v-else>
-                        <!-- Rearrange mode banner -->
-                        <div v-if="isRearranging" class="rearrange-banner">
-                            <span>Drag cards to reorder. Order is saved automatically.</span>
-                            <div class="rearrange-banner-actions">
-                                <button class="ghost-button ghost-button--sm" @click="resetOrder">Reset order</button>
-                                <button class="ghost-button ghost-button--sm ghost-button--accent" @click="isRearranging = false">Done</button>
-                            </div>
-                        </div>
-
-                        <!-- Grouped view -->
-                        <div v-if="displaySettings.groupByCategory && !isRearranging" class="product-sections">
-                            <div
-                                v-for="[category, categoryProducts] in groupedFilteredProducts"
-                                :key="category"
-                                class="category-section"
-                            >
-                                <h4 class="category-section-title">{{ category }}</h4>
-                                <div class="product-grid">
-                                    <button
-                                        v-for="product in categoryProducts"
-                                        :key="product.id"
-                                        type="button"
-                                        class="product-card"
-                                        :class="{ 'product-card--in-cart': cartQtyMap[product.id] }"
-                                        :style="getCardStyle(product)"
-                                        @click="addToCart(product)"
-                                    >
-                                        <span v-if="cartQtyMap[product.id]" class="in-cart-badge">×{{ cartQtyMap[product.id] }}</span>
-                                        <div
-                                            v-if="displaySettings.showType || (displaySettings.showCategory && product.category)"
-                                            class="product-card-top"
-                                        >
-                                            <span v-if="displaySettings.showType" class="product-pill">{{ formatProductType(product.type) }}</span>
-                                            <span v-if="displaySettings.showCategory && product.category" class="product-tag">
-                                                {{ product.category }}
-                                            </span>
-                                        </div>
-                                        <h3>{{ product.name }}</h3>
-                                        <p v-if="displaySettings.showSku" class="product-sub">
-                                            {{ product.sku ? `SKU ${product.sku}` : product.unit }}
-                                        </p>
-                                        <div v-if="displaySettings.showPrice" class="product-price-row">
-                                            <span class="product-price">{{ formatMoney(product.price) }}</span>
-                                            <span v-if="!displaySettings.showSku" class="product-unit">{{ product.unit }}</span>
-                                        </div>
-                                    </button>
-                                </div>
-                            </div>
-                            <div v-if="filteredProducts.length === 0" class="panel-state">
-                                No active products match your search.
-                            </div>
-                        </div>
-
-                        <!-- Flat grid (default + rearrange mode) -->
-                        <div v-else class="product-grid">
-                            <button
-                                v-for="product in filteredProducts"
-                                :key="product.id"
-                                type="button"
-                                class="product-card"
-                                :class="{
-                                    'product-card--in-cart': cartQtyMap[product.id] && !isRearranging,
-                                    'product-card--rearrange': isRearranging,
-                                    'product-card--dragging': draggedId === product.id,
-                                    'product-card--drag-over': dragOverId === product.id,
-                                }"
-                                :style="getCardStyle(product)"
-                                :draggable="isRearranging"
-                                @click="isRearranging ? undefined : addToCart(product)"
-                                @dragstart="onDragStart($event, product.id)"
-                                @dragover="onDragOver($event, product.id)"
-                                @dragleave="onDragLeave"
-                                @drop="onDrop($event, product.id)"
-                                @dragend="onDragEnd"
-                            >
-                                <span v-if="cartQtyMap[product.id] && !isRearranging" class="in-cart-badge">×{{ cartQtyMap[product.id] }}</span>
-                                <div
-                                    v-if="displaySettings.showType || (displaySettings.showCategory && product.category)"
-                                    class="product-card-top"
-                                >
-                                    <span v-if="displaySettings.showType" class="product-pill">{{ formatProductType(product.type) }}</span>
-                                    <span v-if="displaySettings.showCategory && product.category" class="product-tag">
-                                        {{ product.category }}
+                        <!-- ==========================================
+                             TABLE LIST VIEW (Optimized for 2,000+ items)
+                             ========================================== -->
+                        <div v-if="activeViewMode === 'table'" class="pos-table-view">
+                            <!-- Table Toolbar -->
+                            <div class="pos-table-toolbar">
+                                <div class="table-toolbar-left">
+                                    <span class="table-count-text">
+                                        Showing <strong>{{ tableRangeStart }}–{{ tableRangeEnd }}</strong> of <strong>{{ sortedTableProducts.length }}</strong> products
+                                        <span v-if="sortedTableProducts.length !== products.length" class="table-filter-note">
+                                            (filtered from {{ products.length }})
+                                        </span>
                                     </span>
                                 </div>
-                                <h3>{{ product.name }}</h3>
-                                <p v-if="displaySettings.showSku" class="product-sub">
-                                    {{ product.sku ? `SKU ${product.sku}` : product.unit }}
-                                </p>
-                                <div v-if="displaySettings.showPrice" class="product-price-row">
-                                    <span class="product-price">{{ formatMoney(product.price) }}</span>
-                                    <span v-if="!displaySettings.showSku" class="product-unit">{{ product.unit }}</span>
+                                <div class="table-toolbar-right">
+                                    <label class="table-page-size-label">
+                                        <span>Show:</span>
+                                        <select v-model="tablePageSize" class="table-page-size-select">
+                                            <option :value="25">25</option>
+                                            <option :value="50">50</option>
+                                            <option :value="100">100</option>
+                                            <option :value="250">250</option>
+                                            <option value="all">All</option>
+                                        </select>
+                                    </label>
+                                    <div
+                                        v-if="isSearchFocused || isTableFocused"
+                                        class="table-keyboard-guide"
+                                        :class="{ 'table-keyboard-guide--active': isSearchFocused || isTableFocused }"
+                                    >
+                                        <template v-if="isSearchFocused">
+                                            <kbd class="kbd-key">↓</kbd>
+                                            <span>enter table</span>
+                                            <kbd class="kbd-key">↵ Enter</kbd>
+                                            <span>add top match</span>
+                                        </template>
+                                        <template v-else-if="isTableFocused">
+                                            <kbd class="kbd-key">↓</kbd>
+                                            <kbd class="kbd-key">↑</kbd>
+                                            <span>navigate</span>
+                                            <kbd class="kbd-key">↵ Enter</kbd>
+                                            <span>add</span>
+                                            <kbd class="kbd-key">Esc</kbd>
+                                            <span>search</span>
+                                        </template>
+                                    </div>
                                 </div>
-                            </button>
-                            <div v-if="filteredProducts.length === 0" class="panel-state">
-                                No active products match your search.
+                            </div>
+
+                            <!-- Table Scroll Container -->
+                            <div
+                                class="pos-table-container"
+                                @focusin="isTableFocused = true"
+                                @focusout="isTableFocused = false"
+                            >
+                                <table class="pos-table">
+                                    <thead>
+                                        <tr>
+                                            <th class="th-sortable th-name" @click="handleSort('name')">
+                                                <div class="th-content">
+                                                    <span>Product</span>
+                                                    <mdicon
+                                                        :name="tableSortColumn === 'name' ? (tableSortDirection === 'asc' ? 'arrow-up' : 'arrow-down') : 'swap-vertical'"
+                                                        size="14"
+                                                        :class="{ 'th-sort-icon--active': tableSortColumn === 'name' }"
+                                                    />
+                                                </div>
+                                            </th>
+                                            <th v-if="displaySettings.showSku || productsHaveSku" class="th-sortable th-sku" @click="handleSort('sku')">
+                                                <div class="th-content">
+                                                    <span>SKU</span>
+                                                    <mdicon
+                                                        :name="tableSortColumn === 'sku' ? (tableSortDirection === 'asc' ? 'arrow-up' : 'arrow-down') : 'swap-vertical'"
+                                                        size="14"
+                                                        :class="{ 'th-sort-icon--active': tableSortColumn === 'sku' }"
+                                                    />
+                                                </div>
+                                            </th>
+                                            <th v-if="displaySettings.showCategory || categoryList.length > 0" class="th-sortable th-category" @click="handleSort('category')">
+                                                <div class="th-content">
+                                                    <span>Category</span>
+                                                    <mdicon
+                                                        :name="tableSortColumn === 'category' ? (tableSortDirection === 'asc' ? 'arrow-up' : 'arrow-down') : 'swap-vertical'"
+                                                        size="14"
+                                                        :class="{ 'th-sort-icon--active': tableSortColumn === 'category' }"
+                                                    />
+                                                </div>
+                                            </th>
+                                            <th class="th-sortable th-price align-right" @click="handleSort('price')">
+                                                <div class="th-content align-right">
+                                                    <span>Price</span>
+                                                    <mdicon
+                                                        :name="tableSortColumn === 'price' ? (tableSortDirection === 'asc' ? 'arrow-up' : 'arrow-down') : 'swap-vertical'"
+                                                        size="14"
+                                                        :class="{ 'th-sort-icon--active': tableSortColumn === 'price' }"
+                                                    />
+                                                </div>
+                                            </th>
+                                            <th class="th-action align-right">
+                                                <span>Ticket</span>
+                                            </th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr
+                                            v-for="(product, index) in paginatedTableProducts"
+                                            :key="product.id"
+                                            :ref="(el) => setRowRef(el, index)"
+                                            tabindex="0"
+                                            class="pos-table-row"
+                                            :class="{
+                                                'pos-table-row--in-cart': cartQtyMap[product.id],
+                                                'pos-table-row--selected': selectedRowIndex === index,
+                                            }"
+                                            @click="onRowClick(product, index)"
+                                            @focus="selectedRowIndex = index"
+                                            @keydown="onRowKeydown($event, product, index)"
+                                        >
+                                            <!-- Product Name & Meta -->
+                                            <td class="td-product">
+                                                <div class="td-product-cell">
+                                                    <span
+                                                        v-if="displaySettings.useCategoryColor && product.category"
+                                                        class="td-cat-dot"
+                                                        :style="{ background: displaySettings.categoryColors[product.category] || '#cbd5e1' }"
+                                                        :title="product.category"
+                                                    />
+                                                    <span
+                                                        v-if="selectedRowIndex === index"
+                                                        class="td-selected-indicator"
+                                                        title="Currently selected (Press Enter to add)"
+                                                    >
+                                                        ↵
+                                                    </span>
+                                                    <div class="td-product-info">
+                                                        <span class="td-product-title">{{ product.name }}</span>
+                                                        <div class="td-product-sub">
+                                                            <span v-if="displaySettings.showType || product.type" class="td-type-badge">
+                                                                {{ formatProductType(product.type) }}
+                                                            </span>
+                                                            <span class="td-unit-badge">{{ product.unit }}</span>
+                                                            <span v-if="!displaySettings.showSku && !productsHaveSku && product.sku" class="td-sku-hint">
+                                                                SKU: {{ product.sku }}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </td>
+
+                                            <!-- SKU -->
+                                            <td v-if="displaySettings.showSku || productsHaveSku" class="td-sku">
+                                                <code v-if="product.sku" class="td-sku-code">{{ product.sku }}</code>
+                                                <span v-else class="td-empty-dash">—</span>
+                                            </td>
+
+                                            <!-- Category -->
+                                            <td v-if="displaySettings.showCategory || categoryList.length > 0" class="td-category">
+                                                <span
+                                                    v-if="product.category"
+                                                    class="td-category-tag"
+                                                    :style="getCategoryPillStyle(product.category, false)"
+                                                >
+                                                    {{ product.category }}
+                                                </span>
+                                                <span v-else class="td-empty-dash">—</span>
+                                            </td>
+
+                                            <!-- Price -->
+                                            <td class="td-price align-right">
+                                                <span class="td-price-amount">{{ formatMoney(product.price) }}</span>
+                                            </td>
+
+                                            <!-- Action / In-Cart Stepper -->
+                                            <td class="td-action align-right" @click.stop>
+                                                <div v-if="cartQtyMap[product.id]" class="table-qty-stepper">
+                                                    <button
+                                                        type="button"
+                                                        class="table-qty-btn table-qty-btn--minus"
+                                                        title="Decrease quantity"
+                                                        @click.stop="adjustQty(product.id, -1)"
+                                                    >
+                                                        <mdicon name="minus" size="14" />
+                                                    </button>
+                                                    <span class="table-qty-value">{{ cartQtyMap[product.id] }}</span>
+                                                    <button
+                                                        type="button"
+                                                        class="table-qty-btn table-qty-btn--plus"
+                                                        title="Increase quantity"
+                                                        @click.stop="adjustQty(product.id, 1)"
+                                                    >
+                                                        <mdicon name="plus" size="14" />
+                                                    </button>
+                                                </div>
+                                                <button
+                                                    v-else
+                                                    type="button"
+                                                    class="table-add-btn"
+                                                    title="Add to ticket"
+                                                    @click.stop="addToCart(product)"
+                                                >
+                                                    <mdicon name="plus" size="15" />
+                                                    <span>Add</span>
+                                                </button>
+                                            </td>
+                                        </tr>
+
+                                        <!-- Empty Search State -->
+                                        <tr v-if="sortedTableProducts.length === 0">
+                                            <td :colspan="tableColumnCount" class="pos-table-empty">
+                                                <mdicon name="magnify" size="32" class="empty-icon" />
+                                                <p>No products match your search or filter.</p>
+                                                <button
+                                                    v-if="searchQuery || activeCategory !== 'ALL'"
+                                                    type="button"
+                                                    class="ghost-button ghost-button--sm"
+                                                    @click="clearFilters"
+                                                >
+                                                    Clear filters
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <!-- Table Pagination Controls -->
+                            <div v-if="totalTablePages > 1" class="pos-table-pagination">
+                                <div class="table-pagination-nav">
+                                    <button
+                                        type="button"
+                                        class="page-nav-btn"
+                                        :disabled="tablePage <= 1"
+                                        title="First page"
+                                        @click="tablePage = 1"
+                                    >
+                                        <mdicon name="chevron-double-left" size="16" />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        class="page-nav-btn"
+                                        :disabled="tablePage <= 1"
+                                        title="Previous page"
+                                        @click="tablePage = Math.max(1, tablePage - 1)"
+                                    >
+                                        <mdicon name="chevron-left" size="16" />
+                                    </button>
+
+                                    <div class="page-numbers">
+                                        <button
+                                            v-for="p in visibleTablePages"
+                                            :key="p"
+                                            type="button"
+                                            class="page-num-btn"
+                                            :class="{ 'page-num-btn--active': p === tablePage, 'page-num-btn--ellipsis': p === -1 }"
+                                            :disabled="p === -1"
+                                            @click="p !== -1 && (tablePage = p)"
+                                        >
+                                            {{ p === -1 ? '…' : p }}
+                                        </button>
+                                    </div>
+
+                                    <button
+                                        type="button"
+                                        class="page-nav-btn"
+                                        :disabled="tablePage >= totalTablePages"
+                                        title="Next page"
+                                        @click="tablePage = Math.min(totalTablePages, tablePage + 1)"
+                                    >
+                                        <mdicon name="chevron-right" size="16" />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        class="page-nav-btn"
+                                        :disabled="tablePage >= totalTablePages"
+                                        title="Last page"
+                                        @click="tablePage = totalTablePages"
+                                    >
+                                        <mdicon name="chevron-double-right" size="16" />
+                                    </button>
+                                </div>
+                                <span class="page-indicator-text">Page {{ tablePage }} of {{ totalTablePages }}</span>
                             </div>
                         </div>
+
+                        <!-- ==========================================
+                             CARD GRID VIEW (Visual Tiles)
+                             ========================================== -->
+                        <template v-else-if="activeViewMode === 'cards'">
+                            <!-- Rearrange mode banner -->
+                            <div v-if="isRearranging" class="rearrange-banner">
+                                <span>Drag cards to reorder. Order is saved automatically.</span>
+                                <div class="rearrange-banner-actions">
+                                    <button class="ghost-button ghost-button--sm" @click="resetOrder">Reset order</button>
+                                    <button class="ghost-button ghost-button--sm ghost-button--accent" @click="isRearranging = false">Done</button>
+                                </div>
+                            </div>
+
+                            <!-- Grouped view -->
+                            <div v-if="displaySettings.groupByCategory && !isRearranging" class="product-sections">
+                                <div
+                                    v-for="[category, categoryProducts] in groupedFilteredProducts"
+                                    :key="category"
+                                    class="category-section"
+                                >
+                                    <h4 class="category-section-title">{{ category }}</h4>
+                                    <div class="product-grid">
+                                        <button
+                                            v-for="product in categoryProducts"
+                                            :key="product.id"
+                                            type="button"
+                                            class="product-card"
+                                            :class="{ 'product-card--in-cart': cartQtyMap[product.id] }"
+                                            :style="getCardStyle(product)"
+                                            @click="addToCart(product)"
+                                        >
+                                            <span v-if="cartQtyMap[product.id]" class="in-cart-badge">×{{ cartQtyMap[product.id] }}</span>
+                                            <div
+                                                v-if="displaySettings.showType || (displaySettings.showCategory && product.category)"
+                                                class="product-card-top"
+                                            >
+                                                <span v-if="displaySettings.showType" class="product-pill">{{ formatProductType(product.type) }}</span>
+                                                <span v-if="displaySettings.showCategory && product.category" class="product-tag">
+                                                    {{ product.category }}
+                                                </span>
+                                            </div>
+                                            <h3>{{ product.name }}</h3>
+                                            <p v-if="displaySettings.showSku" class="product-sub">
+                                                {{ product.sku ? `SKU ${product.sku}` : product.unit }}
+                                            </p>
+                                            <div v-if="displaySettings.showPrice" class="product-price-row">
+                                                <span class="product-price">{{ formatMoney(product.price) }}</span>
+                                                <span v-if="!displaySettings.showSku" class="product-unit">{{ product.unit }}</span>
+                                            </div>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div v-if="filteredProducts.length === 0" class="panel-state">
+                                    No active products match your search.
+                                </div>
+                            </div>
+
+                            <!-- Flat grid (default + rearrange mode) -->
+                            <div v-else class="product-grid">
+                                <button
+                                    v-for="product in filteredProducts"
+                                    :key="product.id"
+                                    type="button"
+                                    class="product-card"
+                                    :class="{
+                                        'product-card--in-cart': cartQtyMap[product.id] && !isRearranging,
+                                        'product-card--rearrange': isRearranging,
+                                        'product-card--dragging': draggedId === product.id,
+                                        'product-card--drag-over': dragOverId === product.id,
+                                    }"
+                                    :style="getCardStyle(product)"
+                                    :draggable="isRearranging"
+                                    @click="isRearranging ? undefined : addToCart(product)"
+                                    @dragstart="onDragStart($event, product.id)"
+                                    @dragover="onDragOver($event, product.id)"
+                                    @dragleave="onDragLeave"
+                                    @drop="onDrop($event, product.id)"
+                                    @dragend="onDragEnd"
+                                >
+                                    <span v-if="cartQtyMap[product.id] && !isRearranging" class="in-cart-badge">×{{ cartQtyMap[product.id] }}</span>
+                                    <div
+                                        v-if="displaySettings.showType || (displaySettings.showCategory && product.category)"
+                                        class="product-card-top"
+                                    >
+                                        <span v-if="displaySettings.showType" class="product-pill">{{ formatProductType(product.type) }}</span>
+                                        <span v-if="displaySettings.showCategory && product.category" class="product-tag">
+                                            {{ product.category }}
+                                        </span>
+                                    </div>
+                                    <h3>{{ product.name }}</h3>
+                                    <p v-if="displaySettings.showSku" class="product-sub">
+                                        {{ product.sku ? `SKU ${product.sku}` : product.unit }}
+                                    </p>
+                                    <div v-if="displaySettings.showPrice" class="product-price-row">
+                                        <span class="product-price">{{ formatMoney(product.price) }}</span>
+                                        <span v-if="!displaySettings.showSku" class="product-unit">{{ product.unit }}</span>
+                                    </div>
+                                </button>
+                                <div v-if="filteredProducts.length === 0" class="panel-state">
+                                    No active products match your search.
+                                </div>
+                            </div>
+                        </template>
                     </template>
                     </div>
                 </section>
@@ -363,6 +696,48 @@ const route = useRoute();
 const storeContext = useStoreContextStore();
 const { showToast } = useToast();
 
+type PosViewMode = 'cards' | 'table';
+
+const getInitialViewMode = (): PosViewMode => {
+    if (route.path.endsWith('/table') || route.query.view === 'table') {
+        return 'table';
+    }
+    if (route.path.endsWith('/cards') || route.query.view === 'cards') {
+        return 'cards';
+    }
+    const saved = localStorage.getItem('pos_catalog_view_mode');
+    if (saved === 'table' || saved === 'cards') {
+        return saved;
+    }
+    return 'cards';
+};
+
+const activeViewMode = ref<PosViewMode>(getInitialViewMode());
+
+const setViewMode = (mode: PosViewMode) => {
+    activeViewMode.value = mode;
+    localStorage.setItem('pos_catalog_view_mode', mode);
+    router.replace({
+        query: {
+            ...route.query,
+            view: mode === 'table' ? 'table' : undefined,
+        },
+    });
+};
+
+watch(
+    () => [route.query.view, route.path],
+    ([queryView, path]) => {
+        if (typeof path === 'string' && path.endsWith('/table')) {
+            activeViewMode.value = 'table';
+        } else if (queryView === 'table' || queryView === 'cards') {
+            activeViewMode.value = queryView;
+        }
+    }
+);
+
+const searchInputRef = ref<HTMLInputElement | null>(null);
+
 const products = ref<Product[]>([]);
 const cartItems = ref<CartItem[]>([]);
 const searchQuery = ref('');
@@ -404,10 +779,10 @@ const handleFullscreenChange = () => {
 };
 
 const displaySettings = reactive<DisplaySettings>({
-    showSku: false,
+    showSku: true,
     showType: false,
     showCategory: false,
-    showPrice: false,
+    showPrice: true,
     useCategoryColor: true,
     categoryColors: {} as Record<string, string>,
     groupByCategory: false,
@@ -549,6 +924,285 @@ const categoryList = computed(() => {
     }
     return Array.from(set).sort();
 });
+
+const productsHaveSku = computed(() => products.value.some((p) => !!p.sku));
+
+const tableColumnCount = computed(() => {
+    let count = 2; // Product + Ticket
+    if (displaySettings.showSku || productsHaveSku.value) count++;
+    if (displaySettings.showCategory || categoryList.value.length > 0) count++;
+    count++; // Price
+    return count;
+});
+
+const tableSortColumn = ref<'name' | 'sku' | 'category' | 'price'>('name');
+const tableSortDirection = ref<'asc' | 'desc'>('asc');
+const tablePage = ref(1);
+const tablePageSize = ref<number | 'all'>(50);
+
+const handleSort = (column: 'name' | 'sku' | 'category' | 'price') => {
+    if (tableSortColumn.value === column) {
+        tableSortDirection.value = tableSortDirection.value === 'asc' ? 'desc' : 'asc';
+    } else {
+        tableSortColumn.value = column;
+        tableSortDirection.value = column === 'price' ? 'desc' : 'asc';
+    }
+    tablePage.value = 1;
+};
+
+const sortedTableProducts = computed(() => {
+    const list = [...filteredProducts.value];
+    const col = tableSortColumn.value;
+    const isAsc = tableSortDirection.value === 'asc';
+    const mult = isAsc ? 1 : -1;
+
+    return list.sort((a, b) => {
+        if (col === 'name') {
+            return mult * a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true });
+        }
+        if (col === 'sku') {
+            const skuA = a.sku || '';
+            const skuB = b.sku || '';
+            return mult * skuA.localeCompare(skuB, undefined, { sensitivity: 'base', numeric: true });
+        }
+        if (col === 'category') {
+            const catA = a.category || '';
+            const catB = b.category || '';
+            return mult * catA.localeCompare(catB, undefined, { sensitivity: 'base' });
+        }
+        if (col === 'price') {
+            const pA = Number(a.price) || 0;
+            const pB = Number(b.price) || 0;
+            return mult * (pA - pB);
+        }
+        return 0;
+    });
+});
+
+const totalTablePages = computed(() => {
+    if (tablePageSize.value === 'all') return 1;
+    const size = Number(tablePageSize.value) || 50;
+    return Math.max(1, Math.ceil(sortedTableProducts.value.length / size));
+});
+
+const paginatedTableProducts = computed(() => {
+    if (tablePageSize.value === 'all') return sortedTableProducts.value;
+    const size = Number(tablePageSize.value) || 50;
+    const start = (tablePage.value - 1) * size;
+    return sortedTableProducts.value.slice(start, start + size);
+});
+
+const tableRangeStart = computed(() => {
+    if (sortedTableProducts.value.length === 0) return 0;
+    if (tablePageSize.value === 'all') return 1;
+    const size = Number(tablePageSize.value) || 50;
+    return (tablePage.value - 1) * size + 1;
+});
+
+const tableRangeEnd = computed(() => {
+    if (sortedTableProducts.value.length === 0) return 0;
+    if (tablePageSize.value === 'all') return sortedTableProducts.value.length;
+    const size = Number(tablePageSize.value) || 50;
+    return Math.min(tablePage.value * size, sortedTableProducts.value.length);
+});
+
+const visibleTablePages = computed(() => {
+    const total = totalTablePages.value;
+    const current = tablePage.value;
+    if (total <= 7) {
+        return Array.from({ length: total }, (_, i) => i + 1);
+    }
+    const pages: number[] = [];
+    pages.push(1);
+    if (current > 4) {
+        pages.push(-1);
+    }
+    const start = Math.max(2, current - 1);
+    const end = Math.min(total - 1, current + 1);
+    for (let i = start; i <= end; i++) {
+        pages.push(i);
+    }
+    if (current < total - 3) {
+        pages.push(-1);
+    }
+    pages.push(total);
+    return pages;
+});
+
+const selectedRowIndex = ref<number>(-1);
+const rowRefs = ref<(HTMLElement | null)[]>([]);
+const isSearchFocused = ref(false);
+const isTableFocused = ref(false);
+
+const setRowRef = (el: any, index: number) => {
+    rowRefs.value[index] = (el as HTMLElement) || null;
+};
+
+const focusRow = (index: number) => {
+    if (index < 0 || index >= paginatedTableProducts.value.length) return;
+    selectedRowIndex.value = index;
+    const el = rowRefs.value[index];
+    if (el) {
+        el.focus();
+        el.scrollIntoView({ block: 'nearest' });
+    }
+};
+
+const navigateRow = (newIndex: number) => {
+    if (newIndex < 0) {
+        selectedRowIndex.value = -1;
+        if (searchInputRef.value) {
+            searchInputRef.value.focus();
+            const len = searchInputRef.value.value.length;
+            searchInputRef.value.setSelectionRange(len, len);
+        }
+        return;
+    }
+    if (newIndex >= paginatedTableProducts.value.length) return;
+    focusRow(newIndex);
+};
+
+const onRowClick = (product: Product, index: number) => {
+    selectedRowIndex.value = index;
+    focusRow(index);
+    addToCart(product);
+};
+
+const handleGlobalKeydown = (e: KeyboardEvent) => {
+    if (activeViewMode.value !== 'table') return;
+
+    // Check if user is typing in another input / modal / textarea
+    const activeEl = document.activeElement;
+    const isInput = activeEl && ['INPUT', 'TEXTAREA', 'SELECT'].includes(activeEl.tagName);
+
+    // If typing in another input (e.g. payment modal, customer details), do not intercept
+    if (isInput && activeEl !== searchInputRef.value) return;
+
+    // Slash shortcut: '/' quickly focuses the search bar from anywhere in table mode
+    if (e.key === '/' && activeEl !== searchInputRef.value) {
+        e.preventDefault();
+        searchInputRef.value?.focus();
+        searchInputRef.value?.select();
+        return;
+    }
+
+    // If neither search nor a specific table row has focus (e.g. user clicked background/table header)
+    if (!isInput && selectedRowIndex.value === -1) {
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            focusRow(0);
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            focusRow(paginatedTableProducts.value.length - 1);
+        }
+    }
+};
+
+const onSearchKeydown = (e: KeyboardEvent) => {
+    if (activeViewMode.value !== 'table') {
+        if (e.key === 'Enter') handleSearchEnter();
+        return;
+    }
+    if (e.key === 'ArrowDown') {
+        if (paginatedTableProducts.value.length > 0) {
+            e.preventDefault();
+            focusRow(0);
+        }
+    } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (selectedRowIndex.value >= 0 && selectedRowIndex.value < paginatedTableProducts.value.length) {
+            const product = paginatedTableProducts.value[selectedRowIndex.value];
+            addToCart(product);
+            showToast(`Added 1× ${product.name} to ticket`, 'success');
+        } else {
+            handleSearchEnter();
+        }
+    } else if (e.key === 'Escape') {
+        clearSearch();
+    }
+};
+
+const onRowKeydown = (e: KeyboardEvent, product: Product, index: number) => {
+    if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        navigateRow(index + 1);
+    } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        navigateRow(index - 1);
+    } else if (e.key === 'Enter') {
+        e.preventDefault();
+        addToCart(product);
+        showToast(`Added 1× ${product.name} to ticket`, 'success');
+    } else if (e.key === '+' || e.key === '=') {
+        e.preventDefault();
+        adjustQty(product.id, 1);
+    } else if (e.key === '-' || e.key === '_') {
+        e.preventDefault();
+        adjustQty(product.id, -1);
+    } else if (e.key === 'Escape') {
+        e.preventDefault();
+        selectedRowIndex.value = -1;
+        searchInputRef.value?.focus();
+    } else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        // If cashier types regular letters, jump focus back to search input
+        searchInputRef.value?.focus();
+        searchQuery.value += e.key;
+    }
+};
+
+const handleSearchEnter = () => {
+    const query = searchQuery.value.trim().toLowerCase();
+    if (!query) return;
+
+    const list = activeViewMode.value === 'table' ? sortedTableProducts.value : filteredProducts.value;
+    if (list.length === 0) {
+        showToast(`No product found for "${searchQuery.value.trim()}"`, 'error');
+        return;
+    }
+
+    const exactMatch = list.find(
+        (p) => (p.sku && p.sku.toLowerCase() === query) || p.name.toLowerCase() === query
+    );
+    const target = exactMatch || list[0];
+    addToCart(target);
+    showToast(`Added 1× ${target.name} to ticket`, 'success');
+
+    if (searchInputRef.value) {
+        searchInputRef.value.select();
+    }
+};
+
+const clearSearch = () => {
+    searchQuery.value = '';
+    tablePage.value = 1;
+    selectedRowIndex.value = -1;
+    searchInputRef.value?.focus();
+};
+
+const clearFilters = () => {
+    searchQuery.value = '';
+    activeCategory.value = 'ALL';
+    tablePage.value = 1;
+    selectedRowIndex.value = -1;
+    searchInputRef.value?.focus();
+};
+
+watch(
+    () => [searchQuery.value, activeCategory.value, tablePageSize.value, activeViewMode.value],
+    () => {
+        tablePage.value = 1;
+        selectedRowIndex.value = -1;
+        rowRefs.value = [];
+    }
+);
+
+watch(
+    () => tablePage.value,
+    () => {
+        selectedRowIndex.value = -1;
+        rowRefs.value = [];
+    }
+);
 
 const lineTotal = (item: CartItem) => {
     const qty = Number.isFinite(item.qty) ? item.qty : 0;
@@ -822,6 +1476,7 @@ const handleDisplayClickOutside = (event: MouseEvent) => {
 onBeforeUnmount(() => {
     document.removeEventListener('click', handleDisplayClickOutside);
     document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    window.removeEventListener('keydown', handleGlobalKeydown);
     if (document.fullscreenElement === posPageRef.value) {
         document.exitFullscreen().catch(() => {});
     }
@@ -830,6 +1485,7 @@ onBeforeUnmount(() => {
 onMounted(async () => {
     document.addEventListener('click', handleDisplayClickOutside);
     document.addEventListener('fullscreenchange', handleFullscreenChange);
+    window.addEventListener('keydown', handleGlobalKeydown);
     await storeContext.fetchStores();
     const routeStoreId = route.params.storeId as string | undefined;
     if (routeStoreId && routeStoreId !== storeContext.currentStoreId) {
@@ -1060,7 +1716,7 @@ watch(
 }
 
 /* ============================================================
-   PANEL ACTIONS
+   PANEL ACTIONS & VIEW MODE TABS
 ============================================================ */
 .panel-actions {
     display: flex;
@@ -1069,11 +1725,95 @@ watch(
     flex-wrap: wrap;
 }
 
+.view-mode-tabs {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 3px;
+    background: #f1f5f9;
+    border-radius: 9px;
+    border: 1px solid var(--c-border);
+}
+
+.view-mode-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.35rem 0.7rem;
+    border-radius: 7px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--c-muted);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s ease;
+}
+
+.view-mode-tab:hover {
+    color: var(--c-text);
+    background: rgba(255, 255, 255, 0.6);
+}
+
+.view-mode-tab--active {
+    background: white;
+    color: var(--c-accent-dark);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    font-weight: 700;
+}
+
+.tab-badge {
+    padding: 0.08rem 0.45rem;
+    border-radius: 999px;
+    background: var(--c-accent-soft);
+    color: var(--c-accent-dark);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+}
+
+.search-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+    min-width: 240px;
+    flex: 1;
+    max-width: 380px;
+}
+
+.search-icon {
+    position: absolute;
+    left: 0.75rem;
+    color: #94a3b8;
+    pointer-events: none;
+}
+
+.search-clear-btn {
+    position: absolute;
+    right: 0.5rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border: none;
+    background: transparent;
+    color: #94a3b8;
+    cursor: pointer;
+    border-radius: 50%;
+    transition: color 0.12s;
+}
+
+.search-clear-btn:hover {
+    color: #475569;
+}
+
 .search-input {
+    width: 100%;
     border: 1.5px solid var(--c-border);
     border-radius: 8px;
-    padding: 0.48rem 0.85rem;
-    min-width: 200px;
+    padding: 0.48rem 2rem 0.48rem 2.25rem;
     font-size: 0.85rem;
     font-family: var(--app-font-sans);
     color: var(--c-text);
@@ -1089,6 +1829,11 @@ watch(
     outline: none;
     border-color: var(--c-accent);
     box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.12);
+}
+
+.ghost-button--sm {
+    padding: 0.28rem 0.65rem;
+    font-size: 0.76rem;
 }
 
 /* Ghost button (Sales history link) */
@@ -1851,6 +2596,493 @@ watch(
     color: var(--c-muted);
     padding-bottom: 0.4rem;
     border-bottom: 1px solid var(--c-border);
+}
+
+/* ============================================================
+   TABLE LIST VIEW (Optimized for 2,000+ items)
+============================================================ */
+.pos-table-view {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    width: 100%;
+}
+
+.pos-table-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    padding: 0.15rem 0.25rem;
+    font-size: 0.82rem;
+    color: var(--c-muted);
+}
+
+.table-toolbar-left,
+.table-toolbar-right {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.table-count-text strong {
+    color: var(--c-text);
+    font-weight: 700;
+}
+
+.table-filter-note {
+    font-size: 0.78rem;
+    color: #94a3b8;
+    margin-left: 0.25rem;
+}
+
+.table-page-size-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--c-muted);
+}
+
+.table-page-size-select {
+    padding: 0.22rem 0.5rem;
+    border: 1.5px solid var(--c-border);
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--c-text);
+    background: white;
+    cursor: pointer;
+    outline: none;
+    transition: border-color 0.15s;
+}
+
+.table-page-size-select:focus {
+    border-color: var(--c-accent);
+}
+
+.table-keyboard-guide {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.73rem;
+    font-weight: 500;
+    color: var(--c-muted);
+    background: #f8fafc;
+    padding: 0.25rem 0.65rem;
+    border-radius: 6px;
+    border: 1px solid var(--c-border);
+    animation: fadeIn 0.15s ease;
+}
+
+.table-keyboard-guide--active {
+    background: #f0fdfa;
+    border-color: rgba(13, 148, 136, 0.35);
+    color: var(--c-accent-dark);
+}
+
+.kbd-key {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 17px;
+    height: 17px;
+    padding: 0 0.25rem;
+    font-family: inherit;
+    font-size: 0.66rem;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--c-text);
+    background: white;
+    border: 1px solid #cbd5e1;
+    border-bottom: 2px solid #94a3b8;
+    border-radius: 3px;
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.05);
+}
+
+.pos-table-container {
+    border: 1px solid var(--c-border);
+    border-radius: 12px;
+    background: white;
+    overflow-x: auto;
+    overflow-y: auto;
+    /* Allows internal scrolling when product count is high */
+    max-height: calc(100vh - 280px);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+}
+
+.pos-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 0.84rem;
+    text-align: left;
+}
+
+.pos-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: #f8fafc;
+    border-bottom: 1.5px solid var(--c-border);
+    padding: 0.7rem 0.85rem;
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--c-muted);
+    white-space: nowrap;
+    user-select: none;
+}
+
+.th-sortable {
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s;
+}
+
+.th-sortable:hover {
+    background: #f1f5f9;
+    color: var(--c-text);
+}
+
+.th-content {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.th-content.align-right {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.th-sort-icon--active {
+    color: var(--c-accent);
+}
+
+.pos-table-row {
+    border-bottom: 1px solid var(--c-border);
+    cursor: pointer;
+    transition: background 0.12s, box-shadow 0.12s;
+    outline: none;
+}
+
+.pos-table-row:hover {
+    background: #f8fafc;
+}
+
+.pos-table-row--in-cart {
+    background: rgba(13, 148, 136, 0.04);
+}
+
+.pos-table-row--in-cart:hover {
+    background: rgba(13, 148, 136, 0.08);
+}
+
+.pos-table-row:focus-visible,
+.pos-table-row--selected {
+    background: #f0fdfa !important;
+    box-shadow: inset 3px 0 0 var(--c-accent), 0 0 0 1.5px rgba(13, 148, 136, 0.4);
+}
+
+.pos-table-row--selected .td-product-title {
+    color: var(--c-accent-dark);
+}
+
+.td-selected-indicator {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    background: var(--c-accent);
+    color: white;
+    font-size: 0.68rem;
+    font-weight: 700;
+    line-height: 1;
+    flex-shrink: 0;
+    animation: popIn 0.15s ease-out;
+}
+
+@keyframes popIn {
+    from { transform: scale(0.7); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+}
+
+.pos-table tbody td {
+    padding: 0.65rem 0.85rem;
+    vertical-align: middle;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.pos-table-row:last-child td {
+    border-bottom: none;
+}
+
+/* Table cells */
+.td-product-cell {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+}
+
+.td-cat-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    box-shadow: 0 0 0 1.5px rgba(0, 0, 0, 0.08);
+}
+
+.td-product-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    min-width: 0;
+}
+
+.td-product-title {
+    font-weight: 600;
+    color: var(--c-text);
+    line-height: 1.25;
+}
+
+.td-product-sub {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+}
+
+.td-type-badge {
+    display: inline-block;
+    padding: 0.06rem 0.4rem;
+    border-radius: 999px;
+    background: #e0f2fe;
+    color: #0369a1;
+    font-size: 0.66rem;
+    font-weight: 600;
+}
+
+.td-unit-badge {
+    display: inline-block;
+    padding: 0.06rem 0.35rem;
+    border-radius: 4px;
+    background: #f1f5f9;
+    color: var(--c-muted);
+    font-size: 0.68rem;
+    font-weight: 500;
+}
+
+.td-sku-hint {
+    font-size: 0.7rem;
+    color: #94a3b8;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.td-sku {
+    white-space: nowrap;
+}
+
+.td-sku-code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.76rem;
+    padding: 0.15rem 0.45rem;
+    border-radius: 5px;
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    color: var(--c-text);
+    font-weight: 500;
+}
+
+.td-empty-dash {
+    color: #cbd5e1;
+    font-size: 0.85rem;
+}
+
+.td-category {
+    white-space: nowrap;
+}
+
+.td-category-tag {
+    display: inline-block;
+    padding: 0.18rem 0.55rem;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    border: 1px solid var(--pill-border, var(--c-border));
+    background: var(--pill-bg, #f8fafc);
+    color: var(--pill-text, var(--c-text));
+}
+
+.td-price {
+    white-space: nowrap;
+}
+
+.td-price-amount {
+    font-weight: 700;
+    color: var(--c-text);
+    font-variant-numeric: tabular-nums;
+    font-size: 0.88rem;
+}
+
+.td-action {
+    white-space: nowrap;
+}
+
+.align-right {
+    text-align: right;
+}
+
+/* Stepper inside table row */
+.table-qty-stepper {
+    display: inline-flex;
+    align-items: center;
+    background: var(--c-accent-soft);
+    border: 1.5px solid var(--c-accent);
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 1px 2px rgba(13, 148, 136, 0.12);
+}
+
+.table-qty-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border: none;
+    background: transparent;
+    color: var(--c-accent-dark);
+    cursor: pointer;
+    transition: background 0.1s;
+}
+
+.table-qty-btn:hover {
+    background: rgba(13, 148, 136, 0.2);
+}
+
+.table-qty-value {
+    min-width: 24px;
+    text-align: center;
+    font-weight: 700;
+    font-size: 0.82rem;
+    color: var(--c-accent-dark);
+    font-variant-numeric: tabular-nums;
+}
+
+.table-add-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.28rem 0.65rem;
+    border-radius: 7px;
+    border: 1.5px solid var(--c-border);
+    background: white;
+    color: var(--c-text);
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.12s ease;
+}
+
+.table-add-btn:hover {
+    border-color: var(--c-accent);
+    background: var(--c-accent-soft);
+    color: var(--c-accent-dark);
+}
+
+/* Empty search state */
+.pos-table-empty {
+    text-align: center;
+    padding: 3rem 1.5rem !important;
+    color: var(--c-muted);
+}
+
+.pos-table-empty .empty-icon {
+    color: #cbd5e1;
+    margin-bottom: 0.5rem;
+}
+
+.pos-table-empty p {
+    margin: 0 0 0.75rem 0;
+    font-size: 0.88rem;
+}
+
+/* Pagination */
+.pos-table-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    padding: 0.4rem 0.25rem 0.2rem 0.25rem;
+}
+
+.table-pagination-nav {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.page-nav-btn,
+.page-num-btn {
+    min-width: 28px;
+    height: 28px;
+    padding: 0 0.35rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    border: 1.5px solid var(--c-border);
+    background: white;
+    color: var(--c-text);
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.12s ease;
+}
+
+.page-nav-btn:hover:not(:disabled),
+.page-num-btn:hover:not(:disabled) {
+    border-color: var(--c-accent);
+    color: var(--c-accent-dark);
+    background: var(--c-accent-soft);
+}
+
+.page-nav-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.page-num-btn--active {
+    background: var(--c-accent) !important;
+    border-color: var(--c-accent) !important;
+    color: white !important;
+    font-weight: 700;
+}
+
+.page-num-btn--ellipsis {
+    border: none;
+    background: transparent;
+    cursor: default;
+    color: #94a3b8;
+}
+
+.page-numbers {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.page-indicator-text {
+    font-size: 0.78rem;
+    color: var(--c-muted);
+    font-weight: 500;
 }
 
 /* ============================================================

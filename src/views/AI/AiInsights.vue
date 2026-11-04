@@ -286,38 +286,45 @@ const generateReorder = async () => {
     --c-surface: #ffffff;
     --c-bg: #f8fafc;
     min-height: 100vh;
-    padding: 2rem 1.5rem 3rem;
+    padding: 1rem 1.5rem 2rem;
     background: var(--c-bg);
     color: var(--c-text);
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
 .ai-shell {
-    max-width: 1000px;
+    max-width: 1280px;
     margin: 0 auto;
     display: flex;
     flex-direction: column;
-    gap: 1.5rem;
+    gap: 0.85rem;
 }
 
 .ai-header h1 {
-    font-size: 1.6rem;
-    font-weight: 700;
-    margin: 0.15rem 0 0.25rem;
+    font-size: 1.35rem;
+    font-weight: 800;
+    letter-spacing: -0.025em;
+    margin: 0 0 0.15rem;
 }
 
 .ai-eyebrow {
-    font-size: 0.72rem;
-    font-weight: 700;
+    font-size: 0.65rem;
+    font-weight: 750;
     letter-spacing: 0.08em;
     text-transform: uppercase;
     color: var(--c-accent);
+    background: rgba(13, 148, 136, 0.08);
+    padding: 0.2rem 0.6rem;
+    border-radius: 999px;
+    display: inline-block;
+    margin-bottom: 0.25rem;
 }
 
 .ai-header p {
     margin: 0;
     color: var(--c-muted);
-    font-size: 0.9rem;
+    font-size: 0.82rem;
+    line-height: 1.4;
 }
 
 .ai-state {
@@ -408,12 +415,12 @@ const generateReorder = async () => {
     display: inline-flex;
     align-items: center;
     gap: 0.4rem;
-    padding: 0.5rem 0.85rem;
-    border-radius: 9px;
+    padding: 0.45rem 0.9rem;
+    border-radius: 7px;
     border: none;
     background: var(--c-accent);
     color: #fff;
-    font-size: 0.85rem;
+    font-size: 0.82rem;
     font-weight: 600;
     cursor: pointer;
     transition: background 0.12s;

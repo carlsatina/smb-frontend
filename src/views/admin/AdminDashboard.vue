@@ -120,19 +120,19 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.adash { max-width: 960px; display: flex; flex-direction: column; gap: 1.5rem; }
+.adash { max-width: 1280px; display: flex; flex-direction: column; gap: 0.85rem; }
 
-.adash-header { margin-bottom: 0.25rem; }
+.adash-header { margin-bottom: 0.15rem; }
 
 .adash-title {
-    font-size: 1.6rem;
+    font-size: 1.35rem;
     font-weight: 800;
     color: #0f172a;
-    margin: 0 0 0.25rem;
-    letter-spacing: -0.02em;
+    margin: 0 0 0.15rem;
+    letter-spacing: -0.025em;
 }
 
-.adash-sub { color: #64748b; font-size: 0.875rem; margin: 0; }
+.adash-sub { color: #64748b; font-size: 0.82rem; line-height: 1.4; margin: 0; }
 
 .adash-state {
     padding: 1rem 1.25rem;
