@@ -66,6 +66,22 @@ export const todayStr = (timeZone = DEFAULT_TIMEZONE): string => {
     return `${p.year}-${p.month}-${p.day}`;
 };
 
+/**
+ * Current time (HH:mm) in `timeZone`, suitable for time-input defaults.
+ */
+export const currentTimeStr = (timeZone = DEFAULT_TIMEZONE): string => {
+    const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone,
+        hour12: false,
+        hour: '2-digit',
+        minute: '2-digit',
+    }).formatToParts(new Date());
+    const p: Record<string, string> = {};
+    parts.forEach((x) => { if (x.type !== 'literal') p[x.type] = x.value; });
+    const hour = p.hour === '24' ? '00' : p.hour;
+    return `${hour}:${p.minute}`;
+};
+
 const parseDateInput = (dateStr: string): [number, number, number] | null => {
     const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr.trim());
     if (!match) return null;
@@ -90,4 +106,22 @@ export const zonedDayEndIso = (dateStr: string, timeZone = DEFAULT_TIMEZONE): st
     const parts = parseDateInput(dateStr);
     if (!parts) return undefined;
     return zonedWallTimeToUtcIso(parts[0], parts[1], parts[2], 23, 59, 59, 999, timeZone);
+};
+
+/**
+ * Converts a wall-clock date (YYYY-MM-DD) and time (HH:mm or HH:mm:ss) in `timeZone`
+ * into a UTC ISO string.
+ */
+export const zonedDateTimeIso = (
+    dateStr: string,
+    timeStr = '12:00',
+    timeZone = DEFAULT_TIMEZONE
+): string | undefined => {
+    const dParts = parseDateInput(dateStr);
+    if (!dParts) return undefined;
+    const timeMatch = /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/.exec(timeStr.trim());
+    const hour = timeMatch ? Number(timeMatch[1]) : 12;
+    const minute = timeMatch ? Number(timeMatch[2]) : 0;
+    const second = timeMatch && timeMatch[3] ? Number(timeMatch[3]) : 0;
+    return zonedWallTimeToUtcIso(dParts[0], dParts[1], dParts[2], hour, minute, second, 0, timeZone);
 };

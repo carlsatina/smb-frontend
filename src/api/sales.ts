@@ -115,7 +115,7 @@ export const getSale = async (storeId: string, saleId: string) => {
 
 export const finalizeSale = async (
     storeId: string,
-    payload: { items: SaleItemInput[]; paymentMethod: string; orderType?: string }
+    payload: { items: SaleItemInput[]; paymentMethod: string; orderType?: string; customDate?: string }
 ) => {
     return apiClient.request<{ sale: SaleDetail }>(`/api/v1/stores/${storeId}/sales/finalize`, {
         method: 'POST',

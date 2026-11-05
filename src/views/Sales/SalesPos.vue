@@ -238,7 +238,7 @@
                                                     />
                                                 </div>
                                             </th>
-                                            <th v-if="displaySettings.showSku || productsHaveSku" class="th-sortable th-sku" @click="handleSort('sku')">
+                                            <th v-if="displaySettings.showSku" class="th-sortable th-sku" @click="handleSort('sku')">
                                                 <div class="th-content">
                                                     <span>SKU</span>
                                                     <mdicon
@@ -248,7 +248,7 @@
                                                     />
                                                 </div>
                                             </th>
-                                            <th v-if="displaySettings.showCategory || categoryList.length > 0" class="th-sortable th-category" @click="handleSort('category')">
+                                            <th v-if="displaySettings.showCategory" class="th-sortable th-category" @click="handleSort('category')">
                                                 <div class="th-content">
                                                     <span>Category</span>
                                                     <mdicon
@@ -258,7 +258,7 @@
                                                     />
                                                 </div>
                                             </th>
-                                            <th class="th-sortable th-price align-right" @click="handleSort('price')">
+                                            <th v-if="displaySettings.showPrice" class="th-sortable th-price align-right" @click="handleSort('price')">
                                                 <div class="th-content align-right">
                                                     <span>Price</span>
                                                     <mdicon
@@ -274,73 +274,84 @@
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        <tr
-                                            v-for="(product, index) in paginatedTableProducts"
-                                            :key="product.id"
-                                            :ref="(el) => setRowRef(el, index)"
-                                            tabindex="0"
-                                            class="pos-table-row"
-                                            :class="{
-                                                'pos-table-row--in-cart': cartQtyMap[product.id],
-                                                'pos-table-row--selected': selectedRowIndex === index,
-                                            }"
-                                            @click="onRowClick(product, index)"
-                                            @focus="selectedRowIndex = index"
-                                            @keydown="onRowKeydown($event, product, index)"
-                                        >
-                                            <!-- Product Name & Meta -->
-                                            <td class="td-product">
-                                                <div class="td-product-cell">
-                                                    <span
-                                                        v-if="displaySettings.useCategoryColor && product.category"
-                                                        class="td-cat-dot"
-                                                        :style="{ background: displaySettings.categoryColors[product.category] || '#cbd5e1' }"
-                                                        :title="product.category"
-                                                    />
-                                                    <span
-                                                        v-if="selectedRowIndex === index"
-                                                        class="td-selected-indicator"
-                                                        title="Currently selected (Press Enter to add)"
-                                                    >
-                                                        ↵
-                                                    </span>
-                                                    <div class="td-product-info">
-                                                        <span class="td-product-title" :title="product.name">{{ product.name }}</span>
-                                                        <div class="td-product-sub">
-                                                            <span v-if="displaySettings.showType || product.type" class="td-type-badge">
-                                                                {{ formatProductType(product.type) }}
-                                                            </span>
-                                                            <span class="td-unit-badge">{{ product.unit }}</span>
-                                                            <span v-if="!displaySettings.showSku && !productsHaveSku && product.sku" class="td-sku-hint">
-                                                                SKU: {{ product.sku }}
-                                                            </span>
+                                        <template v-for="(product, index) in paginatedTableProducts" :key="product.id">
+                                            <tr
+                                                v-if="shouldShowTableCategoryHeader(index)"
+                                                class="pos-table-category-row"
+                                            >
+                                                <td :colspan="tableColumnCount">
+                                                    <div class="pos-table-category-label">
+                                                        <span
+                                                            v-if="displaySettings.useCategoryColor && product.category"
+                                                            class="td-cat-dot"
+                                                            :style="{ background: displaySettings.categoryColors[product.category] || '#cbd5e1' }"
+                                                        />
+                                                        <span>{{ product.category || 'Uncategorized' }}</span>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            <tr
+                                                :ref="(el) => setRowRef(el, index)"
+                                                tabindex="0"
+                                                class="pos-table-row"
+                                                :class="{
+                                                    'pos-table-row--in-cart': cartQtyMap[product.id],
+                                                    'pos-table-row--selected': selectedRowIndex === index,
+                                                }"
+                                                @click="onRowClick(product, index)"
+                                                @focus="selectedRowIndex = index"
+                                                @keydown="onRowKeydown($event, product, index)"
+                                            >
+                                                <!-- Product Name & Meta -->
+                                                <td class="td-product">
+                                                    <div class="td-product-cell">
+                                                        <span
+                                                            v-if="displaySettings.useCategoryColor && product.category && !displaySettings.groupByCategory"
+                                                            class="td-cat-dot"
+                                                            :style="{ background: displaySettings.categoryColors[product.category] || '#cbd5e1' }"
+                                                            :title="product.category"
+                                                        />
+                                                        <span
+                                                            v-if="selectedRowIndex === index"
+                                                            class="td-selected-indicator"
+                                                            title="Currently selected (Press Enter to add)"
+                                                        >
+                                                            ↵
+                                                        </span>
+                                                        <div class="td-product-info">
+                                                            <span class="td-product-title" :title="product.name">{{ product.name }}</span>
+                                                            <div class="td-product-sub">
+                                                                <span v-if="displaySettings.showType" class="td-type-badge">
+                                                                    {{ formatProductType(product.type) }}
+                                                                </span>
+                                                                <span class="td-unit-badge">{{ product.unit }}</span>
+                                                            </div>
                                                         </div>
                                                     </div>
-                                                </div>
-                                            </td>
+                                                </td>
 
-                                            <!-- SKU -->
-                                            <td v-if="displaySettings.showSku || productsHaveSku" class="td-sku">
-                                                <code v-if="product.sku" class="td-sku-code">{{ product.sku }}</code>
-                                                <span v-else class="td-empty-dash">—</span>
-                                            </td>
+                                                <!-- SKU -->
+                                                <td v-if="displaySettings.showSku" class="td-sku">
+                                                    <code v-if="product.sku" class="td-sku-code">{{ product.sku }}</code>
+                                                    <span v-else class="td-empty-dash">—</span>
+                                                </td>
 
-                                            <!-- Category -->
-                                            <td v-if="displaySettings.showCategory || categoryList.length > 0" class="td-category">
-                                                <span
-                                                    v-if="product.category"
-                                                    class="td-category-tag"
-                                                    :style="getCategoryPillStyle(product.category, false)"
-                                                >
-                                                    {{ product.category }}
-                                                </span>
-                                                <span v-else class="td-empty-dash">—</span>
-                                            </td>
+                                                <!-- Category -->
+                                                <td v-if="displaySettings.showCategory" class="td-category">
+                                                    <span
+                                                        v-if="product.category"
+                                                        class="td-category-tag"
+                                                        :style="getCategoryPillStyle(product.category, false)"
+                                                    >
+                                                        {{ product.category }}
+                                                    </span>
+                                                    <span v-else class="td-empty-dash">—</span>
+                                                </td>
 
-                                            <!-- Price -->
-                                            <td class="td-price align-right">
-                                                <span class="td-price-amount">{{ formatMoney(product.price) }}</span>
-                                            </td>
+                                                <!-- Price -->
+                                                <td v-if="displaySettings.showPrice" class="td-price align-right">
+                                                    <span class="td-price-amount">{{ formatMoney(product.price) }}</span>
+                                                </td>
 
                                             <!-- Action / In-Cart Stepper -->
                                             <td class="td-action align-right" @click.stop>
@@ -375,6 +386,7 @@
                                                 </button>
                                             </td>
                                         </tr>
+                                    </template>
 
                                         <!-- Empty Search State -->
                                         <tr v-if="sortedTableProducts.length === 0">
@@ -665,6 +677,37 @@
                                 </option>
                             </select>
                         </label>
+                        <div v-if="isOwner" class="pos-date-panel">
+                            <div class="pos-date-toggle">
+                                <label class="pos-date-checkbox">
+                                    <input v-model="useCustomDate" type="checkbox" />
+                                    <span>Manual sale date</span>
+                                </label>
+                                <button
+                                    v-if="useCustomDate"
+                                    type="button"
+                                    class="pos-date-now-btn"
+                                    title="Set to current date and time"
+                                    @click="resetCustomDateToNow"
+                                >
+                                    Now
+                                </button>
+                            </div>
+                            <div v-if="useCustomDate" class="pos-date-inputs">
+                                <input
+                                    v-model="customSaleDate"
+                                    type="date"
+                                    class="pos-date-input"
+                                    aria-label="Sale date"
+                                />
+                                <input
+                                    v-model="customSaleTime"
+                                    type="time"
+                                    class="pos-time-input"
+                                    aria-label="Sale time"
+                                />
+                            </div>
+                        </div>
                         <button
                             class="primary-button"
                             :disabled="!canFinalize"
@@ -689,6 +732,8 @@ import { listProducts } from '@/api/products';
 import { finalizeSale } from '@/api/sales';
 import { useToast } from '@/composables/useToast';
 import { useStoreContextStore } from '@/stores/storeContext';
+import { useUserContextStore } from '@/stores/userContext';
+import { todayStr, currentTimeStr, zonedDateTimeIso } from '@/utils/datetime';
 import SkeletonLoader from '@/components/SkeletonLoader.vue';
 
 type Product = {
@@ -725,7 +770,29 @@ type DisplaySettings = {
 const router = useRouter();
 const route = useRoute();
 const storeContext = useStoreContextStore();
+const userContext = useUserContextStore();
 const { showToast } = useToast();
+
+const storeTimezone = computed(() => storeContext.currentStore?.timezone || 'Asia/Manila');
+const isOwner = computed(
+    () => storeContext.currentStore?.role === 'OWNER' || userContext.profile?.isSuperAdmin === true
+);
+
+const useCustomDate = ref(false);
+const customSaleDate = ref(todayStr(storeTimezone.value));
+const customSaleTime = ref(currentTimeStr(storeTimezone.value));
+
+const resetCustomDateToNow = () => {
+    customSaleDate.value = todayStr(storeTimezone.value);
+    customSaleTime.value = currentTimeStr(storeTimezone.value);
+};
+
+watch(storeTimezone, (newTz) => {
+    if (!useCustomDate.value) {
+        customSaleDate.value = todayStr(newTz);
+        customSaleTime.value = currentTimeStr(newTz);
+    }
+});
 
 type PosViewMode = 'cards' | 'table';
 
@@ -1014,9 +1081,9 @@ const productsHaveSku = computed(() => products.value.some((p) => !!p.sku));
 
 const tableColumnCount = computed(() => {
     let count = 2; // Product + Ticket
-    if (displaySettings.showSku || productsHaveSku.value) count++;
-    if (displaySettings.showCategory || categoryList.value.length > 0) count++;
-    count++; // Price
+    if (displaySettings.showSku) count++;
+    if (displaySettings.showCategory) count++;
+    if (displaySettings.showPrice) count++;
     return count;
 });
 
@@ -1048,6 +1115,12 @@ const sortedTableProducts = computed(() => {
     const mult = isAsc ? 1 : -1;
 
     return list.sort((a, b) => {
+        if (displaySettings.groupByCategory && (!isTableExplicitlySorted.value || tableSortColumn.value === 'category')) {
+            const catA = a.category || 'Uncategorized';
+            const catB = b.category || 'Uncategorized';
+            const catDiff = catA.localeCompare(catB, undefined, { sensitivity: 'base' });
+            if (catDiff !== 0) return catDiff;
+        }
         if (col === 'name') {
             return mult * a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true });
         }
@@ -1069,6 +1142,14 @@ const sortedTableProducts = computed(() => {
         return 0;
     });
 });
+
+const shouldShowTableCategoryHeader = (index: number) => {
+    if (!displaySettings.groupByCategory) return false;
+    if (index === 0) return true;
+    const prev = paginatedTableProducts.value[index - 1];
+    const curr = paginatedTableProducts.value[index];
+    return (prev?.category || 'Uncategorized') !== (curr?.category || 'Uncategorized');
+};
 
 const totalTablePages = computed(() => {
     if (tablePageSize.value === 'all') return 1;
@@ -1539,6 +1620,15 @@ const finalizeTicket = async () => {
         const totalDiscount = cartDiscount.value;
         const subtotal = cartSubtotal.value;
 
+        const customDateIso =
+            isOwner.value && useCustomDate.value && customSaleDate.value
+                ? zonedDateTimeIso(
+                      customSaleDate.value,
+                      customSaleTime.value || '12:00',
+                      storeTimezone.value
+                  )
+                : undefined;
+
         const payload = {
             items: cartItems.value.map((item) => {
                 const itemTotal = lineTotal(item);
@@ -1555,6 +1645,7 @@ const finalizeTicket = async () => {
             }),
             paymentMethod: paymentMethod.value,
             orderType: orderType.value,
+            ...(customDateIso ? { customDate: customDateIso } : {}),
         };
         const purchasedIds = cartItems.value.map((item) => item.productId);
         const { sale } = await finalizeSale(storeId, payload);
@@ -1636,6 +1727,7 @@ watch(
                 showSku: displaySettings.showSku,
                 showType: displaySettings.showType,
                 showCategory: displaySettings.showCategory,
+                showPrice: displaySettings.showPrice,
                 useCategoryColor: displaySettings.useCategoryColor,
                 categoryColors: displaySettings.categoryColors,
                 groupByCategory: displaySettings.groupByCategory,
@@ -2619,6 +2711,78 @@ watch(
     box-shadow: 0 0 0 2px rgba(13, 148, 136, 0.12);
 }
 
+.pos-date-panel {
+    background: #f8fafc;
+    border: 1px dashed var(--c-border);
+    border-radius: 8px;
+    padding: 0.35rem 0.5rem;
+    display: grid;
+    gap: 0.3rem;
+}
+
+.pos-date-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.pos-date-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.73rem;
+    font-weight: 600;
+    color: var(--c-text);
+    cursor: pointer;
+    user-select: none;
+}
+
+.pos-date-checkbox input[type="checkbox"] {
+    accent-color: var(--c-accent);
+    cursor: pointer;
+}
+
+.pos-date-now-btn {
+    border: 1px solid var(--c-border);
+    background: white;
+    color: var(--c-text);
+    font-size: 0.68rem;
+    font-weight: 600;
+    padding: 0.15rem 0.45rem;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.pos-date-now-btn:hover {
+    border-color: var(--c-accent);
+    color: var(--c-accent);
+}
+
+.pos-date-inputs {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 0.3rem;
+}
+
+.pos-date-input,
+.pos-time-input {
+    border: 1px solid var(--c-border);
+    border-radius: 6px;
+    padding: 0.28rem 0.45rem;
+    background: white;
+    font-size: 0.74rem;
+    font-family: var(--app-font-sans);
+    color: var(--c-text);
+}
+
+.pos-date-input:focus,
+.pos-time-input:focus {
+    outline: none;
+    border-color: var(--c-accent);
+    box-shadow: 0 0 0 2px rgba(13, 148, 136, 0.12);
+}
+
 /* Finalize sale — primary action */
 .primary-button {
     border: none;
@@ -3166,6 +3330,25 @@ watch(
     border-color: var(--c-accent);
     background: var(--c-accent-soft);
     color: var(--c-accent-dark);
+}
+
+/* Category section header row in table view */
+.pos-table-category-row td {
+    background: #f8fafc;
+    padding: 0.45rem 0.85rem !important;
+    border-top: 1px solid #e2e8f0;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.pos-table-category-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: 0.74rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #475569;
 }
 
 /* Empty search state */

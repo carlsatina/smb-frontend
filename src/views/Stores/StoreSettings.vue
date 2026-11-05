@@ -106,7 +106,7 @@
                                         <input v-model.number="storeForm.defaultTaxRate" type="number" min="0" max="100" step="0.01" placeholder="0" :disabled="!canEdit" />
                                     </label>
                                     <label class="st-field">
-                                        Discount (%)
+                                        Senior/PWD Discount (%)
                                         <input v-model.number="storeForm.defaultDiscount" type="number" min="0" max="100" step="0.01" placeholder="0" :disabled="!canEdit" />
                                     </label>
                                     <label class="st-field">
@@ -825,8 +825,10 @@ const resetForm = () => {
     storeForm.defaultTaxRate = currentStore.value.defaultTaxRate ?? 0;
     storeForm.defaultDiscount = currentStore.value.defaultDiscount ?? 0;
     storeForm.cashierSalesHistoryLimit = currentStore.value.cashierSalesHistoryLimit ?? null;
-    storeForm.paymentMethods = currentStore.value.paymentMethods?.length
-        ? [...currentStore.value.paymentMethods]
+    const validMethodSet = new Set(allPaymentMethods.map((m) => m.value));
+    const loadedMethods = (currentStore.value.paymentMethods ?? []).filter((m) => validMethodSet.has(m));
+    storeForm.paymentMethods = loadedMethods.length > 0
+        ? loadedMethods
         : ['CASH', 'CARD', 'TRANSFER', 'GCASH', 'MAYA', 'OTHER'];
     storeForm.unitOptions = normalizeOptions(currentStore.value.unitOptions ?? [], DEFAULT_UNIT_OPTIONS);
     storeForm.categoryOptions = normalizeOptions(currentStore.value.categoryOptions ?? [], DEFAULT_CATEGORY_OPTIONS);
@@ -1070,8 +1072,12 @@ const saveSettings = async () => {
     if (!currentStore.value || !canEdit.value) return;
     isSaving.value = true;
     try {
+        const validMethodSet = new Set(allPaymentMethods.map((m) => m.value));
+        const cleanPaymentMethods = (storeForm.paymentMethods ?? []).filter((m) => validMethodSet.has(m));
+
         const payload = {
             ...storeForm,
+            paymentMethods: cleanPaymentMethods.length > 0 ? cleanPaymentMethods : ['CASH'],
             unitOptions: normalizeOptions(storeForm.unitOptions, DEFAULT_UNIT_OPTIONS),
             categoryOptions: normalizeOptions(storeForm.categoryOptions, DEFAULT_CATEGORY_OPTIONS),
             expenseCategoryOptions: normalizeOptions(storeForm.expenseCategoryOptions, DEFAULT_EXPENSE_CATEGORY_OPTIONS),
@@ -1080,7 +1086,12 @@ const saveSettings = async () => {
         await storeContext.fetchStores();
         showToast('Store settings updated.', 'success');
     } catch (error: any) {
-        const message = error?.body?.error?.message || 'Unable to update store settings.';
+        const details = error?.body?.error?.details;
+        let message = error?.body?.error?.message || 'Unable to update store settings.';
+        if (details?.fieldErrors && Object.keys(details.fieldErrors).length > 0) {
+            const firstField = Object.entries(details.fieldErrors)[0];
+            message = `${firstField[0]}: ${Array.isArray(firstField[1]) ? firstField[1][0] : firstField[1]}`;
+        }
         showToast(message, 'error');
     } finally {
         isSaving.value = false;

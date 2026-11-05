@@ -630,7 +630,6 @@
                                     <tr v-for="item in lowStockItems" :key="`${item.itemType}-${item.itemId}`">
                                         <td>
                                             <div class="item-name">{{ item.name }}</div>
-                                            <div class="item-meta">{{ item.unit }}</div>
                                         </td>
                                         <td>
                                             <span :class="['item-type-chip', item.itemType === 'INGREDIENT' ? 'item-type-chip--ingredient' : 'item-type-chip--product']">
@@ -644,7 +643,7 @@
                                         </td>
                                         <td>
                                             <div class="stock-level">
-                                                <span class="stock-nums">{{ formatQty(item.currentQty) }} / {{ formatQty(item.lowStockThreshold) }}</span>
+                                                <span class="stock-nums">{{ formatQty(item.currentQty) }} / {{ formatQty(item.lowStockThreshold) }} <span class="stock-unit">{{ item.unit }}</span></span>
                                                 <div class="stock-track">
                                                     <span
                                                         class="stock-fill"
@@ -654,7 +653,7 @@
                                                 </div>
                                             </div>
                                         </td>
-                                        <td class="shortfall">{{ formatQty(item.shortfall) }}</td>
+                                        <td class="shortfall">{{ formatQty(item.shortfall) }} <span class="shortfall-unit">{{ item.unit }}</span></td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -2951,6 +2950,14 @@ watch(
 .shortfall {
     font-weight: 700;
     color: #dc2626;
+}
+
+.stock-unit,
+.shortfall-unit {
+    font-size: 0.72rem;
+    font-weight: 500;
+    color: var(--c-muted);
+    margin-left: 0.15rem;
 }
 
 /* ── Low stock status ── */
