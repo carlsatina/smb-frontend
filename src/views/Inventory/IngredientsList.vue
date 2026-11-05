@@ -179,7 +179,7 @@
                                         @click="canWrite && openEditModal(ingredient)"
                                     >
                                         <td class="col-name">
-                                            <div class="ingredient-name">{{ ingredient.name }}</div>
+                                            <div class="ingredient-name">{{ formatIngredientName(ingredient) }}</div>
                                             <div class="ingredient-meta">
                                                 <span
                                                     class="category-chip"
@@ -187,7 +187,6 @@
                                                 >
                                                     {{ formatCategory(ingredient.category) }}
                                                 </span>
-                                                <span>{{ ingredient.unit }}</span>
                                             </div>
                                         </td>
                                         <td class="col-cost num">
@@ -561,6 +560,14 @@ const formatCategory = (category: string) => {
     if (category === 'RAW_MATERIAL') return 'Raw material';
     if (category === 'PACKAGING') return 'Packaging';
     return category;
+};
+
+const formatIngredientName = (ingredient: Ingredient) => {
+    if (!ingredient?.name) return '';
+    if (ingredient.category === 'RAW_MATERIAL') {
+        return ingredient.name.replace(/\s+Syrup$/i, '');
+    }
+    return ingredient.name;
 };
 
 const formatQty = (value: number | string | null | undefined) => {
