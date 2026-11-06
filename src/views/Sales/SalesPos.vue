@@ -683,9 +683,9 @@
 
                     <div class="checkout-controls">
                         <div
-                            v-if="posChannels.length"
+                            v-if="ticketChannels.length"
                             class="order-type-toggle channel-toggle"
-                            :style="{ gridTemplateColumns: `repeat(${posChannels.length + 1}, 1fr)` }"
+                            :style="{ gridTemplateColumns: `repeat(${ticketChannels.length + 1}, 1fr)` }"
                             role="group"
                             aria-label="Sales channel"
                         >
@@ -696,26 +696,14 @@
                                 @click="selectedChannelKey = null"
                             >Walk-in</button>
                             <button
-                                v-for="channel in posChannels"
+                                v-for="channel in ticketChannels"
                                 :key="channel.key"
                                 type="button"
                                 class="order-type-option channel-option"
                                 :class="{ 'order-type-option--active channel-option--active': selectedChannelKey === channel.key }"
                                 :title="`${channel.name} prices (+${channel.markupPercent}%)`"
-                                @click="requestChannel(channel.key)"
+                                @click="selectedChannelKey = channel.key"
                             >{{ channel.name }}</button>
-                        </div>
-                        <div v-if="pendingChannel" class="channel-conflict" role="alert">
-                            <p>
-                                <strong>{{ pendingChannelBlocked.map((item) => item.name).join(', ') }}</strong>
-                                {{ pendingChannelBlocked.length === 1 ? "isn't" : "aren't" }} sold on {{ pendingChannel.name }}.
-                            </p>
-                            <div class="channel-conflict-actions">
-                                <button type="button" class="channel-conflict-btn" @click="pendingChannelKey = null">Cancel</button>
-                                <button type="button" class="channel-conflict-btn channel-conflict-btn--primary" @click="confirmPendingChannel">
-                                    Remove & switch to {{ pendingChannel.name }}
-                                </button>
-                            </div>
                         </div>
                         <div class="order-type-toggle" role="group" aria-label="Order type">
                             <button
@@ -985,34 +973,18 @@ const isSoldOn = (product: { unavailableChannels?: string[] }, channelKey: strin
 // Products offered on the selected channel; everything for walk-in.
 const sellableProducts = computed(() => products.value.filter((product) => isSoldOn(product, selectedChannelKey.value)));
 
-// Switching to a channel that doesn't sell something on the ticket asks first.
-const pendingChannelKey = ref<string | null>(null);
-const pendingChannel = computed(() => posChannels.value.find((channel) => channel.key === pendingChannelKey.value) ?? null);
-const blockedItemsFor = (channelKey: string) => {
+// Channels the current ticket can still go to: a ticket holding an item that a
+// channel doesn't sell can't become that channel's order, so its option is hidden.
+// (While on a channel, its off-menu products are hidden, so this stays consistent.)
+const ticketChannels = computed(() => {
     const byId = new Map(products.value.map((product) => [product.id, product]));
-    return cartItems.value.filter((item) => {
-        const product = byId.get(item.productId);
-        return product ? !isSoldOn(product, channelKey) : false;
-    });
-};
-const pendingChannelBlocked = computed(() => (pendingChannelKey.value ? blockedItemsFor(pendingChannelKey.value) : []));
-const requestChannel = (channelKey: string) => {
-    if (channelKey === selectedChannelKey.value) return;
-    if (blockedItemsFor(channelKey).length) {
-        pendingChannelKey.value = channelKey;
-        return;
-    }
-    pendingChannelKey.value = null;
-    selectedChannelKey.value = channelKey;
-};
-const confirmPendingChannel = () => {
-    const channelKey = pendingChannelKey.value;
-    if (!channelKey) return;
-    const blocked = new Set(blockedItemsFor(channelKey).map((item) => item.productId));
-    cartItems.value = cartItems.value.filter((item) => !blocked.has(item.productId));
-    pendingChannelKey.value = null;
-    selectedChannelKey.value = channelKey;
-};
+    return posChannels.value.filter((channel) =>
+        cartItems.value.every((item) => {
+            const product = byId.get(item.productId);
+            return !product || isSoldOn(product, channel.key);
+        })
+    );
+});
 
 const displayPrice = (product: { price: number | string; channelPrices?: Record<string, number> }) => {
     const base = Number(product.price) || 0;
@@ -1138,7 +1110,6 @@ const clearCart = () => {
     cartItems.value = [];
     discountEnabled.value = false;
     selectedChannelKey.value = null;
-    pendingChannelKey.value = null;
     orderType.value = 'DINE_IN';
     _paymentMethod.value = paymentMethods.value.includes('CASH') ? 'CASH' : paymentMethods.value[0];
 };
@@ -1853,11 +1824,6 @@ watch(posChannels, (channels) => {
     if (selectedChannelKey.value && !channels.some((channel) => channel.key === selectedChannelKey.value)) {
         selectedChannelKey.value = null;
     }
-});
-
-// Walk-in clears any pending switch.
-watch(selectedChannelKey, () => {
-    pendingChannelKey.value = null;
 });
 
 const handleDisplayClickOutside = (event: MouseEvent) => {
@@ -2914,45 +2880,6 @@ watch(
 
 .channel-toggle {
     margin-bottom: 0.4rem;
-}
-
-.channel-conflict {
-    margin-bottom: 0.5rem;
-    padding: 0.6rem 0.7rem;
-    border-radius: 8px;
-    background: #fffbeb;
-    border: 1px solid #fde68a;
-    font-size: 0.8rem;
-    color: #92400e;
-}
-
-.channel-conflict p {
-    margin: 0 0 0.5rem;
-}
-
-.channel-conflict-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 0.4rem;
-    flex-wrap: wrap;
-}
-
-.channel-conflict-btn {
-    border: 1px solid #fcd34d;
-    background: white;
-    color: #92400e;
-    border-radius: 6px;
-    padding: 0.3rem 0.6rem;
-    font-size: 0.75rem;
-    font-weight: 600;
-    font-family: var(--app-font-sans);
-    cursor: pointer;
-}
-
-.channel-conflict-btn--primary {
-    background: #16a34a;
-    border-color: #16a34a;
-    color: white;
 }
 
 /* Channel tickets get a distinct colour so a cashier notices the higher prices. */
