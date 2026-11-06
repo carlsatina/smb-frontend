@@ -314,7 +314,7 @@ const currentStoreLabel = computed(() => {
     return store.name;
 });
 
-const canWrite = computed(() => canAccess(storeContext.currentStore?.role, 'purchaseOrdersWrite'));
+const canWrite = computed(() => canAccess(storeContext.currentStore, 'purchaseOrdersWrite'));
 // Use the store owner's plan tier for feature access (not the logged-in user's)
 const ownerPlanTier = computed(() => storeContext.currentStore?.ownerPlanTier ?? null);
 const ownerSubscriptionActive = computed(() => storeContext.currentStore?.ownerSubscriptionActive ?? false);

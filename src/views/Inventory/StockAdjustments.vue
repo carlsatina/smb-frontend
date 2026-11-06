@@ -287,7 +287,7 @@ const formatQty = (value: number) => {
     return Number(value).toLocaleString(undefined, { maximumFractionDigits: 2 });
 };
 
-const canEdit = computed(() => canAccess(storeContext.currentStore?.role, 'inventoryAdjustments'));
+const canEdit = computed(() => canAccess(storeContext.currentStore, 'inventoryAdjustments'));
 
 const availableItems = computed(() => {
     return stockItems.value.filter((item) => item.itemType === form.itemType);

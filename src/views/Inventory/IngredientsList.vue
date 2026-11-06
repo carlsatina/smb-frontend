@@ -295,7 +295,7 @@ const page = ref(1);
 const pageSize = ref(10);
 const pageSizeOptions = [10, 20, 50];
 
-const canWrite = computed(() => canAccess(storeContext.currentStore?.role, 'inventoryAdjustments'));
+const canWrite = computed(() => canAccess(storeContext.currentStore, 'inventoryAdjustments'));
 
 const ownerPlanTier = computed(() => storeContext.currentStore?.ownerPlanTier ?? null);
 const ownerSubscriptionActive = computed(() => storeContext.currentStore?.ownerSubscriptionActive ?? false);
@@ -306,7 +306,7 @@ const isPlanLocked = computed(
         (planKnown.value && !hasPlanFeature(ownerPlanTier.value, 'ingredients'))
 );
 
-const canAdmin = computed(() => canAccess(storeContext.currentStore?.role, 'storeSettings'));
+const canAdmin = computed(() => canAccess(storeContext.currentStore, 'storeSettings'));
 const canImportExport = computed(
     () => canAdmin.value && ownerSubscriptionActive.value && hasPlanFeature(ownerPlanTier.value, 'importExport')
 );

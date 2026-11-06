@@ -17,7 +17,7 @@ import { computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useStoreContextStore } from '@/stores/storeContext';
 import { useToast } from '@/composables/useToast';
-import { canAccess, FeatureKey, getDefaultRouteForRole } from '@/utils/roleAccess';
+import { canAccess, FeatureKey, getDefaultRouteForStore } from '@/utils/roleAccess';
 
 const router = useRouter();
 const route = useRoute();
@@ -42,7 +42,7 @@ const selectedStoreId = computed({
         storeContext.setCurrentStore(value);
         const feature = route.meta.feature as FeatureKey | undefined;
         const store = storeContext.stores.find((entry) => entry.id === value);
-        const fallbackRoute = getDefaultRouteForRole(store?.role);
+        const fallbackRoute = getDefaultRouteForStore(store);
 
         if (!route.params.storeId) {
             if (fallbackRoute) {
@@ -55,7 +55,7 @@ const selectedStoreId = computed({
         if (!feature) {
             return;
         }
-        if (!store || !canAccess(store.role, feature)) {
+        if (!store || !canAccess(store, feature)) {
             if (fallbackRoute) {
                 showToast('Store switched. Redirected to an available page.', 'info');
                 router.push({ name: fallbackRoute, params: { storeId: value } });

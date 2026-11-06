@@ -37,8 +37,12 @@
                         </button>
                         <button class="st-sidebar-item" :class="{ 'is-active': activeSection === 'team' }" @click="activeSection = 'team'">
                             <mdicon name="account-group-outline" size="16" />
-                            Team &amp; roles
+                            Team
                             <span v-if="pendingInvites.length" class="st-sidebar-badge">{{ pendingInvites.length }}</span>
+                        </button>
+                        <button class="st-sidebar-item" :class="{ 'is-active': activeSection === 'permissions' }" @click="activeSection = 'permissions'">
+                            <mdicon name="shield-account-outline" size="16" />
+                            Roles &amp; permissions
                         </button>
                         <button class="st-sidebar-item" :class="{ 'is-active': activeSection === 'plan' }" @click="activeSection = 'plan'">
                             <mdicon name="crown-outline" size="16" />
@@ -269,11 +273,23 @@
                             </div>
                         </section>
 
-                        <!-- ── Team & roles ── -->
+                        <!-- ── Roles & permissions ── -->
+                        <section v-if="activeSection === 'permissions' && currentStore" class="st-section">
+                            <div class="st-section-header">
+                                <h2 class="st-section-title">Roles &amp; permissions</h2>
+                                <p class="st-section-sub">Choose what each role can do in this store. Changes apply to everyone with that role.</p>
+                            </div>
+                            <RolePermissionsPanel :store-id="currentStore.id" />
+                        </section>
+
+                        <!-- ── Team ── -->
                         <section v-if="activeSection === 'team'" class="st-section">
                             <div class="st-section-header">
-                                <h2 class="st-section-title">Team &amp; roles</h2>
-                                <p class="st-section-sub">Manage members and invitations for this store.</p>
+                                <h2 class="st-section-title">Team</h2>
+                                <p class="st-section-sub">
+                                    Manage members and invitations for this store. What each role can do is set in
+                                    <button type="button" class="st-inline-link" @click="activeSection = 'permissions'">Roles &amp; permissions</button>.
+                                </p>
                             </div>
 
                             <!-- Tabs -->
@@ -701,6 +717,7 @@ import { useStoreContextStore } from '@/stores/storeContext';
 import { useUserContextStore } from '@/stores/userContext';
 import { DEFAULT_CATEGORY_OPTIONS, DEFAULT_EXPENSE_CATEGORY_OPTIONS, DEFAULT_UNIT_OPTIONS } from '@/utils/catalogDefaults';
 import { getSubcategoriesFor, withSubcategories, type SubcategoryOptions } from '@/utils/subcategories';
+import { hasPermission } from '@/utils/roleAccess';
 import { getPlanConfig, planTierOrder, planConfigs, type PlanTier, type PlanFeature } from '@/utils/planAccess';
 import { getMe } from '@/api/auth';
 import ConfirmModal from '@/components/ConfirmModal.vue';
@@ -717,6 +734,7 @@ import {
     type StoreMember,
 } from '@/api/storeMembers';
 import SkeletonLoader from '@/components/SkeletonLoader.vue';
+import RolePermissionsPanel from '@/components/RolePermissionsPanel.vue';
 
 const router = useRouter();
 const route = useRoute();
@@ -770,7 +788,7 @@ const allPaymentMethods = [
     { value: 'OTHER', label: 'Other' },
 ];
 
-const activeSection = ref<'profile' | 'payment' | 'catalog' | 'team' | 'plan' | 'ai' | 'danger'>('profile');
+const activeSection = ref<'profile' | 'payment' | 'catalog' | 'team' | 'permissions' | 'plan' | 'ai' | 'danger'>('profile');
 
 const isSaving = ref(false);
 const isCatalogSaving = ref(false);
@@ -839,10 +857,7 @@ const currentStore = computed(() => {
     return storeContext.stores.find((store) => store.id === storeId) ?? null;
 });
 
-const canEdit = computed(() => {
-    const role = currentStore.value?.role;
-    return role === 'OWNER' || role === 'ADMIN';
-});
+const canEdit = computed(() => hasPermission(currentStore.value, 'store.manage'));
 const canArchive = computed(() => currentStore.value?.role === 'OWNER');
 
 const timezoneOptions = computed(() => {
@@ -1567,7 +1582,7 @@ onMounted(async () => {
 
     // Support deep-linking via ?section=team etc.
     const qs = route.query.section as string | undefined;
-    if (qs && ['profile', 'payment', 'catalog', 'team', 'plan', 'ai', 'danger'].includes(qs)) {
+    if (qs && ['profile', 'payment', 'catalog', 'team', 'permissions', 'plan', 'ai', 'danger'].includes(qs)) {
         activeSection.value = qs as typeof activeSection.value;
     }
 
@@ -1818,6 +1833,20 @@ watch(
     font-size: 1.05rem;
     font-weight: 700;
     color: var(--c-text);
+}
+
+.st-inline-link {
+    border: none;
+    background: none;
+    padding: 0;
+    font: inherit;
+    color: var(--c-accent);
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.st-inline-link:hover {
+    text-decoration: underline;
 }
 
 .st-section-title--danger {

@@ -84,7 +84,7 @@
                                 <button class="ghost-button" :disabled="isExporting" @click="handleExport">
                                     {{ isExporting ? 'Exporting…' : 'Export CSV' }}
                                 </button>
-                                <button class="ghost-button" :disabled="isImporting" @click="triggerImport">
+                                <button v-if="canEdit" class="ghost-button" :disabled="isImporting" @click="triggerImport">
                                     {{ isImporting ? 'Importing…' : 'Import CSV' }}
                                 </button>
                                 <input
@@ -591,8 +591,8 @@ const goToNext = () => {
 };
 
 const statusFilter = ref<'ALL' | 'FINALIZED' | 'VOIDED'>('ALL');
-const canVoid = computed(() => canAccess(storeContext.currentStore?.role, 'salesVoid'));
-const canEdit = computed(() => canAccess(storeContext.currentStore?.role, 'salesEdit'));
+const canVoid = computed(() => canAccess(storeContext.currentStore, 'salesVoid'));
+const canEdit = computed(() => canAccess(storeContext.currentStore, 'salesEdit'));
 const hasAdvancedFilters = computed(() =>
     Boolean(cashierFilter.value || paymentMethodFilter.value || productFilter.value)
 );

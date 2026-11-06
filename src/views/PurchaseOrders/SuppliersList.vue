@@ -245,7 +245,7 @@ const currentStoreLabel = computed(() => {
     return store.name;
 });
 
-const canWrite = computed(() => canAccess(storeContext.currentStore?.role, 'purchaseOrdersWrite'));
+const canWrite = computed(() => canAccess(storeContext.currentStore, 'purchaseOrdersWrite'));
 const ownerPlanTier = computed(() => storeContext.currentStore?.ownerPlanTier ?? null);
 const ownerSubscriptionActive = computed(() => storeContext.currentStore?.ownerSubscriptionActive ?? false);
 const planKnown = computed(() => ownerPlanTier.value !== null);

@@ -462,7 +462,7 @@ const currentStoreLabel = computed(() => {
     return store.name;
 });
 
-const canAdjust = computed(() => canAccess(storeContext.currentStore?.role, 'inventoryAdjustments'));
+const canAdjust = computed(() => canAccess(storeContext.currentStore, 'inventoryAdjustments'));
 
 const otherStores = computed(() =>
     storeContext.stores.filter((s) => s.id !== storeContext.currentStoreId)

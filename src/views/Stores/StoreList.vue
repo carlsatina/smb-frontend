@@ -279,7 +279,7 @@ import SkeletonLoader from '@/components/SkeletonLoader.vue';
 import { useStoreContextStore } from '@/stores/storeContext';
 import type { StoreSummary } from '@/stores/storeContext';
 import { useToast } from '@/composables/useToast';
-import { canAccess, FeatureKey } from '@/utils/roleAccess';
+import { canAccess, FeatureKey, type StoreAccess } from '@/utils/roleAccess';
 import { useUserContextStore } from '@/stores/userContext';
 import { hasPlanFeature, openPlanUpgradeModal, PlanFeature } from '@/utils/planAccess';
 
@@ -288,8 +288,8 @@ const storeContext = useStoreContextStore();
 const userContext = useUserContextStore();
 const { showToast } = useToast();
 
-const canAccessFeature = (role: string | undefined, feature: FeatureKey) => {
-    return canAccess(role, feature);
+const canAccessFeature = (store: StoreAccess | undefined, feature: FeatureKey) => {
+    return canAccess(store, feature);
 };
 
 const storeForm = reactive({
@@ -402,38 +402,38 @@ const getStoreActions = (store: StoreSummary): StoreAction[] => [
     {
         key: 'store-settings',
         label: 'Store settings',
-        visible: canAccessFeature(store.role, 'storeSettings'),
+        visible: canAccessFeature(store, 'storeSettings'),
         onClick: () => goToSettings(store.id),
     },
     {
         key: 'pos',
         label: 'Open POS',
-        visible: canAccessFeature(store.role, 'salesPos'),
+        visible: canAccessFeature(store, 'salesPos'),
         onClick: () => goToPos(store.id),
     },
     {
         key: 'inventory',
         label: 'Open inventory',
-        visible: canAccessFeature(store.role, 'inventory'),
+        visible: canAccessFeature(store, 'inventory'),
         onClick: () => goToInventory(store.id),
     },
     {
         key: 'purchase-orders',
         label: 'Purchase orders',
-        visible: canAccessFeature(store.role, 'purchaseOrders'),
+        visible: canAccessFeature(store, 'purchaseOrders'),
         onClick: () => goToPurchaseOrders(store.id),
         lockedFeature: isPurchaseOrdersLocked.value ? 'purchaseOrders' : undefined,
     },
     {
         key: 'reports',
         label: 'Reports',
-        visible: canAccessFeature(store.role, 'reports'),
+        visible: canAccessFeature(store, 'reports'),
         onClick: () => goToReports(store.id),
     },
     {
         key: 'products',
         label: 'Open products',
-        visible: canAccessFeature(store.role, 'products'),
+        visible: canAccessFeature(store, 'products'),
         onClick: () => goToProducts(store.id),
         primary: true,
     },

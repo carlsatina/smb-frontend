@@ -337,7 +337,7 @@ const currentStoreLabel = computed(() => {
     return store.name;
 });
 
-const canAdjust = computed(() => canAccess(storeContext.currentStore?.role, 'inventoryAdjustments'));
+const canAdjust = computed(() => canAccess(storeContext.currentStore, 'inventoryAdjustments'));
 
 const hasActiveFilters = computed(() =>
     Boolean(searchQuery.value.trim() || filterMovementType.value !== 'ALL' || fromDate.value || toDate.value)

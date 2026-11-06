@@ -930,7 +930,7 @@ const employeePaymentMethods = computed(() => {
     if (!enabled || enabled.length === 0) return PAYMENT_METHOD_ORDER;
     return PAYMENT_METHOD_ORDER.filter((method) => enabled.includes(method));
 });
-const canViewReports = computed(() => canAccess(storeContext.currentStore?.role, 'reports'));
+const canViewReports = computed(() => canAccess(storeContext.currentStore, 'reports'));
 const isSingleDay = computed(() => filters.from === filters.to);
 
 const canUseIngredients = computed(() => hasPlanFeature(userContext.planTier, 'ingredients'));

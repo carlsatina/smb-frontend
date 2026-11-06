@@ -300,7 +300,7 @@ const activeOnly = ref(false);
 const page = ref(1);
 const pageSize = ref(10);
 const pageSizeOptions = [10, 20, 50];
-const canWrite = computed(() => canAccess(storeContext.currentStore?.role, 'productsWrite'));
+const canWrite = computed(() => canAccess(storeContext.currentStore, 'productsWrite'));
 const canImportExport = computed(() => hasPlanFeature(userContext.effectivePlan, 'importExport'));
 
 const showDeleteModal = ref(false);

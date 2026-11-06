@@ -20,7 +20,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { acceptStoreInvite, previewStoreInvite } from '@/api/storeMembers';
 import { useStoreContextStore } from '@/stores/storeContext';
 import { useUserContextStore } from '@/stores/userContext';
-import { getDefaultRouteForRole } from '@/utils/roleAccess';
+import { getDefaultRouteForStore } from '@/utils/roleAccess';
 
 const route = useRoute();
 const router = useRouter();
@@ -90,7 +90,7 @@ const acceptInvite = async () => {
         storeContext.setCurrentStore(storeId.value);
         status.value = 'success';
         const joinedStore = storeContext.stores.find(s => s.id === storeId.value);
-        const defaultRoute = joinedStore ? getDefaultRouteForRole(joinedStore.role) : null;
+        const defaultRoute = joinedStore ? getDefaultRouteForStore(joinedStore) : null;
         if (defaultRoute) {
             router.push({ name: defaultRoute, params: { storeId: storeId.value } });
         } else {

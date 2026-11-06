@@ -588,6 +588,7 @@ import { useUserContextStore } from '@/stores/userContext';
 import { hasPlanFeature, openPlanUpgradeModal } from '@/utils/planAccess';
 import { DEFAULT_CATEGORY_OPTIONS, DEFAULT_UNIT_OPTIONS } from '@/utils/catalogDefaults';
 import { getSubcategoriesFor, withSubcategories } from '@/utils/subcategories';
+import { hasPermission } from '@/utils/roleAccess';
 import PlanGate from '@/components/PlanGate.vue';
 import IngredientModal from '@/components/IngredientModal.vue';
 import SearchableSelect from '@/components/SearchableSelect.vue';
@@ -838,7 +839,7 @@ const form = ref({
 });
 
 // Subcategories come from the store's per-category lists (Store Settings).
-const canManageCatalog = computed(() => ['OWNER', 'ADMIN'].includes(storeContext.currentStore?.role ?? ''));
+const canManageCatalog = computed(() => hasPermission(storeContext.currentStore, 'store.manage'));
 const subcategoryOptions = computed(() =>
     getSubcategoriesFor(storeContext.currentStore?.subcategoryOptions, form.value.category)
 );

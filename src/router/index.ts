@@ -27,7 +27,7 @@ import ScheduleView from '@/views/Schedule/ScheduleView.vue'
 import { useStoreContextStore } from '@/stores/storeContext'
 import { useAdminContextStore } from '@/stores/adminContext'
 import { getAdminAccessToken } from '@/api/client'
-import { canAccess, FeatureKey, getDefaultRouteForRole } from '@/utils/roleAccess'
+import { canAccess, FeatureKey, getDefaultRouteForStore } from '@/utils/roleAccess'
 import AdminLayout from '@/views/admin/AdminLayout.vue'
 import AdminDashboard from '@/views/admin/AdminDashboard.vue'
 import AdminUsers from '@/views/admin/AdminUsers.vue'
@@ -366,8 +366,8 @@ router.beforeEach(async (to) => {
     }
     const storeContext = useStoreContextStore()
     const store = storeContext.stores.find((entry) => entry.id === storeId)
-    if (!store || !canAccess(store.role, feature)) {
-      const fallbackRoute = store ? getDefaultRouteForRole(store.role) : null
+    if (!store || !canAccess(store, feature)) {
+      const fallbackRoute = store ? getDefaultRouteForStore(store) : null
       if (fallbackRoute && storeId) {
         return { name: fallbackRoute, params: { storeId } }
       }

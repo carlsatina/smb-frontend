@@ -573,7 +573,7 @@ const syncEditForm = () => {
     editForm.expectedDate = purchaseOrder.value.expectedDate ? purchaseOrder.value.expectedDate.slice(0, 10) : '';
 };
 
-const canWrite = computed(() => canAccess(storeContext.currentStore?.role, 'purchaseOrdersWrite'));
+const canWrite = computed(() => canAccess(storeContext.currentStore, 'purchaseOrdersWrite'));
 
 const canEditDetails = computed(() => {
     const status = purchaseOrder.value?.status;

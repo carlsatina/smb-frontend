@@ -26,6 +26,7 @@ export const listStores = () => {
             aiApiKeySet: boolean;
             aiApiKeyLast4: string | null;
             role: string;
+            permissions: string[];
             ownerPlanTier: PlanTier;
             ownerSubscriptionActive: boolean;
         }>;
@@ -71,6 +72,34 @@ export const updateStore = (
         body: payload,
     });
 };
+
+export type PermissionDefinition = {
+    key: string;
+    group: string;
+    label: string;
+    description: string;
+    implies?: string[];
+};
+
+export type EditableRole = 'ADMIN' | 'INVENTORY_MANAGER' | 'CASHIER' | 'VIEWER';
+
+export type RolePermissionsResponse = {
+    permissions: PermissionDefinition[];
+    roles: EditableRole[];
+    defaults: Record<EditableRole, string[]>;
+    matrix: Record<EditableRole, string[]>;
+    isCustomized: boolean;
+    canEdit: boolean;
+};
+
+export const getRolePermissions = (storeId: string) =>
+    apiClient.request<RolePermissionsResponse>(`/api/v1/stores/${storeId}/permissions`);
+
+export const updateRolePermissions = (storeId: string, matrix: Record<EditableRole, string[]>) =>
+    apiClient.request<RolePermissionsResponse>(`/api/v1/stores/${storeId}/permissions`, {
+        method: 'PUT',
+        body: { matrix },
+    });
 
 export const deleteStore = (storeId: string) => {
     return apiClient.request<{ storeId: string }>(`/api/v1/stores/${storeId}`, {

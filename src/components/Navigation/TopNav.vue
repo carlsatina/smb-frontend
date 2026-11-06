@@ -308,7 +308,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { logout } from '@/api/auth';
 import { useStoreContextStore } from '@/stores/storeContext';
 import { useUserContextStore } from '@/stores/userContext';
-import { canAccess, FeatureKey, getDefaultRouteForRole } from '@/utils/roleAccess';
+import { canAccess, FeatureKey, getDefaultRouteForStore } from '@/utils/roleAccess';
 import { hasPlanFeature, openPlanUpgradeModal, getPlanConfig } from '@/utils/planAccess';
 import { useToast } from '@/composables/useToast';
 import TimeClockButton from '@/components/Navigation/TimeClockButton.vue';
@@ -329,27 +329,27 @@ const showVerifyEmail = computed(() => Boolean(userContext.profile) && !isEmailV
 const currentStoreId = computed(() => storeContext.currentStoreId);
 const currentStoreName = computed(() => storeContext.currentStore?.name ?? 'No store');
 const isWarehouse = computed(() => storeContext.currentStore?.storeType === 'WAREHOUSE');
-const canViewProducts = computed(() => canAccess(storeContext.currentStore?.role, 'products'));
-const canViewInventory = computed(() => canAccess(storeContext.currentStore?.role, 'inventory'));
-const canViewPurchaseOrders = computed(() => canAccess(storeContext.currentStore?.role, 'purchaseOrders'));
-const canViewSuppliers = computed(() => canAccess(storeContext.currentStore?.role, 'purchaseOrders'));
-const canViewPos = computed(() => !isWarehouse.value && canAccess(storeContext.currentStore?.role, 'salesPos'));
-const canViewReports = computed(() => canAccess(storeContext.currentStore?.role, 'reports'));
+const canViewProducts = computed(() => canAccess(storeContext.currentStore, 'products'));
+const canViewInventory = computed(() => canAccess(storeContext.currentStore, 'inventory'));
+const canViewPurchaseOrders = computed(() => canAccess(storeContext.currentStore, 'purchaseOrders'));
+const canViewSuppliers = computed(() => canAccess(storeContext.currentStore, 'purchaseOrders'));
+const canViewPos = computed(() => !isWarehouse.value && canAccess(storeContext.currentStore, 'salesPos'));
+const canViewReports = computed(() => canAccess(storeContext.currentStore, 'reports'));
 // AI Insights: owner/admin (summary + chat) or inventory manager (reorder), once AI is configured.
 const canViewAi = computed(
     () =>
         ['OWNER', 'ADMIN', 'INVENTORY_MANAGER'].includes(storeContext.currentStore?.role ?? '') &&
         !!storeContext.currentStore?.aiApiKeySet
 );
-const canViewSettings = computed(() => canAccess(storeContext.currentStore?.role, 'storeSettings'));
+const canViewSettings = computed(() => canAccess(storeContext.currentStore, 'storeSettings'));
 const canViewDailySales = computed(() =>
     userContext.features.includes('DAILY_SALES') &&
     ['OWNER', 'CASHIER'].includes(storeContext.currentStore?.role ?? '')
 );
-const canViewExpenses = computed(() => canAccess(storeContext.currentStore?.role, 'expenses'));
+const canViewExpenses = computed(() => canAccess(storeContext.currentStore, 'expenses'));
 // Every member can open the schedule — staff read it, owners/admins edit it.
 // Warehouses are included: they have staff and shifts like any other store.
-const canViewSchedule = computed(() => canAccess(storeContext.currentStore?.role, 'schedule'));
+const canViewSchedule = computed(() => canAccess(storeContext.currentStore, 'schedule'));
 const planKnown = computed(() => userContext.planTier !== null);
 const isPurchaseOrdersLocked = computed(() => planKnown.value && !hasPlanFeature(userContext.effectivePlan, 'purchaseOrders'));
 const isExpensesLocked = computed(() => planKnown.value && !hasPlanFeature(userContext.effectivePlan, 'expenses'));
@@ -514,7 +514,7 @@ const switchStore = (storeId: string) => {
     storeContext.setCurrentStore(storeId);
     const store = storeContext.stores.find((s) => s.id === storeId);
     const feature = route.meta.feature as FeatureKey | undefined;
-    const fallbackRoute = getDefaultRouteForRole(store?.role);
+    const fallbackRoute = getDefaultRouteForStore(store);
 
     if (!route.params.storeId) {
         if (fallbackRoute) {
@@ -524,7 +524,7 @@ const switchStore = (storeId: string) => {
         return;
     }
 
-    if (!feature || !store || !canAccess(store.role, feature)) {
+    if (!feature || !store || !canAccess(store, feature)) {
         if (fallbackRoute) {
             showToast('Store switched. Redirected to an available page.', 'info');
             router.push({ name: fallbackRoute, params: { storeId } });

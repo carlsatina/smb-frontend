@@ -25,6 +25,7 @@ export type StoreSummary = {
     aiApiKeySet: boolean;
     aiApiKeyLast4: string | null;
     role: string;
+    permissions: string[];
     ownerPlanTier: PlanTier;
     ownerSubscriptionActive: boolean;
 };

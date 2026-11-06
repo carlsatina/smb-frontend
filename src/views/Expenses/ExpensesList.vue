@@ -204,7 +204,7 @@ const expenses = ref<Expense[]>([]);
 const isLoading = ref(true);
 
 const storeId = computed(() => storeContext.currentStoreId);
-const canWrite = computed(() => canAccess(storeContext.currentStore?.role, 'expensesWrite'));
+const canWrite = computed(() => canAccess(storeContext.currentStore, 'expensesWrite'));
 const categoryOptions = computed(() => storeContext.currentStore?.expenseCategoryOptions ?? []);
 const currency = computed(() => storeContext.currentStore?.currency || 'PHP');
 
