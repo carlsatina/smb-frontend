@@ -385,6 +385,51 @@
                         </div>
                     </section>
 
+                    <section v-if="showChannelCard" class="report-card">
+                        <div class="card-header">
+                            <div>
+                                <h2>Sales channels</h2>
+                                <p>Walk-in vs delivery apps, and the markup earned on channel prices</p>
+                            </div>
+                        </div>
+
+                        <SkeletonLoader v-if="isLoading" variant="progress" :count="2" label="Loading sales channels…" />
+                        <div v-else-if="salesChannels.length === 0" class="panel-state panel-state--small">
+                            Channel sales appear here once sales are finalized in this range.
+                        </div>
+                        <div v-else class="payment-mix">
+                            <div class="stack-bar">
+                                <span
+                                    v-for="(ch, index) in salesChannels"
+                                    :key="ch.channel ?? 'walk-in'"
+                                    class="stack-seg"
+                                    :style="{ width: `${ch.sharePct}%`, background: channelColor(ch.channel, index) }"
+                                    :title="`${ch.name}: ${formatMoney(ch.total)} (${ch.sharePct}%)`"
+                                ></span>
+                            </div>
+                            <div class="legend-list">
+                                <div v-for="(ch, index) in salesChannels" :key="ch.channel ?? 'walk-in'" class="legend-row">
+                                    <span class="legend-dot" :style="{ background: channelColor(ch.channel, index) }"></span>
+                                    <div class="legend-name">
+                                        {{ ch.name }}
+                                        <span class="legend-meta">
+                                            {{ ch.orderCount }} orders
+                                            <template v-if="ch.channel"> · {{ formatMoney(ch.markup) }} markup</template>
+                                        </span>
+                                    </div>
+                                    <div class="legend-value">
+                                        <strong>{{ formatMoney(ch.total) }}</strong>
+                                        <span class="legend-share">{{ ch.sharePct }}%</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <p v-if="channelMarkupTotal > 0" class="channel-note">
+                                {{ formatMoney(channelMarkupTotal) }} of channel sales is markup above store prices
+                                (before discounts).
+                            </p>
+                        </div>
+                    </section>
+
                     <section class="report-card">
                         <div class="card-header">
                             <div>
@@ -818,6 +863,8 @@ import {
     getIngredientUsage,
     getLowStock,
     getPaymentMethodBreakdown,
+    getSalesByChannel,
+    type SalesChannelRecord,
     getProductMargins,
     getProductsSold,
     getProfitSummary,
@@ -911,6 +958,15 @@ const ingredientUsage = ref<IngredientUsageRecord[]>([]);
 const purchaseSpend = ref<PurchaseSpendRecord[]>([]);
 const productMargins = ref<ProductMarginRecord[]>([]);
 const paymentMethods = ref<PaymentMethodRecord[]>([]);
+const salesChannels = ref<SalesChannelRecord[]>([]);
+// Only stores that use channels (or have channel sales in range) see the card.
+const showChannelCard = computed(
+    () => (storeContext.currentStore?.salesChannels?.length ?? 0) > 0 || salesChannels.value.some((ch) => ch.channel)
+);
+const channelMarkupTotal = computed(() => salesChannels.value.reduce((sum, ch) => sum + (ch.channel ? ch.markup : 0), 0));
+const CHANNEL_COLORS = ['#16a34a', '#f59e0b', '#8b5cf6', '#ef4444'];
+const channelColor = (channel: string | null, index: number) =>
+    channel === null ? '#94a3b8' : CHANNEL_COLORS[(index - 1 + CHANNEL_COLORS.length) % CHANNEL_COLORS.length];
 const employeeSales = ref<EmployeeSalesRecord[]>([]);
 const marginSummary = ref({ costedItems: 0, totalItems: 0 });
 const purchaseSpendSummary = ref<PurchaseSpendSummary>({
@@ -1057,6 +1113,7 @@ const loadReports = async () => {
         expenseSummary.value = { total: 0, byCategory: [] };
         purchaseSpendSummary.value = { totalSpend: 0, totalReceipts: 0, avgReceipt: 0 };
         paymentMethods.value = [];
+        salesChannels.value = [];
         employeeSales.value = [];
         prevSalesSummary.value = null;
         prevProfitTotal.value = null;
@@ -1088,6 +1145,7 @@ const loadReports = async () => {
                 : Promise.resolve({ suppliers: [] as PurchaseSpendRecord[], summary: { totalSpend: 0, totalReceipts: 0, avgReceipt: 0 } as PurchaseSpendSummary }),
             getProductMargins(storeId, { from: filters.from, to: filters.to, limit: 10 }),
             getPaymentMethodBreakdown(storeId, { from: filters.from, to: filters.to }),
+            getSalesByChannel(storeId, { from: filters.from, to: filters.to }),
             getEmployeeSales(storeId, { from: filters.from, to: filters.to }),
             canUseExpenses.value
                 ? getExpenseSummary(storeId, filters.from, filters.to)
@@ -1101,7 +1159,7 @@ const loadReports = async () => {
         resumeLoading();
         const [
             summary, sales, hourly, top, soldPerProduct, profit, lowStock, usage, spend,
-            margins, paymentBreakdown, empSales, expense, prevSummary, prevProfit, prevExpense,
+            margins, paymentBreakdown, channelBreakdown, empSales, expense, prevSummary, prevProfit, prevExpense,
         ] = await Promise.allSettled(reportRequests);
         if (summary.status === 'fulfilled') salesSummary.value = summary.value.totals;
         if (sales.status === 'fulfilled') salesDays.value = sales.value.days;
@@ -1123,6 +1181,7 @@ const loadReports = async () => {
             marginSummary.value = margins.value.summary;
         }
         if (paymentBreakdown.status === 'fulfilled') paymentMethods.value = paymentBreakdown.value.methods;
+        if (channelBreakdown.status === 'fulfilled') salesChannels.value = channelBreakdown.value.channels;
         if (empSales.status === 'fulfilled') employeeSales.value = empSales.value.employees;
         if (expense.status === 'fulfilled') expenseSummary.value = { total: expense.value.total, byCategory: expense.value.byCategory };
         prevSalesSummary.value = prevSummary.status === 'fulfilled' ? prevSummary.value.totals : null;
@@ -1592,6 +1651,13 @@ watch(
 </script>
 
 <style scoped>
+.channel-note {
+    margin: 0.75rem 0 0;
+    font-size: 0.78rem;
+    color: #15803d;
+    font-weight: 600;
+}
+
 /* ============================================================
    TOKENS
 ============================================================ */

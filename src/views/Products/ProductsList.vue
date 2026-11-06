@@ -189,6 +189,11 @@
                                                 >
                                                     {{ formatProductType(product.type) }}
                                                 </span>
+                                                <span
+                                                    v-for="name in notSoldOn(product)"
+                                                    :key="name"
+                                                    class="channel-off-tag"
+                                                >Not on {{ name }}</span>
                                                 <span>
                                                     {{ product.category || 'Uncategorized' }}<template v-if="product.category && product.subcategory">
                                                         <span class="subcategory-sep" aria-hidden="true">›</span>{{ product.subcategory }}</template>
@@ -282,6 +287,7 @@ type ProductRow = {
     barcode?: string | null;
     category?: string | null;
     subcategory?: string | null;
+    unavailableChannels?: string[];
     price: number;
     cost?: number | null;
     active?: boolean;
@@ -463,6 +469,14 @@ const toggleCatalog = (filter: 'READY_MADE' | 'RECIPE' | 'MISSING_RECIPE') => {
     catalogFilter.value = catalogFilter.value === filter ? 'ALL' : filter;
 };
 
+// Channel names (e.g. Grab) this product is hidden from in the POS.
+const notSoldOn = (product: ProductRow) => {
+    const channels = storeContext.currentStore?.salesChannels ?? [];
+    return (product.unavailableChannels ?? [])
+        .map((key) => channels.find((channel) => channel.key === key && channel.active)?.name)
+        .filter((name): name is string => Boolean(name));
+};
+
 const isMissingRecipe = (product: ProductRow) =>
     product.type === 'RECIPE' && (product.recipeLineCount ?? 0) === 0;
 
@@ -597,6 +611,17 @@ watch(() => storeContext.currentStoreId, async () => {
 </script>
 
 <style scoped>
+.channel-off-tag {
+    display: inline-block;
+    padding: 0.02rem 0.4rem;
+    border-radius: 999px;
+    background: #f1f5f9;
+    color: #64748b;
+    font-size: 0.68rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
 .subcategory-sep {
     margin: 0 0.3rem;
     color: #94a3b8;

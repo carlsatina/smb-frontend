@@ -24,6 +24,8 @@ export type SaleSummary = {
     total: number;
     paymentMethod: string;
     orderType: string;
+    // Sales channel key (e.g. GRAB); null = walk-in.
+    channel?: string | null;
     createdAt: string;
     finalizedAt: string | null;
     voidedAt: string | null;
@@ -46,6 +48,8 @@ export type SaleDetailItem = {
     discount: number;
     tax: number;
     total: number;
+    // Store price at the time of sale (unitPrice - basePrice = channel markup).
+    basePrice?: number | null;
     product?: {
         id: string;
         name: string;
@@ -65,6 +69,8 @@ export type SaleDetail = {
     total: number;
     paymentMethod: string;
     orderType: string;
+    // Sales channel key (e.g. GRAB); null = walk-in.
+    channel?: string | null;
     createdAt: string;
     finalizedAt: string | null;
     voidedAt: string | null;
@@ -103,6 +109,7 @@ export const listSales = async (
         cashierId?: string;
         paymentMethod?: string;
         productId?: string;
+        channel?: string;
         page?: number;
         pageSize?: number;
     } = {}
@@ -117,7 +124,7 @@ export const getSale = async (storeId: string, saleId: string) => {
 
 export const finalizeSale = async (
     storeId: string,
-    payload: { items: SaleItemInput[]; paymentMethod: string; orderType?: string; customDate?: string }
+    payload: { items: SaleItemInput[]; paymentMethod: string; orderType?: string; customDate?: string; channel?: string | null }
 ) => {
     return apiClient.request<{ sale: SaleDetail }>(`/api/v1/stores/${storeId}/sales/finalize`, {
         method: 'POST',
@@ -163,6 +170,7 @@ export const exportSales = (
         cashierId?: string;
         paymentMethod?: string;
         productId?: string;
+        channel?: string;
     } = {}
 ) => {
     const query = buildQuery(params as Record<string, string | number | undefined>);

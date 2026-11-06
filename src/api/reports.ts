@@ -305,6 +305,28 @@ export const getPaymentMethodBreakdown = (storeId: string, params?: { from?: str
     );
 };
 
+export type SalesChannelRecord = {
+    channel: string | null; // null = walk-in
+    name: string;
+    total: number;
+    orderCount: number;
+    markup: number;
+    sharePct: number;
+};
+
+export type SalesByChannelResponse = {
+    range: { from: string; to: string };
+    grandTotal: number;
+    channels: SalesChannelRecord[];
+};
+
+export const getSalesByChannel = (storeId: string, params?: { from?: string; to?: string }) => {
+    const query = buildRangeQuery(params);
+    return apiClient.request<SalesByChannelResponse>(
+        `/api/v1/stores/${storeId}/reports/sales-by-channel${query ? `?${query}` : ''}`
+    );
+};
+
 export type EmployeeMethodRecord = {
     method: string;
     total: number;

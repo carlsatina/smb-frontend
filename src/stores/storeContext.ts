@@ -1,3 +1,4 @@
+import type { SalesChannel } from '@/utils/salesChannels';
 import { defineStore } from 'pinia';
 import { listStores } from '@/api/stores';
 import type { PlanTier } from '@/utils/planAccess';
@@ -15,6 +16,7 @@ export type StoreSummary = {
     unitOptions: string[];
     categoryOptions: string[];
     subcategoryOptions: Record<string, string[]>;
+    salesChannels: SalesChannel[];
     expenseCategoryOptions: string[];
     defaultTaxRate: number;
     defaultDiscount: number;

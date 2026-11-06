@@ -10,6 +10,10 @@ export type ProductPayload = {
     unit: string;
     category?: string | null;
     subcategory?: string | null;
+    // Explicit per-channel prices, e.g. { GRAB: 115 }; missing = channel markup.
+    channelPrices?: Record<string, number>;
+    // Channel keys this product is not sold on, e.g. ['GRAB']. Walk-in always sells everything.
+    unavailableChannels?: string[];
     active?: boolean;
     lowStockThreshold?: number | null;
     recipeLines?: {

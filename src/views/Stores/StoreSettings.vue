@@ -31,6 +31,10 @@
                             <mdicon name="credit-card-outline" size="16" />
                             Payment methods
                         </button>
+                        <button class="st-sidebar-item" :class="{ 'is-active': activeSection === 'channels' }" @click="activeSection = 'channels'">
+                            <mdicon name="moped-outline" size="16" />
+                            Sales channels
+                        </button>
                         <button class="st-sidebar-item" :class="{ 'is-active': activeSection === 'catalog' }" @click="activeSection = 'catalog'">
                             <mdicon name="format-list-bulleted" size="16" />
                             Catalog defaults
@@ -271,6 +275,18 @@
                                 <p v-if="!canEdit" class="st-permission-note">Only owners or admins can edit settings.</p>
                                 <span v-else class="st-field-hint">Units, categories and subcategories are saved automatically.</span>
                             </div>
+                        </section>
+
+                        <!-- ── Sales channels ── -->
+                        <section v-if="activeSection === 'channels' && currentStore" class="st-section">
+                            <div class="st-section-header">
+                                <h2 class="st-section-title">Sales channels</h2>
+                                <p class="st-section-sub">
+                                    Delivery apps like Grab that sell above store prices. Cashiers pick the channel on the POS ticket,
+                                    and reports show channel sales and markup separately.
+                                </p>
+                            </div>
+                            <SalesChannelsPanel :can-edit="canEdit" />
                         </section>
 
                         <!-- ── Roles & permissions ── -->
@@ -755,6 +771,7 @@ import {
 } from '@/api/storeMembers';
 import SkeletonLoader from '@/components/SkeletonLoader.vue';
 import RolePermissionsPanel from '@/components/RolePermissionsPanel.vue';
+import SalesChannelsPanel from '@/components/SalesChannelsPanel.vue';
 import MemberPermissionsModal from '@/components/MemberPermissionsModal.vue';
 
 const router = useRouter();
@@ -809,7 +826,7 @@ const allPaymentMethods = [
     { value: 'OTHER', label: 'Other' },
 ];
 
-const activeSection = ref<'profile' | 'payment' | 'catalog' | 'team' | 'permissions' | 'plan' | 'ai' | 'danger'>('profile');
+const activeSection = ref<'profile' | 'payment' | 'channels' | 'catalog' | 'team' | 'permissions' | 'plan' | 'ai' | 'danger'>('profile');
 
 const isSaving = ref(false);
 const isCatalogSaving = ref(false);
@@ -1631,7 +1648,7 @@ onMounted(async () => {
 
     // Support deep-linking via ?section=team etc.
     const qs = route.query.section as string | undefined;
-    if (qs && ['profile', 'payment', 'catalog', 'team', 'permissions', 'plan', 'ai', 'danger'].includes(qs)) {
+    if (qs && ['profile', 'payment', 'channels', 'catalog', 'team', 'permissions', 'plan', 'ai', 'danger'].includes(qs)) {
         activeSection.value = qs as typeof activeSection.value;
     }
 

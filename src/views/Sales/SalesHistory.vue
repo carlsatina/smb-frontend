@@ -118,6 +118,16 @@
                                 </option>
                             </select>
                         </label>
+                        <label v-if="channelOptions.length" class="filter-field">
+                            <span>Channel</span>
+                            <select v-model="channelFilter" :disabled="isFilterOptionsLoading">
+                                <option value="">All channels</option>
+                                <option value="WALK_IN">Walk-in</option>
+                                <option v-for="channel in channelOptions" :key="channel.key" :value="channel.key">
+                                    {{ channel.name }}
+                                </option>
+                            </select>
+                        </label>
                         <label class="filter-field">
                             <span>Item</span>
                             <select v-model="productFilter" :disabled="isFilterOptionsLoading">
@@ -256,7 +266,10 @@
                                             </div>
                                         </td>
                                         <td class="sale-meta">{{ sale.cashier?.fullName || sale.cashier?.email || '—' }}</td>
-                                        <td class="sale-payment">{{ formatPaymentMethod(sale.paymentMethod) }}</td>
+                                        <td class="sale-payment">
+                                            {{ formatPaymentMethod(sale.paymentMethod) }}
+                                            <span v-if="sale.channel" class="channel-tag">{{ channelName(sale.channel) }}</span>
+                                        </td>
                                         <td>
                                             <div class="item-list">
                                                 <div v-for="item in sale.items.slice(0, 2)" :key="item.id" class="item-line">
@@ -421,6 +434,10 @@ const total = ref(0);
 const cashierFilter = ref('');
 const paymentMethodFilter = ref('');
 const productFilter = ref('');
+const channelFilter = ref('');
+// Includes channels turned off since, so older Grab sales still filter and label correctly.
+const channelOptions = computed(() => storeContext.currentStore?.salesChannels ?? []);
+const channelName = (key: string) => channelOptions.value.find((channel) => channel.key === key)?.name ?? key;
 const cashierOptions = ref<StoreMember[]>([]);
 const productOptions = ref<ProductResponse[]>([]);
 const ALL_PAYMENT_METHOD_OPTIONS = [
@@ -594,7 +611,7 @@ const statusFilter = ref<'ALL' | 'FINALIZED' | 'VOIDED'>('ALL');
 const canVoid = computed(() => canAccess(storeContext.currentStore, 'salesVoid'));
 const canEdit = computed(() => canAccess(storeContext.currentStore, 'salesEdit'));
 const hasAdvancedFilters = computed(() =>
-    Boolean(cashierFilter.value || paymentMethodFilter.value || productFilter.value)
+    Boolean(cashierFilter.value || paymentMethodFilter.value || productFilter.value || channelFilter.value)
 );
 
 const loadFilterOptions = async () => {
@@ -648,6 +665,7 @@ const loadSales = async () => {
             cashierId: cashierFilter.value || undefined,
             paymentMethod: paymentMethodFilter.value || undefined,
             productId: productFilter.value || undefined,
+            channel: channelFilter.value || undefined,
             page: page.value,
             pageSize: pageSize.value,
         });
@@ -662,6 +680,7 @@ const clearAdvancedFilters = () => {
     cashierFilter.value = '';
     paymentMethodFilter.value = '';
     productFilter.value = '';
+    channelFilter.value = '';
 };
 
 const resetAdvancedFilters = () => {
@@ -727,7 +746,7 @@ const buildReceiptMarkup = (sale: SaleDetail) => {
         <div class="head">
             <h1 class="title">${escapeHtml(receiptNumber)}</h1>
             <div class="meta">${escapeHtml(formatDate(sale.createdAt))}</div>
-            <div class="meta">${escapeHtml(formatPaymentMethod(sale.paymentMethod))}</div>
+            <div class="meta">${escapeHtml(formatPaymentMethod(sale.paymentMethod))}${sale.channel ? ` · ${escapeHtml(channelName(sale.channel))}` : ''}</div>
             <div class="meta">${escapeHtml(cashier)}</div>
             <div class="meta">${escapeHtml(formatStatus(sale.status))}</div>
         </div>
@@ -938,6 +957,7 @@ const handleExport = async () => {
         if (cashierFilter.value) params.cashierId = cashierFilter.value;
         if (paymentMethodFilter.value) params.paymentMethod = paymentMethodFilter.value;
         if (productFilter.value) params.productId = productFilter.value;
+        if (channelFilter.value) params.channel = channelFilter.value;
 
         const { blob, filename } = await exportSales(storeId, params);
         const url = URL.createObjectURL(blob);
@@ -991,7 +1011,7 @@ watch(
 );
 
 watch(
-    [statusFilter, cashierFilter, paymentMethodFilter, productFilter],
+    [statusFilter, cashierFilter, paymentMethodFilter, productFilter, channelFilter],
     async () => {
         if (isResettingFilters.value) return;
         page.value = 1;
@@ -1608,6 +1628,18 @@ watch(
     text-transform: uppercase;
     letter-spacing: 0.07em;
     white-space: nowrap;
+}
+
+.channel-tag {
+    display: inline-block;
+    margin-left: 0.35rem;
+    padding: 0.05rem 0.45rem;
+    border-radius: 999px;
+    background: rgba(22, 163, 74, 0.12);
+    color: #15803d;
+    font-size: 0.7rem;
+    font-weight: 700;
+    vertical-align: 1px;
 }
 
 .sale-edited {

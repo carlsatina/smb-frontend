@@ -251,6 +251,8 @@ const methodOptions = computed(() => {
 const addProductOptions = computed(() =>
     props.products
         .filter((product) => product.active !== false)
+        // A Grab sale can only gain items that are sold on Grab.
+        .filter((product) => !original.value?.channel || !(product.unavailableChannels ?? []).includes(original.value.channel))
         .map((product) => ({ value: product.id, label: `${product.name} · ${formatMoney(product.price)}` }))
 );
 

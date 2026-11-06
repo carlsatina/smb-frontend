@@ -1,5 +1,6 @@
 import type { PlanTier } from '@/utils/planAccess';
 import { apiClient } from './client';
+import type { SalesChannel } from '@/utils/salesChannels';
 
 export type AiProvider = 'OPENAI' | 'ANTHROPIC';
 
@@ -16,6 +17,7 @@ export const listStores = () => {
             unitOptions: string[];
             categoryOptions: string[];
             subcategoryOptions: Record<string, string[]>;
+            salesChannels: SalesChannel[];
             expenseCategoryOptions: string[];
             defaultTaxRate: number;
             defaultDiscount: number;
@@ -60,6 +62,7 @@ export const updateStore = (
         unitOptions?: string[];
         categoryOptions?: string[];
         subcategoryOptions?: Record<string, string[]>;
+        salesChannels?: Array<Omit<SalesChannel, 'key'> & { key?: string | null }>;
         expenseCategoryOptions?: string[];
         defaultTaxRate?: number;
         defaultDiscount?: number;

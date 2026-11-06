@@ -309,6 +309,43 @@
                     </div>
                     <p v-if="marginPct !== null && marginPct < 0" class="margin-note margin-note--bad">Cost exceeds selling price.</p>
                     <p v-else-if="marginPct !== null && marginPct < 30" class="margin-note margin-note--warn">Below 30% — consider adjusting pricing.</p>
+
+                    <div v-if="productChannels.length" class="form-grid channel-prices">
+                        <div v-for="channel in productChannels" :key="channel.key" class="field">
+                            <label class="channel-toggle">
+                                <input
+                                    type="checkbox"
+                                    :checked="!channelOff[channel.key]"
+                                    @change="channelOff[channel.key] = !($event.target as HTMLInputElement).checked"
+                                />
+                                Sell on {{ channel.name }}
+                            </label>
+                            <span v-if="channelOff[channel.key]" class="field-hint">
+                                Hidden from the POS when {{ channel.name }} is selected.
+                            </span>
+                        </div>
+                        <label
+                            v-for="channel in productChannels.filter((c) => !channelOff[c.key])"
+                            :key="`${channel.key}-price`"
+                            class="field"
+                        >
+                            <span>{{ channel.name }} price <em>optional</em></span>
+                            <div class="money-input">
+                                <span class="money-prefix">{{ currencySymbol }}</span>
+                                <input
+                                    v-model.number="channelPriceInputs[channel.key]"
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    :placeholder="String(autoChannelPrice(channel))"
+                                />
+                            </div>
+                            <span class="field-hint">
+                                Leave blank to use +{{ channel.markupPercent }}% →
+                                {{ formatMoney(autoChannelPrice(channel)) }}
+                            </span>
+                        </label>
+                    </div>
                 </div>
             </div>
 
@@ -589,6 +626,7 @@ import { hasPlanFeature, openPlanUpgradeModal } from '@/utils/planAccess';
 import { DEFAULT_CATEGORY_OPTIONS, DEFAULT_UNIT_OPTIONS } from '@/utils/catalogDefaults';
 import { getSubcategoriesFor, withSubcategories } from '@/utils/subcategories';
 import { hasPermission } from '@/utils/roleAccess';
+import { activeChannels, computeChannelPrice, type SalesChannel } from '@/utils/salesChannels';
 import PlanGate from '@/components/PlanGate.vue';
 import IngredientModal from '@/components/IngredientModal.vue';
 import SearchableSelect from '@/components/SearchableSelect.vue';
@@ -837,6 +875,30 @@ const form = ref({
     active: true,
     lowStockThreshold: 0,
 });
+
+// ── Sales channel prices (e.g. Grab). Blank = store price + channel markup. ──
+const productChannels = computed(() => activeChannels(storeContext.currentStore?.salesChannels));
+// Saved overrides, including ones for channels that are currently turned off.
+const savedChannelPrices = ref<Record<string, number>>({});
+const channelPriceInputs = ref<Record<string, number | ''>>({});
+// Channels this product is not sold on (saved list, including channels currently turned off).
+const savedUnavailableChannels = ref<string[]>([]);
+const channelOff = ref<Record<string, boolean>>({});
+const buildUnavailableChannels = () => {
+    const activeKeys = new Set(productChannels.value.map((channel) => channel.key));
+    const kept = savedUnavailableChannels.value.filter((key) => !activeKeys.has(key));
+    return [...kept, ...productChannels.value.filter((channel) => channelOff.value[channel.key]).map((c) => c.key)];
+};
+const autoChannelPrice = (channel: SalesChannel) => computeChannelPrice(Number(form.value.price) || 0, channel);
+const buildChannelPrices = () => {
+    const result: Record<string, number> = { ...savedChannelPrices.value };
+    productChannels.value.forEach((channel) => {
+        const value = channelPriceInputs.value[channel.key];
+        if (typeof value === 'number' && Number.isFinite(value) && value >= 0) result[channel.key] = value;
+        else delete result[channel.key];
+    });
+    return result;
+};
 
 // Subcategories come from the store's per-category lists (Store Settings).
 const canManageCatalog = computed(() => hasPermission(storeContext.currentStore, 'store.manage'));
@@ -1110,6 +1172,10 @@ watch(
 const loadProduct = async () => {
     if (!storeContext.currentStoreId || !productId.value) return;
     const data = await getProduct(storeContext.currentStoreId, productId.value);
+    savedChannelPrices.value = { ...(data.product.channelPrices ?? {}) };
+    savedUnavailableChannels.value = [...(data.product.unavailableChannels ?? [])];
+    channelOff.value = Object.fromEntries((data.product.unavailableChannels ?? []).map((key) => [key, true]));
+    channelPriceInputs.value = { ...(data.product.channelPrices ?? {}) };
     form.value = {
         name: data.product.name,
         type: data.product.type,
@@ -1452,6 +1518,8 @@ const save = async () => {
         subcategory: (form.value.category && form.value.subcategory.trim()) || null,
         cost: normalizeOptionalNumber(form.value.cost),
         lowStockThreshold: normalizeOptionalNumber(form.value.lowStockThreshold),
+        channelPrices: buildChannelPrices(),
+        unavailableChannels: buildUnavailableChannels(),
         recipeLines: recipePayload,
     };
     if (form.value.type === 'RECIPE' && isRecipeMissing.value) {
@@ -1878,12 +1946,40 @@ watch(
 
 .field input::placeholder { color: #94a3b8; }
 
+.channel-prices {
+    margin-top: 1rem;
+}
+
+.channel-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #0f172a;
+    cursor: pointer;
+}
+
+.channel-toggle input {
+    width: 17px;
+    height: 17px;
+    accent-color: #0d9488;
+}
+
 .field-hint {
     font-size: 0.75rem;
     color: #64748b;
 }
 
-.field-hint--warn {
+/* Beat the label-span styles so hints stay small and muted. */
+.field span.field-hint {
+    font-size: 0.75rem;
+    font-weight: 400;
+    color: #64748b;
+}
+
+.field-hint--warn,
+.field span.field-hint--warn {
     color: #b45309;
 }
 

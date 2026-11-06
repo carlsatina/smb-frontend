@@ -377,7 +377,7 @@
 
                                                 <!-- Price -->
                                                 <td v-if="displaySettings.showPrice" class="td-price align-right">
-                                                    <span class="td-price-amount">{{ formatMoney(product.price) }}</span>
+                                                    <span class="td-price-amount">{{ formatMoney(displayPrice(product)) }}</span>
                                                 </td>
 
                                             <!-- Action / In-Cart Stepper -->
@@ -541,7 +541,7 @@
                                                 {{ product.sku ? `SKU ${product.sku}` : product.unit }}
                                             </p>
                                             <div v-if="displaySettings.showPrice" class="product-price-row">
-                                                <span class="product-price">{{ formatMoney(product.price) }}</span>
+                                                <span class="product-price">{{ formatMoney(displayPrice(product)) }}</span>
                                                 <span v-if="!displaySettings.showSku" class="product-unit">{{ product.unit }}</span>
                                             </div>
                                         </button>
@@ -595,7 +595,7 @@
                                         {{ product.sku ? `SKU ${product.sku}` : product.unit }}
                                     </p>
                                     <div v-if="displaySettings.showPrice" class="product-price-row">
-                                        <span class="product-price">{{ formatMoney(product.price) }}</span>
+                                        <span class="product-price">{{ formatMoney(displayPrice(product)) }}</span>
                                         <span v-if="!displaySettings.showSku" class="product-unit">{{ product.unit }}</span>
                                     </div>
                                 </button>
@@ -682,11 +682,48 @@
                     </div>
 
                     <div class="checkout-controls">
+                        <div
+                            v-if="posChannels.length"
+                            class="order-type-toggle channel-toggle"
+                            :style="{ gridTemplateColumns: `repeat(${posChannels.length + 1}, 1fr)` }"
+                            role="group"
+                            aria-label="Sales channel"
+                        >
+                            <button
+                                type="button"
+                                class="order-type-option"
+                                :class="{ 'order-type-option--active': !selectedChannelKey }"
+                                @click="selectedChannelKey = null"
+                            >Walk-in</button>
+                            <button
+                                v-for="channel in posChannels"
+                                :key="channel.key"
+                                type="button"
+                                class="order-type-option channel-option"
+                                :class="{ 'order-type-option--active channel-option--active': selectedChannelKey === channel.key }"
+                                :title="`${channel.name} prices (+${channel.markupPercent}%)`"
+                                @click="requestChannel(channel.key)"
+                            >{{ channel.name }}</button>
+                        </div>
+                        <div v-if="pendingChannel" class="channel-conflict" role="alert">
+                            <p>
+                                <strong>{{ pendingChannelBlocked.map((item) => item.name).join(', ') }}</strong>
+                                {{ pendingChannelBlocked.length === 1 ? "isn't" : "aren't" }} sold on {{ pendingChannel.name }}.
+                            </p>
+                            <div class="channel-conflict-actions">
+                                <button type="button" class="channel-conflict-btn" @click="pendingChannelKey = null">Cancel</button>
+                                <button type="button" class="channel-conflict-btn channel-conflict-btn--primary" @click="confirmPendingChannel">
+                                    Remove & switch to {{ pendingChannel.name }}
+                                </button>
+                            </div>
+                        </div>
                         <div class="order-type-toggle" role="group" aria-label="Order type">
                             <button
                                 type="button"
                                 class="order-type-option"
                                 :class="{ 'order-type-option--active': orderType === 'DINE_IN' }"
+                                :disabled="channelForcesTakeout"
+                                :title="channelForcesTakeout ? `${selectedChannel?.name} orders are always takeout` : undefined"
                                 @click="orderType = 'DINE_IN'"
                             >Dine-in</button>
                             <button
@@ -755,6 +792,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { getSubcategoriesFor } from '@/utils/subcategories';
+import { activeChannels, computeChannelPrice } from '@/utils/salesChannels';
 import { useRoute, useRouter } from 'vue-router';
 import { listProducts } from '@/api/products';
 import { finalizeSale } from '@/api/sales';
@@ -773,6 +811,8 @@ type Product = {
     unit: string;
     category?: string | null;
     subcategory?: string | null;
+    channelPrices?: Record<string, number>;
+    unavailableChannels?: string[];
     active?: boolean;
 };
 
@@ -917,7 +957,7 @@ const recordRecentProducts = (newProductIds: string[]) => {
 
 const recentProducts = computed(() => {
     if (recentProductIds.value.length === 0) return [];
-    const productMap = new Map(products.value.map((p) => [p.id, p]));
+    const productMap = new Map(sellableProducts.value.map((p) => [p.id, p]));
     return recentProductIds.value
         .map((id) => productMap.get(id))
         .filter((p): p is Product => Boolean(p && p.active !== false));
@@ -934,6 +974,51 @@ watch(() => storeContext.currentStore?.paymentMethods, (methods) => {
 }, { immediate: true });
 const discountEnabled = ref(false);
 const orderType = ref<'DINE_IN' | 'TAKEOUT'>('DINE_IN');
+
+// ── Sales channel (e.g. Grab): channel prices for the whole ticket ──
+const posChannels = computed(() => activeChannels(storeContext.currentStore?.salesChannels));
+const selectedChannelKey = ref<string | null>(null);
+const selectedChannel = computed(() => posChannels.value.find((channel) => channel.key === selectedChannelKey.value) ?? null);
+const channelForcesTakeout = computed(() => Boolean(selectedChannel.value?.alwaysTakeout));
+const isSoldOn = (product: { unavailableChannels?: string[] }, channelKey: string | null) =>
+    !channelKey || !(product.unavailableChannels ?? []).includes(channelKey);
+// Products offered on the selected channel; everything for walk-in.
+const sellableProducts = computed(() => products.value.filter((product) => isSoldOn(product, selectedChannelKey.value)));
+
+// Switching to a channel that doesn't sell something on the ticket asks first.
+const pendingChannelKey = ref<string | null>(null);
+const pendingChannel = computed(() => posChannels.value.find((channel) => channel.key === pendingChannelKey.value) ?? null);
+const blockedItemsFor = (channelKey: string) => {
+    const byId = new Map(products.value.map((product) => [product.id, product]));
+    return cartItems.value.filter((item) => {
+        const product = byId.get(item.productId);
+        return product ? !isSoldOn(product, channelKey) : false;
+    });
+};
+const pendingChannelBlocked = computed(() => (pendingChannelKey.value ? blockedItemsFor(pendingChannelKey.value) : []));
+const requestChannel = (channelKey: string) => {
+    if (channelKey === selectedChannelKey.value) return;
+    if (blockedItemsFor(channelKey).length) {
+        pendingChannelKey.value = channelKey;
+        return;
+    }
+    pendingChannelKey.value = null;
+    selectedChannelKey.value = channelKey;
+};
+const confirmPendingChannel = () => {
+    const channelKey = pendingChannelKey.value;
+    if (!channelKey) return;
+    const blocked = new Set(blockedItemsFor(channelKey).map((item) => item.productId));
+    cartItems.value = cartItems.value.filter((item) => !blocked.has(item.productId));
+    pendingChannelKey.value = null;
+    selectedChannelKey.value = channelKey;
+};
+
+const displayPrice = (product: { price: number | string; channelPrices?: Record<string, number> }) => {
+    const base = Number(product.price) || 0;
+    const channel = selectedChannel.value;
+    return channel ? computeChannelPrice(base, channel, product.channelPrices?.[channel.key]) : base;
+};
 const isLoading = ref(false);
 const isSubmitting = ref(false);
 
@@ -1021,7 +1106,7 @@ const addToCart = (product: Product) => {
         type: product.type,
         unit: product.unit,
         category: product.category,
-        unitPrice: Number(product.price),
+        unitPrice: displayPrice(product),
         qty: 1,
     });
 };
@@ -1052,6 +1137,8 @@ const removeItem = (productId: string) => {
 const clearCart = () => {
     cartItems.value = [];
     discountEnabled.value = false;
+    selectedChannelKey.value = null;
+    pendingChannelKey.value = null;
     orderType.value = 'DINE_IN';
     _paymentMethod.value = paymentMethods.value.includes('CASH') ? 'CASH' : paymentMethods.value[0];
 };
@@ -1062,9 +1149,9 @@ const goToSalesHistory = () => {
 };
 
 const orderedProducts = computed(() => {
-    if (productOrder.value.length === 0) return products.value;
+    if (productOrder.value.length === 0) return sellableProducts.value;
     const orderMap = new Map(productOrder.value.map((id, i) => [id, i]));
-    return [...products.value].sort((a, b) => {
+    return [...sellableProducts.value].sort((a, b) => {
         const ai = orderMap.has(a.id) ? orderMap.get(a.id)! : Infinity;
         const bi = orderMap.has(b.id) ? orderMap.get(b.id)! : Infinity;
         return ai - bi;
@@ -1119,7 +1206,7 @@ const groupedFilteredProducts = computed(() => {
 
 const categoryList = computed(() => {
     const set = new Set<string>();
-    for (const product of products.value) {
+    for (const product of sellableProducts.value) {
         if (product.category) {
             set.add(product.category);
         }
@@ -1136,7 +1223,7 @@ const subcategoryList = computed(() => {
     if (!isSpecificCategory.value) return [] as Array<{ value: string; label: string }>;
     const subs = new Set<string>();
     let hasUnassigned = false;
-    for (const product of products.value) {
+    for (const product of sellableProducts.value) {
         if (product.category !== activeCategory.value) continue;
         if (product.subcategory) subs.add(product.subcategory);
         else hasUnassigned = true;
@@ -1224,8 +1311,8 @@ const sortedTableProducts = computed(() => {
             return mult * catA.localeCompare(catB, undefined, { sensitivity: 'base' });
         }
         if (col === 'price') {
-            const pA = Number(a.price) || 0;
-            const pB = Number(b.price) || 0;
+            const pA = displayPrice(a);
+            const pB = displayPrice(b);
             return mult * (pA - pB);
         }
         return 0;
@@ -1734,6 +1821,7 @@ const finalizeTicket = async () => {
             }),
             paymentMethod: paymentMethod.value,
             orderType: orderType.value,
+            channel: selectedChannel.value?.key ?? null,
             ...(customDateIso ? { customDate: customDateIso } : {}),
         };
         const purchasedIds = cartItems.value.map((item) => item.productId);
@@ -1749,6 +1837,28 @@ const finalizeTicket = async () => {
         isSubmitting.value = false;
     }
 };
+
+// Switching channel re-prices what's already on the ticket.
+watch(selectedChannel, (channel) => {
+    const byId = new Map(products.value.map((product) => [product.id, product]));
+    cartItems.value.forEach((item) => {
+        const product = byId.get(item.productId);
+        if (product) item.unitPrice = displayPrice(product);
+    });
+    if (channel?.alwaysTakeout) orderType.value = 'TAKEOUT';
+});
+
+// A channel turned off in settings can't stay selected.
+watch(posChannels, (channels) => {
+    if (selectedChannelKey.value && !channels.some((channel) => channel.key === selectedChannelKey.value)) {
+        selectedChannelKey.value = null;
+    }
+});
+
+// Walk-in clears any pending switch.
+watch(selectedChannelKey, () => {
+    pendingChannelKey.value = null;
+});
 
 const handleDisplayClickOutside = (event: MouseEvent) => {
     if (displaySettingsRef.value?.open && !displaySettingsRef.value.contains(event.target as Node)) {
@@ -2795,6 +2905,60 @@ watch(
     background: white;
     color: var(--c-accent);
     box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12);
+}
+
+.order-type-option:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.channel-toggle {
+    margin-bottom: 0.4rem;
+}
+
+.channel-conflict {
+    margin-bottom: 0.5rem;
+    padding: 0.6rem 0.7rem;
+    border-radius: 8px;
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    font-size: 0.8rem;
+    color: #92400e;
+}
+
+.channel-conflict p {
+    margin: 0 0 0.5rem;
+}
+
+.channel-conflict-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+}
+
+.channel-conflict-btn {
+    border: 1px solid #fcd34d;
+    background: white;
+    color: #92400e;
+    border-radius: 6px;
+    padding: 0.3rem 0.6rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    font-family: var(--app-font-sans);
+    cursor: pointer;
+}
+
+.channel-conflict-btn--primary {
+    background: #16a34a;
+    border-color: #16a34a;
+    color: white;
+}
+
+/* Channel tickets get a distinct colour so a cashier notices the higher prices. */
+.channel-option--active {
+    background: #16a34a;
+    color: white;
 }
 
 .select-field {
