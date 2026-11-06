@@ -973,10 +973,11 @@ const isSoldOn = (product: { unavailableChannels?: string[] }, channelKey: strin
 // Products offered on the selected channel; everything for walk-in.
 const sellableProducts = computed(() => products.value.filter((product) => isSoldOn(product, selectedChannelKey.value)));
 
-// Channels the current ticket can still go to: a ticket holding an item that a
-// channel doesn't sell can't become that channel's order, so its option is hidden.
+// Channels the current ticket can go to. Hidden on an empty ticket (walk-in is the
+// default) and for any channel that doesn't sell an item already on the ticket.
 // (While on a channel, its off-menu products are hidden, so this stays consistent.)
 const ticketChannels = computed(() => {
+    if (cartItems.value.length === 0) return [];
     const byId = new Map(products.value.map((product) => [product.id, product]));
     return posChannels.value.filter((channel) =>
         cartItems.value.every((item) => {
@@ -1818,6 +1819,15 @@ watch(selectedChannel, (channel) => {
     });
     if (channel?.alwaysTakeout) orderType.value = 'TAKEOUT';
 });
+
+// An empty ticket is a walk-in ticket; otherwise a ticket emptied item by item
+// could be stuck on a channel with the selector hidden.
+watch(
+    () => cartItems.value.length,
+    (count) => {
+        if (count === 0) selectedChannelKey.value = null;
+    }
+);
 
 // A channel turned off in settings can't stay selected.
 watch(posChannels, (channels) => {
