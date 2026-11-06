@@ -13,7 +13,13 @@
             </p>
 
             <div class="rp-toolbar">
-                <span class="rp-toolbar-note">Owners always have every permission.</span>
+                <span class="rp-toolbar-note">
+                    Owners always have every permission.
+                    <template v-if="(data.customMemberCount ?? 0) > 0">
+                        {{ data.customMemberCount }} member{{ data.customMemberCount === 1 ? ' has' : 's have' }}
+                        custom permissions on top of their role (see Team).
+                    </template>
+                </span>
                 <label class="rp-toggle">
                     <input v-model="showDescriptions" type="checkbox" />
                     Show descriptions

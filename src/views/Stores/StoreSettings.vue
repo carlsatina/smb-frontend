@@ -320,6 +320,11 @@
                                             <div class="st-member-name">
                                                 {{ member.fullName || member.email }}
                                                 <span v-if="isSuspended(member)" class="st-member-badge">Suspended</span>
+                                                <span
+                                                    v-if="member.role !== 'OWNER' && (member.customPermissionCount ?? 0) > 0"
+                                                    class="st-member-badge st-member-badge--custom"
+                                                    :title="`${member.customPermissionCount} permission${member.customPermissionCount === 1 ? '' : 's'} differ from the ${member.role} role`"
+                                                >Custom permissions</span>
                                             </div>
                                             <div class="st-member-meta">
                                                 {{ member.email }}
@@ -335,6 +340,14 @@
                                             >
                                                 <option v-for="role in roleOptions" :key="role" :value="role">{{ role }}</option>
                                             </select>
+                                            <button
+                                                v-if="canManageMembers && member.role !== 'OWNER'"
+                                                class="st-btn-ghost"
+                                                type="button"
+                                                @click="permissionsMemberId = member.id"
+                                            >
+                                                Permissions
+                                            </button>
                                             <button
                                                 class="st-btn-ghost"
                                                 type="button"
@@ -693,6 +706,13 @@
             </div>
         </div>
 
+        <MemberPermissionsModal
+            v-if="currentStore"
+            :store-id="currentStore.id"
+            :member-id="permissionsMemberId"
+            @close="permissionsMemberId = null"
+            @saved="onMemberPermissionsSaved"
+        />
         <ConfirmModal
             :show="confirmModal.show"
             :title="confirmModal.title"
@@ -735,6 +755,7 @@ import {
 } from '@/api/storeMembers';
 import SkeletonLoader from '@/components/SkeletonLoader.vue';
 import RolePermissionsPanel from '@/components/RolePermissionsPanel.vue';
+import MemberPermissionsModal from '@/components/MemberPermissionsModal.vue';
 
 const router = useRouter();
 const route = useRoute();
@@ -1345,23 +1366,51 @@ const loadCurrentUser = async () => {
     }
 };
 
+// ── Per-person permissions ──
+const permissionsMemberId = ref<string | null>(null);
+const onMemberPermissionsSaved = (customCount: number) => {
+    const member = members.value.find((entry) => entry.id === permissionsMemberId.value);
+    if (member) member.customPermissionCount = customCount;
+};
+
 const changeMemberRole = async (member: StoreMember, event: Event) => {
     if (!currentStore.value || !canManageMembers.value) return;
     if (!(event.target instanceof HTMLSelectElement)) return;
-    const nextRole = event.target.value;
+    const select = event.target;
+    const nextRole = select.value;
     const previousRole = member.role;
     if (nextRole === previousRole) return;
-    updatingMemberId.value = member.id;
-    try {
-        const data = await updateStoreMemberRole(currentStore.value.id, member.id, nextRole);
-        member.role = data.member.role;
-        showToast('Member role updated.', 'success');
-    } catch (error: any) {
-        (event.target as HTMLSelectElement).value = previousRole;
-        showToast(error?.body?.error?.message || 'Unable to update role.', 'error');
-    } finally {
-        updatingMemberId.value = null;
+
+    const apply = async () => {
+        if (!currentStore.value) return;
+        updatingMemberId.value = member.id;
+        try {
+            const data = await updateStoreMemberRole(currentStore.value.id, member.id, nextRole);
+            member.role = data.member.role;
+            member.customPermissionCount = 0;
+            showToast('Member role updated.', 'success');
+        } catch (error: any) {
+            select.value = previousRole;
+            showToast(error?.body?.error?.message || 'Unable to update role.', 'error');
+        } finally {
+            updatingMemberId.value = null;
+        }
+    };
+
+    // Changing role clears personal exceptions, so confirm when there are any.
+    if ((member.customPermissionCount ?? 0) > 0) {
+        select.value = previousRole;
+        confirmModal.title = 'Change role';
+        confirmModal.message = `${member.fullName || member.email} has custom permissions. Changing their role to ${nextRole} resets them to the new role's permissions.`;
+        confirmModal.confirmText = 'Change role';
+        confirmModal.onConfirm = async () => {
+            select.value = nextRole;
+            await apply();
+        };
+        confirmModal.show = true;
+        return;
     }
+    await apply();
 };
 
 // Shared confirmation modal — drives both member removal and invite revocation.
@@ -2479,6 +2528,8 @@ watch(
     letter-spacing: 0.02em;
     vertical-align: middle;
 }
+
+.st-member-badge--custom { background: rgba(13, 148, 136, 0.1); color: #0f766e; }
 
 .st-role-select {
     border: 1px solid var(--c-border);

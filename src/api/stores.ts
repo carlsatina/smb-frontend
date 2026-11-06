@@ -90,6 +90,7 @@ export type RolePermissionsResponse = {
     matrix: Record<EditableRole, string[]>;
     isCustomized: boolean;
     canEdit: boolean;
+    customMemberCount?: number;
 };
 
 export const getRolePermissions = (storeId: string) =>

@@ -1,4 +1,5 @@
 import { apiClient } from './client';
+import type { PermissionDefinition } from './stores';
 
 export type StoreMember = {
     id: string;
@@ -11,7 +12,28 @@ export type StoreMember = {
     // their role, and they stop consuming a plan seat until reinstated.
     suspendedAt?: string | null;
     suspendedBy?: string | null;
+    // Number of personal permission exceptions on top of the role.
+    customPermissionCount?: number;
 };
+
+export type MemberPermissionsResponse = {
+    member: { id: string; userId: string; fullName?: string | null; email: string; role: string };
+    permissions: PermissionDefinition[];
+    rolePermissions: string[];
+    overrides: Record<string, boolean>;
+    effective: string[];
+    editable: boolean;
+    canEdit: boolean;
+};
+
+export const getMemberPermissions = (storeId: string, memberId: string) =>
+    apiClient.request<MemberPermissionsResponse>(`/api/v1/stores/${storeId}/members/${memberId}/permissions`);
+
+export const updateMemberPermissions = (storeId: string, memberId: string, permissions: string[]) =>
+    apiClient.request<MemberPermissionsResponse>(`/api/v1/stores/${storeId}/members/${memberId}/permissions`, {
+        method: 'PUT',
+        body: { permissions },
+    });
 
 export type StoreInvite = {
     id: string;
