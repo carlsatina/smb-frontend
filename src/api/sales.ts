@@ -27,6 +27,7 @@ export type SaleSummary = {
     createdAt: string;
     finalizedAt: string | null;
     voidedAt: string | null;
+    editedAt?: string | null;
     itemCount: number;
     cashier?: {
         id: string;
@@ -67,6 +68,7 @@ export type SaleDetail = {
     createdAt: string;
     finalizedAt: string | null;
     voidedAt: string | null;
+    editedAt?: string | null;
     cashier?: {
         id: string;
         fullName?: string | null;
@@ -119,6 +121,17 @@ export const finalizeSale = async (
 ) => {
     return apiClient.request<{ sale: SaleDetail }>(`/api/v1/stores/${storeId}/sales/finalize`, {
         method: 'POST',
+        body: payload,
+    });
+};
+
+export const updateSale = async (
+    storeId: string,
+    saleId: string,
+    payload: { items: SaleItemInput[]; paymentMethod: string; orderType: string }
+) => {
+    return apiClient.request<{ sale: SaleDetail }>(`/api/v1/stores/${storeId}/sales/${saleId}`, {
+        method: 'PATCH',
         body: payload,
     });
 };

@@ -11,6 +11,13 @@
             @cancel="cancelImport"
             @update:show="showImportPreview = $event"
         />
+        <EditSaleModal
+            :sale-id="editingSaleId"
+            :products="productOptions"
+            :payment-method-options="paymentMethodOptions"
+            @close="editingSaleId = null"
+            @saved="handleSaleSaved"
+        />
         <div class="sales-shell">
 
             <!-- HEADER -->
@@ -240,6 +247,13 @@
                                         <td>
                                             <div class="receipt-number">{{ sale.receiptNumber ? `#${sale.receiptNumber}` : '—' }}</div>
                                             <div class="sale-meta">{{ formatDate(sale.createdAt) }}</div>
+                                            <div
+                                                v-if="sale.editedAt"
+                                                class="sale-edited"
+                                                :title="`Edited ${formatDate(sale.editedAt)}`"
+                                            >
+                                                <mdicon name="pencil" size="12" /> Edited
+                                            </div>
                                         </td>
                                         <td class="sale-meta">{{ sale.cashier?.fullName || sale.cashier?.email || '—' }}</td>
                                         <td class="sale-payment">{{ formatPaymentMethod(sale.paymentMethod) }}</td>
@@ -267,6 +281,15 @@
                                                     @click="printSale(sale.id)"
                                                 >
                                                     {{ printingSaleId === sale.id ? 'Printing...' : 'Print' }}
+                                                </button>
+                                                <button
+                                                    v-if="sale.status === 'FINALIZED' && canEdit"
+                                                    type="button"
+                                                    class="table-action-button"
+                                                    :disabled="voidingSaleId === sale.id"
+                                                    @click="editingSaleId = sale.id"
+                                                >
+                                                    Edit
                                                 </button>
                                                 <button
                                                     v-if="sale.status === 'FINALIZED' && canVoid"
@@ -319,6 +342,7 @@ import PullToRefresh from '@/components/PullToRefresh.vue';
 import { useRoute, useRouter } from 'vue-router';
 import SkeletonLoader from '@/components/SkeletonLoader.vue';
 import CsvImportPreviewModal from '@/components/CsvImportPreviewModal.vue';
+import EditSaleModal from '@/components/EditSaleModal.vue';
 import { listProducts, ProductResponse } from '@/api/products';
 import { exportSales, getSale, importSales, listSales, SaleDetail, SalesImportResult, SaleSummary, voidSale } from '@/api/sales';
 import { listStoreMembers, StoreMember } from '@/api/storeMembers';
@@ -372,6 +396,7 @@ const isFilterOptionsLoading = ref(false);
 const isResettingFilters = ref(false);
 const printingSaleId = ref<string | null>(null);
 const voidingSaleId = ref<string | null>(null);
+const editingSaleId = ref<string | null>(null);
 
 const searchQuery = ref('');
 const showDateModal = ref(false);
@@ -567,6 +592,7 @@ const goToNext = () => {
 
 const statusFilter = ref<'ALL' | 'FINALIZED' | 'VOIDED'>('ALL');
 const canVoid = computed(() => canAccess(storeContext.currentStore?.role, 'salesVoid'));
+const canEdit = computed(() => canAccess(storeContext.currentStore?.role, 'salesEdit'));
 const hasAdvancedFilters = computed(() =>
     Boolean(cashierFilter.value || paymentMethodFilter.value || productFilter.value)
 );
@@ -773,6 +799,13 @@ const voidSaleRow = async (saleId: string) => {
             voidingSaleId.value = null;
         }
     }
+};
+
+const handleSaleSaved = async (sale: SaleDetail) => {
+    editingSaleId.value = null;
+    const label = sale.receiptNumber ? `Receipt #${sale.receiptNumber}` : 'Sale';
+    showToast(`${label} updated.`, 'success');
+    await loadSales();
 };
 
 const changePage = async (nextPage: number) => {
@@ -1575,6 +1608,16 @@ watch(
     text-transform: uppercase;
     letter-spacing: 0.07em;
     white-space: nowrap;
+}
+
+.sale-edited {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    margin-top: 0.2rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #b45309;
 }
 
 .status-pill--active { background: rgba(13, 148, 136, 0.1); color: var(--c-accent-dark); }
