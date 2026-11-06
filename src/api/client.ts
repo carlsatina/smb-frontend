@@ -116,6 +116,14 @@ const maybeDispatchStoreSuspended = (errorBody: any) => {
     }
 };
 
+// A permission the UI thought we had was refused (e.g. the owner changed the
+// role grid mid-session). Ask the app to refresh what the member can see.
+const maybeDispatchPermissionsStale = (status: number, errorBody: any) => {
+    if (typeof window !== 'undefined' && status === 403 && errorBody?.error?.code === 'FORBIDDEN') {
+        window.dispatchEvent(new CustomEvent('permissions:stale'));
+    }
+};
+
 const maybeDispatchPlanUpgrade = (errorBody: any) => {
     const errorCode = errorBody?.error?.code;
     if (typeof window !== 'undefined' && (errorCode === 'PLAN_LIMIT' || errorCode === 'SUBSCRIPTION_REQUIRED')) {
@@ -162,6 +170,7 @@ export const apiClient = {
                 }
                 maybeDispatchPlanUpgrade(errorBody);
                 maybeDispatchStoreSuspended(errorBody);
+                maybeDispatchPermissionsStale(response.status, errorBody);
                 throw { status: response.status, body: errorBody };
             }
 
@@ -206,6 +215,7 @@ export const apiClient = {
                 }
                 maybeDispatchPlanUpgrade(errorBody);
                 maybeDispatchStoreSuspended(errorBody);
+                maybeDispatchPermissionsStale(response.status, errorBody);
                 throw { status: response.status, body: errorBody };
             }
 
@@ -241,6 +251,7 @@ export const apiClient = {
                 try { errorBody = await response.json(); } catch { errorBody = null; }
                 maybeDispatchPlanUpgrade(errorBody);
                 maybeDispatchStoreSuspended(errorBody);
+                maybeDispatchPermissionsStale(response.status, errorBody);
                 throw { status: response.status, body: errorBody };
             }
 

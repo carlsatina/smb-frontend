@@ -307,7 +307,13 @@ const page = ref(1);
 const pageSize = ref(10);
 const pageSizeOptions = [10, 20, 50];
 const canWrite = computed(() => canAccess(storeContext.currentStore, 'productsWrite'));
-const canImportExport = computed(() => hasPlanFeature(userContext.effectivePlan, 'importExport'));
+// Catalog CSV import/export is limited to owners and admins (server enforces the same).
+const canImportExport = computed(
+    () =>
+        hasPlanFeature(userContext.effectivePlan, 'importExport') &&
+        ['OWNER', 'ADMIN'].includes(storeContext.currentStore?.role ?? '') &&
+        canAccess(storeContext.currentStore, 'productsWrite')
+);
 
 const showDeleteModal = ref(false);
 const productToDelete = ref<ProductRow | null>(null);

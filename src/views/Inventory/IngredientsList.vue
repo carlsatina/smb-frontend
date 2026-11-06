@@ -306,7 +306,12 @@ const isPlanLocked = computed(
         (planKnown.value && !hasPlanFeature(ownerPlanTier.value, 'ingredients'))
 );
 
-const canAdmin = computed(() => canAccess(storeContext.currentStore, 'storeSettings'));
+// Catalog CSV import/export is limited to owners and admins with "Manage products & stock".
+const canAdmin = computed(
+    () =>
+        ['OWNER', 'ADMIN'].includes(storeContext.currentStore?.role ?? '') &&
+        canAccess(storeContext.currentStore, 'inventoryAdjustments')
+);
 const canImportExport = computed(
     () => canAdmin.value && ownerSubscriptionActive.value && hasPlanFeature(ownerPlanTier.value, 'importExport')
 );

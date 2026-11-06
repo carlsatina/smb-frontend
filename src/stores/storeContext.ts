@@ -69,6 +69,25 @@ export const useStoreContextStore = defineStore('storeContext', {
                 this.hasLoaded = true;
             }
         },
+        // Re-reads the signed-in member's role and permissions without replacing the
+        // store objects, so open forms (e.g. Store Settings) aren't reset.
+        async refreshPermissions() {
+            if (!this.hasLoaded) return;
+            try {
+                const data = await listStores();
+                const fresh = new Map(data.stores.map((store) => [store.id, store]));
+                this.stores.forEach((store) => {
+                    const next = fresh.get(store.id);
+                    if (!next) return;
+                    if (store.role !== next.role) store.role = next.role;
+                    if (JSON.stringify(store.permissions) !== JSON.stringify(next.permissions)) {
+                        store.permissions = next.permissions;
+                    }
+                });
+            } catch {
+                // Best effort; the server still enforces access.
+            }
+        },
         setCurrentStore(storeId: string) {
             this.currentStoreId = storeId;
             localStorage.setItem('currentStoreId', storeId);

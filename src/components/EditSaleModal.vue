@@ -54,6 +54,8 @@
                                         step="0.01"
                                         inputmode="decimal"
                                         :class="{ invalid: !(line.unitPrice >= 0) }"
+                                        :readonly="Boolean(saleChannel)"
+                                        :title="saleChannel ? `${saleChannel.name} prices are set automatically` : undefined"
                                         :aria-label="`Unit price for ${line.name}`"
                                     />
                                 </label>
@@ -92,7 +94,12 @@
                             <div class="edit-sale__field">
                                 <span>Order type</span>
                                 <div class="edit-sale__toggle" role="group" aria-label="Order type">
-                                    <button type="button" :class="{ active: orderType === 'DINE_IN' }" @click="orderType = 'DINE_IN'">Dine-in</button>
+                                    <button
+                                        type="button"
+                                        :class="{ active: orderType === 'DINE_IN' }"
+                                        :disabled="Boolean(saleChannel?.alwaysTakeout)"
+                                        @click="orderType = 'DINE_IN'"
+                                    >Dine-in</button>
                                     <button type="button" :class="{ active: orderType === 'TAKEOUT' }" @click="orderType = 'TAKEOUT'">Takeout</button>
                                 </div>
                             </div>
@@ -142,6 +149,10 @@
                             </div>
                         </section>
 
+                        <p v-if="saleChannel" class="edit-sale__note">
+                            <mdicon name="moped-outline" size="16" />
+                            {{ saleChannel.name }} sale: prices are set automatically (existing items keep the price they were sold at).
+                        </p>
                         <p class="edit-sale__note">
                             <mdicon name="information-outline" size="16" />
                             Stock is adjusted for the difference only. The edit is recorded in the audit log.
@@ -174,6 +185,7 @@ import SearchableSelect from '@/components/SearchableSelect.vue';
 import type { ProductResponse } from '@/api/products';
 import { getSale, SaleDetail, updateSale } from '@/api/sales';
 import { useStoreContextStore } from '@/stores/storeContext';
+import { computeChannelPrice } from '@/utils/salesChannels';
 
 type EditLine = {
     key: string;
@@ -247,6 +259,16 @@ const methodOptions = computed(() => {
     if (!current || options.some((option) => option.value === current)) return options;
     return [...options, { value: current, label: current.charAt(0) + current.slice(1).toLowerCase() }];
 });
+
+// Channel (e.g. Grab) sales are re-priced by the server; mirror that here.
+const saleChannel = computed(() => {
+    const key = original.value?.channel;
+    return key ? (storeContext.currentStore?.salesChannels ?? []).find((channel) => channel.key === key) ?? null : null;
+});
+const priceForNewLine = (product: ProductResponse) =>
+    saleChannel.value
+        ? computeChannelPrice(Number(product.price) || 0, saleChannel.value, product.channelPrices?.[saleChannel.value.key])
+        : product.price;
 
 const addProductOptions = computed(() =>
     props.products
@@ -338,7 +360,7 @@ watch(addProductId, (productId) => {
         productId: product.id,
         name: product.name,
         qty: 1,
-        unitPrice: product.price,
+        unitPrice: priceForNewLine(product),
     });
 });
 
@@ -616,6 +638,16 @@ const formatDate = (value: string) =>
     font-family: inherit;
     color: #64748b;
     cursor: pointer;
+}
+
+.edit-sale__toggle button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.edit-sale__line input[readonly] {
+    background: #f8fafc;
+    color: #475569;
 }
 
 .edit-sale__toggle button.active { background: rgba(13, 148, 136, 0.1); color: #0f766e; }

@@ -338,8 +338,7 @@ const canViewReports = computed(() => canAccess(storeContext.currentStore, 'repo
 // AI Insights: owner/admin (summary + chat) or inventory manager (reorder), once AI is configured.
 const canViewAi = computed(
     () =>
-        ['OWNER', 'ADMIN', 'INVENTORY_MANAGER'].includes(storeContext.currentStore?.role ?? '') &&
-        !!storeContext.currentStore?.aiApiKeySet
+        canAccess(storeContext.currentStore, 'aiInsights') && !!storeContext.currentStore?.aiApiKeySet
 );
 const canViewSettings = computed(() => canAccess(storeContext.currentStore, 'storeSettings'));
 const canViewDailySales = computed(() =>

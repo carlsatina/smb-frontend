@@ -128,7 +128,7 @@
                                     <span class="st-toggle-track"></span>
                                     <span class="st-toggle-label">Allow negative stock</span>
                                 </label>
-                                <p v-if="!canEdit" class="st-permission-note">Your role is {{ currentStore?.role }}. Only owners or admins can edit settings.</p>
+                                <p v-if="!canEdit" class="st-permission-note">Your role is {{ currentStore?.role }}. You need the “Manage store &amp; team” permission to edit settings.</p>
                                 <div class="st-form-footer">
                                     <button class="st-btn-ghost" type="button" @click="resetForm">Reset changes</button>
                                     <button class="st-btn-primary" type="submit" :disabled="!canEdit || !storeForm.name || isSaving">
@@ -151,7 +151,7 @@
                                         {{ pm.label }}
                                     </label>
                                 </div>
-                                <p v-if="!canEdit" class="st-permission-note">Only owners or admins can edit settings.</p>
+                                <p v-if="!canEdit" class="st-permission-note">You need the “Manage store &amp; team” permission to edit settings.</p>
                                 <div class="st-form-footer">
                                     <button class="st-btn-ghost" type="button" @click="resetForm">Reset changes</button>
                                     <button class="st-btn-primary" type="submit" :disabled="!canEdit || isSaving">
@@ -272,7 +272,7 @@
                                         <div v-else class="st-catalog-empty">No expense categories configured.</div>
                                     </div>
                                 </div>
-                                <p v-if="!canEdit" class="st-permission-note">Only owners or admins can edit settings.</p>
+                                <p v-if="!canEdit" class="st-permission-note">You need the “Manage store &amp; team” permission to edit settings.</p>
                                 <span v-else class="st-field-hint">Units, categories and subcategories are saved automatically.</span>
                             </div>
                         </section>
@@ -351,10 +351,10 @@
                                             <select
                                                 class="st-role-select"
                                                 :value="member.role"
-                                                :disabled="!canManageMembers || isOwnerLocked(member) || isUpdatingMember(member.id)"
+                                                :disabled="!canManageMembers || isOwnerLocked(member) || !canAssignRole(member.role) || isUpdatingMember(member.id)"
                                                 @change="changeMemberRole(member, $event)"
                                             >
-                                                <option v-for="role in roleOptions" :key="role" :value="role">{{ role }}</option>
+                                                <option v-for="role in memberRoleOptions(member)" :key="role" :value="role">{{ role }}</option>
                                             </select>
                                             <button
                                                 v-if="canManageMembers && member.role !== 'OWNER'"
@@ -421,7 +421,7 @@
                                             </button>
                                         </div>
                                     </form>
-                                    <p v-else class="st-permission-note">Only owners or admins can invite new members.</p>
+                                    <p v-else class="st-permission-note">You need the “Manage store &amp; team” permission to invite members.</p>
 
                                     <div v-if="recentInviteLink" class="st-invite-link-card">
                                         <span class="st-invite-link-label">Invite link</span>
@@ -642,7 +642,7 @@
                                     </span>
                                     <span v-else class="st-field-hint">Validates the saved key with the provider. No tokens are used.</span>
                                 </div>
-                                <p v-if="!canEdit" class="st-permission-note">Your role is {{ currentStore?.role }}. Only owners or admins can edit settings.</p>
+                                <p v-if="!canEdit" class="st-permission-note">Your role is {{ currentStore?.role }}. You need the “Manage store &amp; team” permission to edit settings.</p>
                                 <div class="st-form-footer">
                                     <button class="st-btn-ghost" type="button" @click="syncAiForm">Reset changes</button>
                                     <button class="st-btn-primary" type="submit" :disabled="!canEdit || isAiSaving">
@@ -1340,9 +1340,19 @@ const inviteForm = reactive({ email: '', role: 'CASHIER', expiresInDays: 7 });
 
 const canManageMembers = computed(() => canEdit.value);
 const canManageOwners = computed(() => currentStore.value?.role === 'OWNER');
-const inviteRoleOptions = computed(() =>
-    canManageOwners.value ? roleOptions : roleOptions.filter((r) => r !== 'OWNER')
-);
+// Owners assign any role, admins anything below Owner, and delegated managers
+// (store.manage on another role) only roles below Admin. The server also checks
+// the role's permissions are ones the manager holds.
+const assignableRoles = computed(() => {
+    const role = currentStore.value?.role;
+    if (role === 'OWNER') return roleOptions;
+    if (role === 'ADMIN') return roleOptions.filter((r) => r !== 'OWNER');
+    return roleOptions.filter((r) => r !== 'OWNER' && r !== 'ADMIN');
+});
+const canAssignRole = (role: string) => assignableRoles.value.includes(role);
+const memberRoleOptions = (member: StoreMember) =>
+    canAssignRole(member.role) ? assignableRoles.value : [member.role];
+const inviteRoleOptions = assignableRoles;
 const pendingInvites = computed(() => invites.value.filter((i) => i.status !== 'ACCEPTED'));
 const isOwnerLocked = (member: StoreMember) => member.role === 'OWNER' && !canManageOwners.value;
 const isUpdatingMember = (id: string) => updatingMemberId.value === id;

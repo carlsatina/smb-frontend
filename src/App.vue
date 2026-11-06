@@ -70,6 +70,16 @@ const closePlanModal = () => {
     planModalMessage.value = null;
 };
 
+// Keep the member's permissions current when the owner changes them mid-session:
+// refresh after a refused request and when the window regains focus (throttled).
+let lastPermissionRefresh = 0;
+const refreshPermissions = () => {
+    const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
+    if (!token || Date.now() - lastPermissionRefresh < 15000) return;
+    lastPermissionRefresh = Date.now();
+    storeContext.refreshPermissions();
+};
+
 onMounted(() => {
     const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
     if (token) {
@@ -79,6 +89,8 @@ onMounted(() => {
     window.addEventListener('auth:login', handleAuthLogin);
     window.addEventListener('plan:upgrade', handlePlanUpgrade);
     window.addEventListener('store:suspended', handleStoreSuspended);
+    window.addEventListener('permissions:stale', refreshPermissions);
+    window.addEventListener('focus', refreshPermissions);
 });
 
 onBeforeUnmount(() => {
@@ -86,6 +98,8 @@ onBeforeUnmount(() => {
     window.removeEventListener('auth:login', handleAuthLogin);
     window.removeEventListener('plan:upgrade', handlePlanUpgrade);
     window.removeEventListener('store:suspended', handleStoreSuspended);
+    window.removeEventListener('permissions:stale', refreshPermissions);
+    window.removeEventListener('focus', refreshPermissions);
 });
 </script>
 
