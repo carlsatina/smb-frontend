@@ -143,6 +143,14 @@ export const updateSale = async (
     });
 };
 
+// Owner-only soft delete; recorded in the audit log with an optional reason.
+export const deleteSale = async (storeId: string, saleId: string, reason?: string | null) => {
+    return apiClient.request<{ id: string; receiptNumber: number | null; stockReturned: boolean }>(
+        `/api/v1/stores/${storeId}/sales/${saleId}`,
+        { method: 'DELETE', body: { reason: reason ?? null } }
+    );
+};
+
 export const voidSale = async (storeId: string, saleId: string) => {
     return apiClient.request<{ sale: SaleDetail }>(`/api/v1/stores/${storeId}/sales/${saleId}/void`, {
         method: 'POST',

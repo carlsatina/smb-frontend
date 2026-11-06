@@ -533,6 +533,11 @@ const formatActionLabel = (action: string) => {
         PURCHASE_RECEIPT: 'Purchase Receipt',
         PURCHASE_ORDER_STATUS: 'PO Status Change',
         SUPPLIER_UPDATED: 'Supplier Updated',
+        SALE_EDITED: 'Sale Edited',
+        SALE_DELETED: 'Sale Deleted',
+        ROLE_PERMISSIONS_UPDATED: 'Role Permissions Updated',
+        MEMBER_PERMISSIONS_UPDATED: 'Member Permissions Updated',
+        MEMBER_PERMISSIONS_CLEARED: 'Member Permissions Cleared',
     };
     return labels[action] || action.replace(/_/g, ' ');
 };
@@ -543,6 +548,11 @@ const getActionIcon = (action: string) => {
         PURCHASE_RECEIPT: 'package-variant-closed',
         PURCHASE_ORDER_STATUS: 'clipboard-check-outline',
         SUPPLIER_UPDATED: 'account-edit-outline',
+        SALE_EDITED: 'receipt-text-edit-outline',
+        SALE_DELETED: 'delete-outline',
+        ROLE_PERMISSIONS_UPDATED: 'shield-account-outline',
+        MEMBER_PERMISSIONS_UPDATED: 'shield-account-outline',
+        MEMBER_PERMISSIONS_CLEARED: 'shield-off-outline',
     };
     return icons[action] || 'circle-outline';
 };
@@ -553,6 +563,11 @@ const getActionClass = (action: string) => {
         PURCHASE_RECEIPT: 'receipt',
         PURCHASE_ORDER_STATUS: 'status',
         SUPPLIER_UPDATED: 'supplier',
+        SALE_EDITED: 'status',
+        SALE_DELETED: 'deleted',
+        ROLE_PERMISSIONS_UPDATED: 'supplier',
+        MEMBER_PERMISSIONS_UPDATED: 'supplier',
+        MEMBER_PERMISSIONS_CLEARED: 'supplier',
     };
     return classes[action] || '';
 };
@@ -1027,6 +1042,11 @@ watch(
 .log-icon.supplier {
     background: rgba(139, 92, 246, 0.12);
     color: #8b5cf6;
+}
+
+.log-icon.deleted {
+    background: rgba(220, 38, 38, 0.12);
+    color: #dc2626;
 }
 
 .log-content {

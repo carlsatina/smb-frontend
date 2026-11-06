@@ -11,6 +11,7 @@
             @cancel="cancelImport"
             @update:show="showImportPreview = $event"
         />
+        <DeleteSaleModal :sale="deletingSale" @close="deletingSale = null" @deleted="handleSaleDeleted" />
         <EditSaleModal
             :sale-id="editingSaleId"
             :products="productOptions"
@@ -313,6 +314,17 @@
                                                 >
                                                     {{ voidingSaleId === sale.id ? 'Voiding...' : 'Void' }}
                                                 </button>
+                                                <button
+                                                    v-if="isOwner"
+                                                    type="button"
+                                                    class="table-action-button table-action-button--icon"
+                                                    :disabled="voidingSaleId === sale.id"
+                                                    :title="`Delete ${sale.receiptNumber ? `receipt #${sale.receiptNumber}` : 'sale'}`"
+                                                    :aria-label="`Delete ${sale.receiptNumber ? `receipt #${sale.receiptNumber}` : 'sale'}`"
+                                                    @click="deletingSale = sale"
+                                                >
+                                                    <mdicon name="trash-can-outline" size="16" />
+                                                </button>
                                             </div>
                                         </td>
                                     </tr>
@@ -356,6 +368,7 @@ import { useRoute, useRouter } from 'vue-router';
 import SkeletonLoader from '@/components/SkeletonLoader.vue';
 import CsvImportPreviewModal from '@/components/CsvImportPreviewModal.vue';
 import EditSaleModal from '@/components/EditSaleModal.vue';
+import DeleteSaleModal from '@/components/DeleteSaleModal.vue';
 import { listProducts, ProductResponse } from '@/api/products';
 import { exportSales, getSale, importSales, listSales, SaleDetail, SalesImportResult, SaleSummary, voidSale } from '@/api/sales';
 import { listStoreMembers, StoreMember } from '@/api/storeMembers';
@@ -410,6 +423,9 @@ const isResettingFilters = ref(false);
 const printingSaleId = ref<string | null>(null);
 const voidingSaleId = ref<string | null>(null);
 const editingSaleId = ref<string | null>(null);
+// Deleting sales is owner-only (server enforces the same).
+const deletingSale = ref<SaleSummary | null>(null);
+const isOwner = computed(() => storeContext.currentStore?.role === 'OWNER');
 
 const searchQuery = ref('');
 const showDateModal = ref(false);
@@ -824,6 +840,13 @@ const handleSaleSaved = async (sale: SaleDetail) => {
     editingSaleId.value = null;
     const label = sale.receiptNumber ? `Receipt #${sale.receiptNumber}` : 'Sale';
     showToast(`${label} updated.`, 'success');
+    await loadSales();
+};
+
+const handleSaleDeleted = async () => {
+    deletingSale.value = null;
+    // Step back a page if this removed the last row on it.
+    if (sales.value.length === 1 && page.value > 1) page.value -= 1;
     await loadSales();
 };
 
@@ -1596,6 +1619,21 @@ watch(
     border-color: var(--c-accent);
     color: var(--c-accent-dark);
     background: rgba(13, 148, 136, 0.05);
+}
+
+.table-action-button--icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+    color: #94a3b8;
+}
+
+.table-action-button--icon:hover:not(:disabled) {
+    color: #dc2626;
+    border-color: #fecaca;
+    background: #fef2f2;
 }
 
 .table-action-button--danger {
