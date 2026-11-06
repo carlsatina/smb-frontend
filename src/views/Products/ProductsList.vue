@@ -189,7 +189,10 @@
                                                 >
                                                     {{ formatProductType(product.type) }}
                                                 </span>
-                                                <span>{{ product.category || 'Uncategorized' }}</span>
+                                                <span>
+                                                    {{ product.category || 'Uncategorized' }}<template v-if="product.category && product.subcategory">
+                                                        <span class="subcategory-sep" aria-hidden="true">›</span>{{ product.subcategory }}</template>
+                                                </span>
                                             </div>
                                         </td>
                                         <td v-if="showSkuColumn" class="col-sku">{{ product.sku || '—' }}</td>
@@ -278,6 +281,7 @@ type ProductRow = {
     sku?: string | null;
     barcode?: string | null;
     category?: string | null;
+    subcategory?: string | null;
     price: number;
     cost?: number | null;
     active?: boolean;
@@ -359,10 +363,10 @@ const downloadTemplate = () => {
     // Columns match the importer; only Name and Price are required.
     // Recipe holds "Ingredient Name:qty | Ingredient Name:qty" for RECIPE products;
     // leave it blank for READY_MADE. Ingredient names must already exist in the store.
-    const headers = 'Name,Type,SKU,Barcode,Price,Cost,Unit,Category,Active,Low Stock Threshold,Recipe';
+    const headers = 'Name,Type,SKU,Barcode,Price,Cost,Unit,Category,Subcategory,Active,Low Stock Threshold,Recipe';
     const example = [
-        'Iced Coffee,READY_MADE,SKU-001,,120,60,pcs,Beverages,true,10,',
-        'Latte,RECIPE,SKU-002,,150,,pcs,Beverages,true,,"Espresso Beans:18 | Milk:200 | Sugar:10"',
+        'Iced Coffee,READY_MADE,SKU-001,,120,60,pcs,Beverages,Iced,true,10,',
+        'Latte,RECIPE,SKU-002,,150,,pcs,Beverages,Hot,true,,"Espresso Beans:18 | Milk:200 | Sugar:10"',
     ].join('\n');
     const csv = `${headers}\n${example}\n`;
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -469,7 +473,7 @@ const filteredProducts = computed(() => {
         if (catalogFilter.value === 'RECIPE' && product.type !== 'RECIPE') return false;
         if (catalogFilter.value === 'MISSING_RECIPE' && !isMissingRecipe(product)) return false;
         if (activeOnly.value && !product.active) return false;
-        if (query && !product.name.toLowerCase().includes(query) && !(product.sku || '').toLowerCase().includes(query) && !(product.barcode || '').toLowerCase().includes(query) && !(product.category || '').toLowerCase().includes(query)) return false;
+        if (query && !product.name.toLowerCase().includes(query) && !(product.sku || '').toLowerCase().includes(query) && !(product.barcode || '').toLowerCase().includes(query) && !(product.category || '').toLowerCase().includes(query) && !(product.subcategory || '').toLowerCase().includes(query)) return false;
         return true;
     });
 });
@@ -593,6 +597,11 @@ watch(() => storeContext.currentStoreId, async () => {
 </script>
 
 <style scoped>
+.subcategory-sep {
+    margin: 0 0.3rem;
+    color: #94a3b8;
+}
+
 /* ============================================================
    TOKENS
 ============================================================ */

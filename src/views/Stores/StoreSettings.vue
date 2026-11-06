@@ -190,6 +190,66 @@
                                         <div v-else class="st-catalog-empty">No categories configured.</div>
                                     </div>
                                     <div class="st-catalog-group">
+                                        <span class="st-catalog-label">Subcategories</span>
+                                        <span class="st-field-hint">Optional groups within a category. They appear as a second row of filters in the POS, in this order.</span>
+                                        <div class="st-subcat-list">
+                                            <div v-for="category in storeForm.categoryOptions" :key="category" class="st-subcat-row">
+                                                <div class="st-subcat-category">{{ category }}</div>
+                                                <div class="st-subcat-body">
+                                                    <div v-if="subcategoriesOf(category).length" class="st-catalog-tags">
+                                                        <span
+                                                            v-for="(sub, index) in subcategoriesOf(category)"
+                                                            :key="sub"
+                                                            class="st-catalog-tag st-subcat-tag"
+                                                        >
+                                                            <button
+                                                                v-if="subcategoriesOf(category).length > 1"
+                                                                type="button"
+                                                                class="st-catalog-remove st-subcat-move"
+                                                                :disabled="!canEdit || isCatalogSaving || index === 0"
+                                                                :aria-label="`Move ${sub} earlier`"
+                                                                @click="moveSubcategory(category, index, -1)"
+                                                            >&lsaquo;</button>
+                                                            {{ sub }}
+                                                            <button
+                                                                v-if="subcategoriesOf(category).length > 1"
+                                                                type="button"
+                                                                class="st-catalog-remove st-subcat-move"
+                                                                :disabled="!canEdit || isCatalogSaving || index === subcategoriesOf(category).length - 1"
+                                                                :aria-label="`Move ${sub} later`"
+                                                                @click="moveSubcategory(category, index, 1)"
+                                                            >&rsaquo;</button>
+                                                            <button
+                                                                type="button"
+                                                                class="st-catalog-remove"
+                                                                :disabled="!canEdit || isCatalogSaving"
+                                                                :aria-label="`Remove ${sub}`"
+                                                                @click="removeSubcategory(category, sub)"
+                                                            >&times;</button>
+                                                        </span>
+                                                    </div>
+                                                    <div v-if="canEdit" class="st-catalog-input st-subcat-input">
+                                                        <input
+                                                            v-model="newSubcategory[category]"
+                                                            type="text"
+                                                            maxlength="60"
+                                                            :placeholder="`Add subcategory to ${category}`"
+                                                            :disabled="isCatalogSaving"
+                                                            @keydown.enter.prevent="addSubcategory(category)"
+                                                        />
+                                                        <button
+                                                            class="st-btn-ghost"
+                                                            type="button"
+                                                            :disabled="isCatalogSaving || !(newSubcategory[category] || '').trim()"
+                                                            @click="addSubcategory(category)"
+                                                        >Add</button>
+                                                    </div>
+                                                    <div v-else-if="!subcategoriesOf(category).length" class="st-catalog-empty">None</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="st-catalog-group">
                                         <span class="st-catalog-label">Expense categories</span>
                                         <div class="st-catalog-input">
                                             <input v-model="newExpenseCategory" type="text" placeholder="Add expense category" :disabled="!canEdit || isCatalogSaving" @keydown.enter.prevent="addExpenseCategoryOption" />
@@ -205,7 +265,7 @@
                                     </div>
                                 </div>
                                 <p v-if="!canEdit" class="st-permission-note">Only owners or admins can edit settings.</p>
-                                <span v-else class="st-field-hint">Units and categories are saved automatically.</span>
+                                <span v-else class="st-field-hint">Units, categories and subcategories are saved automatically.</span>
                             </div>
                         </section>
 
@@ -640,6 +700,7 @@ import { useToast } from '@/composables/useToast';
 import { useStoreContextStore } from '@/stores/storeContext';
 import { useUserContextStore } from '@/stores/userContext';
 import { DEFAULT_CATEGORY_OPTIONS, DEFAULT_EXPENSE_CATEGORY_OPTIONS, DEFAULT_UNIT_OPTIONS } from '@/utils/catalogDefaults';
+import { getSubcategoriesFor, withSubcategories, type SubcategoryOptions } from '@/utils/subcategories';
 import { getPlanConfig, planTierOrder, planConfigs, type PlanTier, type PlanFeature } from '@/utils/planAccess';
 import { getMe } from '@/api/auth';
 import ConfirmModal from '@/components/ConfirmModal.vue';
@@ -676,6 +737,7 @@ const storeForm = reactive({
     paymentMethods: ['CASH', 'CARD', 'TRANSFER', 'GCASH', 'MAYA', 'OTHER'] as string[],
     unitOptions: [...DEFAULT_UNIT_OPTIONS],
     categoryOptions: [...DEFAULT_CATEGORY_OPTIONS],
+    subcategoryOptions: {} as SubcategoryOptions,
     expenseCategoryOptions: [...DEFAULT_EXPENSE_CATEGORY_OPTIONS],
 });
 
@@ -833,6 +895,7 @@ const resetForm = () => {
     storeForm.unitOptions = normalizeOptions(currentStore.value.unitOptions ?? [], DEFAULT_UNIT_OPTIONS);
     storeForm.categoryOptions = normalizeOptions(currentStore.value.categoryOptions ?? [], DEFAULT_CATEGORY_OPTIONS);
     storeForm.expenseCategoryOptions = normalizeOptions(currentStore.value.expenseCategoryOptions ?? [], DEFAULT_EXPENSE_CATEGORY_OPTIONS);
+    storeForm.subcategoryOptions = { ...(currentStore.value.subcategoryOptions ?? {}) };
     newUnit.value = '';
     newCategory.value = '';
     newExpenseCategory.value = '';
@@ -1036,6 +1099,61 @@ const removeCategoryOption = async (category: string) => {
     if (await persistCatalog(previousUnits, previousCategories)) {
         showToast('Category removed.', 'success');
     }
+};
+
+// ── Subcategories (per category, saved immediately) ──
+const newSubcategory = reactive<Record<string, string>>({});
+
+const subcategoriesOf = (category: string) => getSubcategoriesFor(storeForm.subcategoryOptions, category);
+
+const persistSubcategories = async (category: string, next: string[]) => {
+    if (!currentStore.value || !canEdit.value) return false;
+    const previous = storeForm.subcategoryOptions;
+    storeForm.subcategoryOptions = withSubcategories(previous, category, next);
+    isCatalogSaving.value = true;
+    try {
+        await updateStore(currentStore.value.id, { subcategoryOptions: storeForm.subcategoryOptions });
+        await storeContext.fetchStores();
+        return true;
+    } catch (error: any) {
+        storeForm.subcategoryOptions = previous;
+        showToast(error?.body?.error?.message || 'Unable to update subcategories.', 'error');
+        return false;
+    } finally {
+        isCatalogSaving.value = false;
+    }
+};
+
+const addSubcategory = async (category: string) => {
+    if (isCatalogSaving.value) return;
+    const value = (newSubcategory[category] || '').trim();
+    if (!value) return;
+    const current = subcategoriesOf(category);
+    if (current.some((entry) => entry.toLowerCase() === value.toLowerCase())) {
+        showToast(`${category} already has "${value}".`, 'info');
+        newSubcategory[category] = '';
+        return;
+    }
+    newSubcategory[category] = '';
+    if (await persistSubcategories(category, [...current, value])) {
+        showToast('Subcategory added.', 'success');
+    }
+};
+
+const removeSubcategory = async (category: string, sub: string) => {
+    if (isCatalogSaving.value) return;
+    if (await persistSubcategories(category, subcategoriesOf(category).filter((entry) => entry !== sub))) {
+        showToast('Subcategory removed. Products using it keep their category.', 'success');
+    }
+};
+
+const moveSubcategory = async (category: string, index: number, delta: -1 | 1) => {
+    if (isCatalogSaving.value) return;
+    const list = [...subcategoriesOf(category)];
+    const target = index + delta;
+    if (target < 0 || target >= list.length) return;
+    [list[index], list[target]] = [list[target], list[index]];
+    await persistSubcategories(category, list);
 };
 
 const addExpenseCategoryOption = async () => {
@@ -2155,6 +2273,75 @@ watch(
 .st-catalog-remove:disabled {
     cursor: not-allowed;
     opacity: 0.5;
+}
+
+.st-subcat-list {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--c-border);
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.st-subcat-row {
+    display: grid;
+    grid-template-columns: 160px minmax(0, 1fr);
+    gap: 0.75rem;
+    padding: 0.75rem 0.9rem;
+    align-items: start;
+}
+
+.st-subcat-row + .st-subcat-row {
+    border-top: 1px solid var(--c-border);
+}
+
+.st-subcat-category {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--c-text);
+    padding-top: 0.35rem;
+    overflow-wrap: anywhere;
+}
+
+.st-subcat-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    min-width: 0;
+}
+
+.st-subcat-tag {
+    gap: 0.2rem;
+}
+
+.st-subcat-move {
+    font-size: 1rem;
+    padding: 0 0.1rem;
+    opacity: 0.6;
+}
+
+.st-subcat-move:hover:not(:disabled) {
+    opacity: 1;
+}
+
+.st-subcat-move:disabled {
+    opacity: 0.2;
+}
+
+.st-subcat-input input {
+    padding: 0.45rem 0.65rem;
+    font-size: 0.85rem;
+}
+
+@media (max-width: 640px) {
+    .st-subcat-row {
+        grid-template-columns: 1fr;
+        gap: 0.4rem;
+    }
+
+    .st-subcat-category {
+        padding-top: 0;
+    }
 }
 
 .st-catalog-empty {

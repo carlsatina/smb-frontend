@@ -9,6 +9,7 @@ export type ProductPayload = {
     cost?: number | null;
     unit: string;
     category?: string | null;
+    subcategory?: string | null;
     active?: boolean;
     lowStockThreshold?: number | null;
     recipeLines?: {

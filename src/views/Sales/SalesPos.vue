@@ -156,6 +156,33 @@
                         </button>
                     </div>
 
+                    <div
+                        v-if="storeContext.currentStoreId && subcategoryList.length > 0"
+                        class="category-filters subcategory-filters"
+                        role="group"
+                        :aria-label="`${activeCategory} subcategories`"
+                    >
+                        <mdicon name="subdirectory-arrow-right" size="14" class="subcategory-icon" />
+                        <button
+                            type="button"
+                            class="category-pill subcategory-pill"
+                            :class="{ active: activeSubcategory === 'ALL' }"
+                            @click="activeSubcategory = 'ALL'"
+                        >
+                            All {{ activeCategory }}
+                        </button>
+                        <button
+                            v-for="sub in subcategoryList"
+                            :key="sub.value"
+                            type="button"
+                            class="category-pill subcategory-pill"
+                            :class="{ active: activeSubcategory === sub.value }"
+                            @click="activeSubcategory = sub.value"
+                        >
+                            {{ sub.label }}
+                        </button>
+                    </div>
+
                     <div class="catalog-scroll">
                     <div v-if="!storeContext.currentStoreId" class="panel-state">
                         Select or create a store to start selling.
@@ -343,7 +370,7 @@
                                                         class="td-category-tag"
                                                         :style="getCategoryPillStyle(product.category, false)"
                                                     >
-                                                        {{ product.category }}
+                                                        {{ categoryLabel(product) }}
                                                     </span>
                                                     <span v-else class="td-empty-dash">—</span>
                                                 </td>
@@ -506,7 +533,7 @@
                                             >
                                                 <span v-if="displaySettings.showType" class="product-pill">{{ formatProductType(product.type) }}</span>
                                                 <span v-if="displaySettings.showCategory && product.category" class="product-tag">
-                                                    {{ product.category }}
+                                                    {{ categoryLabel(product) }}
                                                 </span>
                                             </div>
                                             <h3 :title="product.name">{{ product.name }}</h3>
@@ -560,7 +587,7 @@
                                     >
                                         <span v-if="displaySettings.showType" class="product-pill">{{ formatProductType(product.type) }}</span>
                                         <span v-if="displaySettings.showCategory && product.category" class="product-tag">
-                                            {{ product.category }}
+                                            {{ categoryLabel(product) }}
                                         </span>
                                     </div>
                                     <h3 :title="product.name">{{ product.name }}</h3>
@@ -727,6 +754,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
+import { getSubcategoriesFor } from '@/utils/subcategories';
 import { useRoute, useRouter } from 'vue-router';
 import { listProducts } from '@/api/products';
 import { finalizeSale } from '@/api/sales';
@@ -744,6 +772,7 @@ type Product = {
     price: number;
     unit: string;
     category?: string | null;
+    subcategory?: string | null;
     active?: boolean;
 };
 
@@ -840,6 +869,8 @@ const products = ref<Product[]>([]);
 const cartItems = ref<CartItem[]>([]);
 const searchQuery = ref('');
 const activeCategory = ref('ALL');
+const NO_SUBCATEGORY = '__NONE__';
+const activeSubcategory = ref('ALL');
 
 const recentProductIds = ref<string[]>([]);
 
@@ -1048,21 +1079,40 @@ const filteredProducts = computed(() => {
             activeCategory.value === 'ALL' ||
             activeCategory.value === 'RECENT' ||
             product.category === activeCategory.value;
+        const matchesSubcategory =
+            activeSubcategory.value === 'ALL' ||
+            (activeSubcategory.value === NO_SUBCATEGORY
+                ? !product.subcategory
+                : product.subcategory === activeSubcategory.value);
         const matchesQuery =
             !query ||
             product.name.toLowerCase().includes(query) ||
             (product.sku || '').toLowerCase().includes(query) ||
-            (product.category || '').toLowerCase().includes(query);
-        return matchesCategory && matchesQuery;
+            (product.category || '').toLowerCase().includes(query) ||
+            (product.subcategory || '').toLowerCase().includes(query);
+        return matchesCategory && matchesSubcategory && matchesQuery;
     });
 });
 
 const groupedFilteredProducts = computed(() => {
     const groups = new Map<string, Product[]>();
     for (const product of filteredProducts.value) {
-        const key = activeCategory.value === 'RECENT' ? 'Recently Ordered' : (product.category || 'Uncategorized');
+        // With a single category selected, grouping by category is one heading; group by subcategory instead.
+        const key =
+            activeCategory.value === 'RECENT'
+                ? 'Recently Ordered'
+                : isSpecificCategory.value && subcategoryList.value.length > 0
+                  ? (product.subcategory || 'Other')
+                  : (product.category || 'Uncategorized');
         if (!groups.has(key)) groups.set(key, []);
         groups.get(key)!.push(product);
+    }
+    if (isSpecificCategory.value && subcategoryList.value.length > 0) {
+        // Section order follows the subcategory pills ("Other" last).
+        const order = subcategoryList.value.map((sub) => (sub.value === NO_SUBCATEGORY ? 'Other' : sub.value));
+        return new Map(
+            [...groups.entries()].sort(([a], [b]) => order.indexOf(a) - order.indexOf(b))
+        );
     }
     return groups;
 });
@@ -1075,6 +1125,45 @@ const categoryList = computed(() => {
         }
     }
     return Array.from(set).sort();
+});
+
+const isSpecificCategory = computed(
+    () => activeCategory.value !== 'ALL' && activeCategory.value !== 'RECENT'
+);
+
+// Subcategory pills for the selected category; "Other" covers its products without one.
+const subcategoryList = computed(() => {
+    if (!isSpecificCategory.value) return [] as Array<{ value: string; label: string }>;
+    const subs = new Set<string>();
+    let hasUnassigned = false;
+    for (const product of products.value) {
+        if (product.category !== activeCategory.value) continue;
+        if (product.subcategory) subs.add(product.subcategory);
+        else hasUnassigned = true;
+    }
+    if (subs.size === 0) return [];
+    // Configured order from Store Settings first (only those with products), then any unlisted ones.
+    const configured = getSubcategoriesFor(storeContext.currentStore?.subcategoryOptions, activeCategory.value);
+    const ordered = configured.filter((sub) => subs.has(sub));
+    const unlisted = Array.from(subs)
+        .filter((sub) => !configured.includes(sub))
+        .sort((a, b) => a.localeCompare(b));
+    const list = [...ordered, ...unlisted].map((sub) => ({ value: sub, label: sub }));
+    if (hasUnassigned) list.push({ value: NO_SUBCATEGORY, label: 'Other' });
+    return list;
+});
+
+const categoryLabel = (product: Product) =>
+    product.subcategory && product.category ? `${product.category} · ${product.subcategory}` : product.category;
+
+watch(activeCategory, () => {
+    activeSubcategory.value = 'ALL';
+});
+
+watch(subcategoryList, (list) => {
+    if (activeSubcategory.value !== 'ALL' && !list.some((sub) => sub.value === activeSubcategory.value)) {
+        activeSubcategory.value = 'ALL';
+    }
 });
 
 const productsHaveSku = computed(() => products.value.some((p) => !!p.sku));
@@ -1370,7 +1459,7 @@ watch(
 );
 
 watch(
-    () => [searchQuery.value, activeCategory.value, tablePageSize.value, activeViewMode.value],
+    () => [searchQuery.value, activeCategory.value, activeSubcategory.value, tablePageSize.value, activeViewMode.value],
     () => {
         tablePage.value = 1;
         selectedRowIndex.value = -1;
@@ -2217,6 +2306,28 @@ watch(
 
 .category-pill.active {
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.subcategory-filters {
+    align-items: center;
+    margin-top: 0.35rem;
+}
+
+.subcategory-icon {
+    display: inline-flex;
+    color: var(--c-muted);
+    margin-right: 0.1rem;
+}
+
+.subcategory-pill {
+    font-weight: 500;
+}
+
+.subcategory-pill.active {
+    background: var(--c-accent-soft);
+    border-color: var(--c-accent);
+    color: var(--c-accent-dark);
+    font-weight: 600;
 }
 
 .category-pill--all {

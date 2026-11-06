@@ -138,6 +138,70 @@
 
                         <div class="field">
                             <div class="field-header">
+                                <span>Subcategory <em>optional</em></span>
+                                <button
+                                    v-if="canManageCatalog && form.category && !isAddingCategory && !isAddingSubcategory"
+                                    type="button"
+                                    class="field-action-btn"
+                                    @click="startAddSubcategory"
+                                >
+                                    <mdicon name="plus" size="13" />
+                                    <span>Add subcategory</span>
+                                </button>
+                            </div>
+                            <div v-if="isAddingSubcategory" class="inline-create-box">
+                                <div class="inline-create-input-wrap">
+                                    <input
+                                        ref="newSubcategoryInputRef"
+                                        v-model="newSubcategoryName"
+                                        type="text"
+                                        class="inline-create-input"
+                                        maxlength="60"
+                                        :placeholder="`New subcategory in ${form.category}...`"
+                                        :disabled="isSavingSubcategory"
+                                        @keydown.enter.prevent="submitNewSubcategory"
+                                        @keydown.esc.prevent="cancelAddSubcategory"
+                                    />
+                                </div>
+                                <div class="inline-create-actions">
+                                    <button
+                                        type="button"
+                                        class="inline-create-btn inline-create-btn--save"
+                                        :disabled="!newSubcategoryName.trim() || isSavingSubcategory"
+                                        @click="submitNewSubcategory"
+                                    >
+                                        {{ isSavingSubcategory ? 'Adding...' : 'Add' }}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        class="inline-create-btn inline-create-btn--cancel"
+                                        :disabled="isSavingSubcategory"
+                                        @click="cancelAddSubcategory"
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            </div>
+                            <select
+                                v-else
+                                v-model="form.subcategory"
+                                :disabled="!form.category || isAddingCategory || subcategoryOptions.length === 0"
+                            >
+                                <option value="">{{ subcategoryPlaceholder }}</option>
+                                <option v-for="sub in subcategoryOptions" :key="sub" :value="sub">
+                                    {{ sub }}
+                                </option>
+                                <option v-if="isUnlistedSubcategory" :value="form.subcategory">
+                                    {{ form.subcategory }} (not in list)
+                                </option>
+                            </select>
+                            <span v-if="isUnlistedSubcategory" class="field-hint field-hint--warn">
+                                Not in {{ form.category }}'s subcategory list. Pick another, or add it.
+                            </span>
+                        </div>
+
+                        <div class="field">
+                            <div class="field-header">
                                 <span>Unit</span>
                                 <button
                                     v-if="!isAddingUnit"
@@ -523,6 +587,7 @@ import { useStoreContextStore } from '@/stores/storeContext';
 import { useUserContextStore } from '@/stores/userContext';
 import { hasPlanFeature, openPlanUpgradeModal } from '@/utils/planAccess';
 import { DEFAULT_CATEGORY_OPTIONS, DEFAULT_UNIT_OPTIONS } from '@/utils/catalogDefaults';
+import { getSubcategoriesFor, withSubcategories } from '@/utils/subcategories';
 import PlanGate from '@/components/PlanGate.vue';
 import IngredientModal from '@/components/IngredientModal.vue';
 import SearchableSelect from '@/components/SearchableSelect.vue';
@@ -767,9 +832,78 @@ const form = ref({
     cost: 0,
     unit: DEFAULT_UNIT_OPTIONS[0],
     category: DEFAULT_CATEGORY_OPTIONS[0],
+    subcategory: '',
     active: true,
     lowStockThreshold: 0,
 });
+
+// Subcategories come from the store's per-category lists (Store Settings).
+const canManageCatalog = computed(() => ['OWNER', 'ADMIN'].includes(storeContext.currentStore?.role ?? ''));
+const subcategoryOptions = computed(() =>
+    getSubcategoriesFor(storeContext.currentStore?.subcategoryOptions, form.value.category)
+);
+const isUnlistedSubcategory = computed(() => {
+    const sub = form.value.subcategory.trim().toLowerCase();
+    return Boolean(sub) && !subcategoryOptions.value.some((entry) => entry.toLowerCase() === sub);
+});
+const subcategoryPlaceholder = computed(() => {
+    if (!form.value.category) return 'Pick a category first';
+    if (subcategoryOptions.value.length === 0) {
+        return canManageCatalog.value ? 'None yet — add one' : `No subcategories for ${form.value.category}`;
+    }
+    return 'None';
+});
+
+// ── Inline subcategory creation (owners/admins; saved to the store's list) ──
+const isAddingSubcategory = ref(false);
+const newSubcategoryName = ref('');
+const isSavingSubcategory = ref(false);
+const newSubcategoryInputRef = ref<HTMLInputElement | null>(null);
+
+const startAddSubcategory = () => {
+    isAddingSubcategory.value = true;
+    newSubcategoryName.value = '';
+    nextTick(() => newSubcategoryInputRef.value?.focus());
+};
+
+const cancelAddSubcategory = () => {
+    isAddingSubcategory.value = false;
+    newSubcategoryName.value = '';
+};
+
+const submitNewSubcategory = async () => {
+    const value = newSubcategoryName.value.trim();
+    const category = form.value.category;
+    const storeId = storeContext.currentStoreId;
+    if (!value || !category || !storeId) return;
+
+    const existing = subcategoryOptions.value.find((entry) => entry.toLowerCase() === value.toLowerCase());
+    if (existing) {
+        form.value.subcategory = existing;
+        cancelAddSubcategory();
+        showToast(`Subcategory "${existing}" already exists. Selected.`, 'info');
+        return;
+    }
+
+    isSavingSubcategory.value = true;
+    try {
+        await updateStore(storeId, {
+            subcategoryOptions: withSubcategories(
+                storeContext.currentStore?.subcategoryOptions,
+                category,
+                [...subcategoryOptions.value, value]
+            ),
+        });
+        await storeContext.fetchStores();
+        form.value.subcategory = value;
+        showToast(`Subcategory "${value}" added to ${category}.`, 'success');
+        cancelAddSubcategory();
+    } catch (error: any) {
+        showToast(error?.body?.error?.message || 'Unable to add subcategory.', 'error');
+    } finally {
+        isSavingSubcategory.value = false;
+    }
+};
 
 const storeUnitOptions = computed(() => {
     const storeOptions = storeContext.currentStore?.unitOptions ?? [];
@@ -826,6 +960,13 @@ const cancelAddCategory = () => {
 const onCategorySelectChange = () => {
     if (form.value.category === '__ADD_NEW_CATEGORY__') {
         startAddCategory();
+        return;
+    }
+    // A subcategory belongs to its category; drop it if the new one doesn't list it.
+    cancelAddSubcategory();
+    const sub = form.value.subcategory.trim().toLowerCase();
+    if (sub && !subcategoryOptions.value.some((item) => item.toLowerCase() === sub)) {
+        form.value.subcategory = '';
     }
 };
 
@@ -977,6 +1118,7 @@ const loadProduct = async () => {
         cost: data.product.cost ? Number(data.product.cost) : 0,
         unit: data.product.unit,
         category: data.product.category ?? '',
+        subcategory: data.product.subcategory ?? '',
         active: data.product.active ?? true,
         lowStockThreshold: data.product.lowStockThreshold ? Number(data.product.lowStockThreshold) : 0,
     };
@@ -1306,6 +1448,7 @@ const save = async () => {
         sku: form.value.sku || null,
         barcode: form.value.barcode || null,
         category: form.value.category || null,
+        subcategory: (form.value.category && form.value.subcategory.trim()) || null,
         cost: normalizeOptionalNumber(form.value.cost),
         lowStockThreshold: normalizeOptionalNumber(form.value.lowStockThreshold),
         recipeLines: recipePayload,
@@ -1733,6 +1876,21 @@ watch(
 }
 
 .field input::placeholder { color: #94a3b8; }
+
+.field-hint {
+    font-size: 0.75rem;
+    color: #64748b;
+}
+
+.field-hint--warn {
+    color: #b45309;
+}
+
+.field select:disabled,
+.field input:disabled {
+    background: #f8fafc;
+    cursor: not-allowed;
+}
 
 .field input:focus,
 .field select:focus {
