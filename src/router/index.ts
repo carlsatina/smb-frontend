@@ -42,6 +42,7 @@ import ForgotPassword from '@/views/LandingPage/ForgotPassword.vue'
 import ResetPassword from '@/views/LandingPage/ResetPassword.vue'
 import VerifyEmail from '@/views/LandingPage/VerifyEmail.vue'
 import AccountProfile from '@/views/Account/AccountProfile.vue'
+import HelpCenter from '@/views/Help/HelpCenter.vue'
 
 
 const routes: Array<RouteRecordRaw> = [
@@ -212,6 +213,12 @@ const routes: Array<RouteRecordRaw> = [
     path: '/account/profile',
     name: 'account-profile',
     component: AccountProfile,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/help/:articleId?',
+    name: 'help',
+    component: HelpCenter,
     meta: { requiresAuth: true }
   },
   {

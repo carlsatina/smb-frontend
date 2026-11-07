@@ -143,6 +143,17 @@
                                 <span class="topnav__pd-item-label">My Profile</span>
                             </RouterLink>
 
+                            <RouterLink
+                                to="/help"
+                                class="topnav__pd-item"
+                                @click="closeProfile"
+                            >
+                                <span class="topnav__pd-item-icon">
+                                    <mdicon name="help-circle-outline" size="16" />
+                                </span>
+                                <span class="topnav__pd-item-label">Help &amp; Support</span>
+                            </RouterLink>
+
                             <div class="topnav__pd-divider"></div>
 
                             <button
@@ -207,6 +218,9 @@
                     <p class="topnav__mobile-label">Account</p>
                     <RouterLink to="/account/profile" class="topnav__mobile-item" @click="closeMobileMenu">
                         <mdicon name="account-circle-outline" size="20" /><span>My Profile</span>
+                    </RouterLink>
+                    <RouterLink to="/help" class="topnav__mobile-item" @click="closeMobileMenu">
+                        <mdicon name="help-circle-outline" size="20" /><span>Help &amp; Support</span>
                     </RouterLink>
                     <button type="button" class="topnav__mobile-item topnav__mobile-item--danger" @click="() => { closeMobileMenu(); handleLogout(); }">
                         <mdicon name="logout" size="20" /><span>Sign out</span>
