@@ -31,14 +31,45 @@ export type BillingLine = {
     storeId: string;
     storeName: string;
     storeType: string;
-    position: number;
+    // null for a free (complimentary) store
+    position: number | null;
     fee: number;
+    exempt?: boolean;
+};
+
+export type BillingDiscountType = 'PERCENT' | 'FIXED';
+
+export type OwnerDiscount = {
+    type: BillingDiscountType;
+    value: number;
+    // Start of the first billing month it no longer applies to; null = no end.
+    endsAt: string | null;
+    note: string | null;
+};
+
+export type StoreBillingSettings = {
+    id: string;
+    name: string;
+    storeType: string;
+    billingExempt: boolean;
+    billingExemptEndsAt: string | null;
+    billingExemptNote: string | null;
+};
+
+export type BillingOwnerProfile = {
+    id: string;
+    email: string;
+    fullName: string | null;
+    discount: OwnerDiscount | null;
 };
 
 export type BillingStatement = {
     id: string;
     storeCount: number;
     lines: BillingLine[];
+    subtotal: number;
+    discountAmount: number;
+    discountNote: string | null;
     amount: number;
     sentAt: string | null;
     sentToEmail: string | null;
@@ -49,9 +80,13 @@ export type BillingStatement = {
 };
 
 export type BillingOwner = {
-    owner: { id: string; email: string; fullName: string | null };
+    owner: BillingOwnerProfile;
     lines: BillingLine[];
+    subtotal: number;
+    discountAmount: number;
+    discountNote: string | null;
     amount: number;
+    stores: StoreBillingSettings[];
     statement: BillingStatement | null;
 };
 
@@ -92,6 +127,7 @@ export type PlatformStats = {
         year: number;
         billableOwners: number;
         billableStores: number;
+        freeStores: number;
         expectedRevenue: number;
         collectedRevenue: number;
         paidOwners: number;
@@ -151,3 +187,41 @@ export const getBillingHistory = (month?: number, year?: number) => {
         `/api/v1/admin/billing/history${qs ? `?${qs}` : ''}`
     );
 };
+
+// "Through" month: the setting applies up to and including that billing month.
+export type ThroughMonth = { throughYear: number; throughMonth: number } | null;
+
+export const setOwnerDiscount = (
+    ownerId: string,
+    discount: { type: BillingDiscountType; value: number; note: string | null; through: ThroughMonth } | null
+) =>
+    apiClient.request<{ owner: BillingOwnerProfile }>(`/api/v1/admin/billing/owners/${ownerId}/discount`, {
+        method: 'PATCH',
+        body: {
+            discount: discount
+                ? {
+                      type: discount.type,
+                      value: discount.value,
+                      note: discount.note,
+                      throughYear: discount.through?.throughYear ?? null,
+                      throughMonth: discount.through?.throughMonth ?? null,
+                  }
+                : null,
+        },
+    });
+
+export const setStoreExemption = (
+    storeId: string,
+    exemption: { note: string | null; through: ThroughMonth } | null
+) =>
+    apiClient.request<{ store: StoreBillingSettings }>(`/api/v1/admin/billing/stores/${storeId}/exemption`, {
+        method: 'PATCH',
+        body: exemption
+            ? {
+                  exempt: true,
+                  note: exemption.note,
+                  throughYear: exemption.through?.throughYear ?? null,
+                  throughMonth: exemption.through?.throughMonth ?? null,
+              }
+            : { exempt: false },
+    });

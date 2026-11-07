@@ -50,6 +50,10 @@
                             <span class="adash-stat-label">Billable stores</span>
                             <span class="adash-stat-value">{{ stats.billing.billableStores }}</span>
                         </div>
+                        <div v-if="stats.billing.freeStores > 0" class="adash-stat-row">
+                            <span class="adash-stat-label">Free stores</span>
+                            <span class="adash-stat-value">{{ stats.billing.freeStores }}</span>
+                        </div>
                         <div class="adash-stat-row">
                             <span class="adash-stat-label">Outstanding</span>
                             <span class="adash-stat-value" :class="{ 'adash-stat-value--warn': outstanding > 0 }">
@@ -74,7 +78,7 @@
                         </div>
                     </div>
                     <p class="adash-note">
-                        Each owner's stores are ranked oldest first. Warehouses count as stores. All features are included.
+                        Each owner's stores are ranked oldest first. Warehouses count as stores; free stores don't take a slot. Owner discounts apply to the total. All features are included.
                     </p>
                 </div>
             </div>

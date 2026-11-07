@@ -88,23 +88,39 @@
                             <td>
                                 <div class="ab-owner-email">{{ row.owner.email }}</div>
                                 <div v-if="row.owner.fullName" class="ab-muted">{{ row.owner.fullName }}</div>
+                                <span
+                                    v-if="row.owner.discount"
+                                    class="ab-discount-tag"
+                                    :class="{ 'ab-discount-tag--inactive': !discountAppliesThisMonth(row) }"
+                                    :title="row.owner.discount.note ?? ''"
+                                >
+                                    {{ discountLabel(row.owner.discount) }}<template v-if="row.owner.discount.endsAt"> · through {{ throughLabel(row.owner.discount.endsAt) }}</template>
+                                </span>
                             </td>
                             <td>
                                 <ol class="ab-lines">
-                                    <li v-for="line in displayLines(row)" :key="line.storeId" class="ab-line">
+                                    <li v-for="line in displayLines(row)" :key="line.storeId" class="ab-line" :class="{ 'ab-line--free': line.exempt }">
                                         <span class="ab-line-name">
+                                            <span class="ab-line-pos">{{ line.position ? `${line.position}.` : '–' }}</span>
                                             {{ line.storeName }}
                                             <span v-if="line.storeType === 'WAREHOUSE'" class="ab-line-tag">Warehouse</span>
                                         </span>
-                                        <span class="ab-line-fee">{{ formatPeso(line.fee) }}</span>
+                                        <span v-if="line.exempt" class="ab-line-free">Free</span>
+                                        <span v-else class="ab-line-fee">{{ formatPeso(line.fee) }}</span>
                                     </li>
                                     <li v-if="displayLines(row).length === 0" class="ab-muted">No stores this month</li>
                                 </ol>
                             </td>
                             <td class="ab-td-num">
+                                <div v-if="display(row).discountAmount > 0" class="ab-subtotal">
+                                    {{ formatPeso(display(row).subtotal) }}
+                                </div>
                                 <span class="ab-num" :class="displayAmount(row) > 0 ? 'ab-num--active' : 'ab-num--zero'">
                                     {{ formatPeso(displayAmount(row)) }}
                                 </span>
+                                <div v-if="display(row).discountAmount > 0" class="ab-discount-line">
+                                    −{{ formatPeso(display(row).discountAmount) }} discount
+                                </div>
                                 <div v-if="hasChangedSinceSent(row)" class="ab-changed" :title="`Sent as ${formatPeso(row.statement!.amount)}`">
                                     Changed since sent
                                 </div>
@@ -125,8 +141,15 @@
                             <td class="ab-td-action">
                                 <div class="ab-actions">
                                     <button
+                                        class="ab-btn ab-btn--plain"
+                                        :disabled="busyOwnerId === row.owner.id"
+                                        @click="openAdjust(row)"
+                                    >
+                                        Adjust
+                                    </button>
+                                    <button
                                         class="ab-btn ab-btn--ghost"
-                                        :disabled="displayLines(row).length === 0 || busyOwnerId === row.owner.id"
+                                        :disabled="displayAmount(row) <= 0 || busyOwnerId === row.owner.id"
                                         @click="openSendConfirm(row)"
                                     >
                                         {{ row.statement?.sentAt ? 'Resend' : 'Send bill' }}
@@ -134,7 +157,7 @@
                                     <button
                                         v-if="!row.statement?.paidAt"
                                         class="ab-btn"
-                                        :disabled="displayLines(row).length === 0 || busyOwnerId === row.owner.id"
+                                        :disabled="displayAmount(row) <= 0 || busyOwnerId === row.owner.id"
                                         @click="openPaidConfirm(row)"
                                     >
                                         Mark paid
@@ -222,8 +245,12 @@
 
                 <div class="ab-modal-summary">
                     <div v-for="line in displayLines(confirm.row)" :key="line.storeId" class="ab-summary-row">
-                        <span class="ab-summary-label">{{ line.position }}. {{ line.storeName }}</span>
-                        <span class="ab-summary-value">{{ formatPeso(line.fee) }}</span>
+                        <span class="ab-summary-label">{{ line.position ? `${line.position}. ` : '' }}{{ line.storeName }}</span>
+                        <span class="ab-summary-value">{{ line.exempt ? 'Free' : formatPeso(line.fee) }}</span>
+                    </div>
+                    <div v-if="display(confirm.row).discountAmount > 0" class="ab-summary-row">
+                        <span class="ab-summary-label">Discount<template v-if="display(confirm.row).discountNote"> — {{ display(confirm.row).discountNote }}</template></span>
+                        <span class="ab-summary-value">−{{ formatPeso(display(confirm.row).discountAmount) }}</span>
                     </div>
                     <div class="ab-summary-row ab-summary-row--total">
                         <span class="ab-summary-label">Total due</span>
@@ -252,6 +279,84 @@
                 </div>
             </div>
         </div>
+
+        <!-- Adjust (discount + free stores) modal -->
+        <div v-if="adjust.row" class="ab-modal-backdrop" @click.self="closeAdjust">
+            <div class="ab-modal ab-modal--wide">
+                <h2 class="ab-modal-title">Billing adjustments</h2>
+                <p class="ab-modal-sub">
+                    For <strong>{{ adjust.row.owner.email }}</strong>. Changes apply to unpaid months, including {{ monthLabel }}.
+                </p>
+
+                <section class="ab-adjust-section">
+                    <h3 class="ab-adjust-heading">Discount</h3>
+                    <div class="ab-segment" role="group" aria-label="Discount type">
+                        <button
+                            v-for="option in discountOptions"
+                            :key="option.value"
+                            class="ab-segment-btn"
+                            :class="{ 'ab-segment-btn--active': adjust.discountType === option.value }"
+                            @click="adjust.discountType = option.value"
+                        >
+                            {{ option.label }}
+                        </button>
+                    </div>
+                    <div v-if="adjust.discountType !== 'NONE'" class="ab-adjust-grid">
+                        <label class="ab-field">
+                            <span class="ab-field-label">{{ adjust.discountType === 'PERCENT' ? 'Percent off' : 'Amount off (₱)' }}</span>
+                            <input
+                                v-model.number="adjust.discountValue"
+                                class="ab-input"
+                                type="number"
+                                min="0"
+                                :max="adjust.discountType === 'PERCENT' ? 100 : undefined"
+                                step="0.01"
+                            />
+                        </label>
+                        <label class="ab-field">
+                            <span class="ab-field-label">Applies through</span>
+                            <input v-model="adjust.discountThrough" class="ab-input" type="month" />
+                            <span class="ab-field-hint">Leave empty for no end date.</span>
+                        </label>
+                        <label class="ab-field ab-field--full">
+                            <span class="ab-field-label">Note (optional)</span>
+                            <input v-model="adjust.discountNote" class="ab-input" type="text" maxlength="200" placeholder="e.g. Launch promo" />
+                        </label>
+                    </div>
+                    <p v-if="discountError" class="ab-field-error">{{ discountError }}</p>
+                </section>
+
+                <section class="ab-adjust-section">
+                    <h3 class="ab-adjust-heading">Free stores</h3>
+                    <p class="ab-field-hint">A free store is billed ₱0 and doesn't take a price slot, so the owner's other stores are priced without it.</p>
+                    <div v-if="adjust.stores.length === 0" class="ab-muted">This owner has no stores in {{ monthLabel }}.</div>
+                    <div v-for="store in adjust.stores" :key="store.id" class="ab-free-row">
+                        <label class="ab-check">
+                            <input v-model="store.exempt" type="checkbox" />
+                            <span>{{ store.name }}</span>
+                            <span v-if="store.storeType === 'WAREHOUSE'" class="ab-line-tag">Warehouse</span>
+                        </label>
+                        <div v-if="store.exempt" class="ab-free-fields">
+                            <label class="ab-free-field">
+                                <span class="ab-field-hint">Free through (empty = no end)</span>
+                                <input v-model="store.through" class="ab-input ab-input--sm" type="month" />
+                            </label>
+                            <label class="ab-free-field">
+                                <span class="ab-field-hint">Note (optional)</span>
+                                <input v-model="store.note" class="ab-input ab-input--sm" type="text" maxlength="200" placeholder="e.g. Pilot store" />
+                            </label>
+                        </div>
+                    </div>
+                </section>
+
+                <div class="ab-modal-footer">
+                    <button class="ab-btn ab-btn--ghost" :disabled="adjust.saving" @click="closeAdjust">Cancel</button>
+                    <button class="ab-btn" :disabled="adjust.saving || Boolean(discountError)" @click="saveAdjust">
+                        {{ adjust.saving ? 'Saving…' : 'Save adjustments' }}
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 </template>
 
@@ -262,10 +367,15 @@ import {
     getBillingOwners,
     sendBillingNotice,
     setBillingPayment,
+    setOwnerDiscount,
+    setStoreExemption,
+    type BillingDiscountType,
     type BillingHistoryEntry,
     type BillingLine,
     type BillingOwner,
     type BillingPricing,
+    type OwnerDiscount,
+    type ThroughMonth,
 } from '@/api/admin';
 import { useToast } from '@/composables/useToast';
 
@@ -332,14 +442,13 @@ const pricingText = computed(() => {
 });
 
 // A paid statement is frozen at what was paid; otherwise show live pricing.
-const displayLines = (row: BillingOwner): BillingLine[] =>
-    row.statement?.paidAt ? row.statement.lines : row.lines;
-const displayAmount = (row: BillingOwner) =>
-    row.statement?.paidAt ? row.statement.amount : row.amount;
+const display = (row: BillingOwner) => (row.statement?.paidAt ? row.statement : row);
+const displayLines = (row: BillingOwner): BillingLine[] => display(row).lines;
+const displayAmount = (row: BillingOwner) => display(row).amount;
 const hasChangedSinceSent = (row: BillingOwner) =>
     Boolean(row.statement?.sentAt && !row.statement.paidAt && row.statement.amount !== row.amount);
 
-const billableOwners = computed(() => owners.value.filter((row) => displayLines(row).length > 0));
+const billableOwners = computed(() => owners.value.filter((row) => displayAmount(row) > 0));
 const totalDue = computed(() => billableOwners.value.reduce((acc, row) => acc + displayAmount(row), 0));
 const totalCollected = computed(() =>
     billableOwners.value.filter((row) => row.statement?.paidAt).reduce((acc, row) => acc + displayAmount(row), 0)
@@ -350,7 +459,7 @@ const visibleOwners = computed(() => {
     return owners.value.filter((row) => {
         const paid = Boolean(row.statement?.paidAt);
         if (statusFilter.value === 'paid' && !paid) return false;
-        if (statusFilter.value === 'unpaid' && (paid || displayLines(row).length === 0)) return false;
+        if (statusFilter.value === 'unpaid' && (paid || displayAmount(row) <= 0)) return false;
         if (!q) return true;
         return (
             row.owner.email.toLowerCase().includes(q) ||
@@ -413,13 +522,13 @@ const loadHistory = async () => {
 };
 
 const openSendConfirm = (row: BillingOwner) => {
-    if (displayLines(row).length === 0) return;
+    if (displayAmount(row) <= 0) return;
     confirm.row = row;
     confirm.mode = 'send';
 };
 
 const openPaidConfirm = (row: BillingOwner) => {
-    if (displayLines(row).length === 0) return;
+    if (displayAmount(row) <= 0) return;
     confirm.row = row;
     confirm.mode = 'paid';
     confirm.note = '';
@@ -472,6 +581,152 @@ const markUnpaid = async (row: BillingOwner) => {
         showToast(errorMessage(e, 'Failed to update payment.'), 'error');
     } finally {
         busyOwnerId.value = null;
+    }
+};
+
+// ── Discounts & free stores ──────────────────────────────────
+// The API stores an end as the start of the first month it no longer covers;
+// the UI talks in "through <month>" (an <input type="month"> value, YYYY-MM).
+const manilaYearMonth = (date: Date) => {
+    const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit' })
+        .formatToParts(date);
+    return `${parts.find((p) => p.type === 'year')?.value}-${parts.find((p) => p.type === 'month')?.value}`;
+};
+const throughValue = (endsAt: string | null) =>
+    endsAt ? manilaYearMonth(new Date(new Date(endsAt).getTime() - 1)) : '';
+const throughLabel = (endsAt: string) => {
+    const [y, m] = throughValue(endsAt).split('-').map(Number);
+    return `${MONTH_NAMES[m - 1].slice(0, 3)} ${y}`;
+};
+const toThrough = (value: string): ThroughMonth => {
+    if (!value) return null;
+    const [y, m] = value.split('-').map(Number);
+    return y && m ? { throughYear: y, throughMonth: m } : null;
+};
+
+const discountLabel = (discount: OwnerDiscount) =>
+    discount.type === 'PERCENT' ? `${discount.value}% off` : `${formatPeso(discount.value)} off`;
+
+const selectedMonthKey = computed(() => `${selectedYear.value}-${String(selectedMonth.value).padStart(2, '0')}`);
+const discountAppliesThisMonth = (row: BillingOwner) => {
+    const endsAt = row.owner.discount?.endsAt ?? null;
+    return !endsAt || throughValue(endsAt) >= selectedMonthKey.value;
+};
+
+type DiscountChoice = BillingDiscountType | 'NONE';
+const discountOptions: { value: DiscountChoice; label: string }[] = [
+    { value: 'NONE', label: 'None' },
+    { value: 'PERCENT', label: 'Percent' },
+    { value: 'FIXED', label: 'Fixed ₱' },
+];
+
+type StoreDraft = { id: string; name: string; storeType: string; exempt: boolean; through: string; note: string; original: string };
+const storeKey = (exempt: boolean, through: string, note: string) => JSON.stringify([exempt, exempt ? through : '', exempt ? note.trim() : '']);
+
+const adjust = reactive<{
+    row: BillingOwner | null;
+    discountType: DiscountChoice;
+    discountValue: number | null;
+    discountThrough: string;
+    discountNote: string;
+    discountOriginal: string;
+    stores: StoreDraft[];
+    saving: boolean;
+}>({
+    row: null,
+    discountType: 'NONE',
+    discountValue: null,
+    discountThrough: '',
+    discountNote: '',
+    discountOriginal: '',
+    stores: [],
+    saving: false,
+});
+
+const discountKey = () =>
+    adjust.discountType === 'NONE'
+        ? 'NONE'
+        : JSON.stringify([adjust.discountType, Number(adjust.discountValue), adjust.discountThrough, adjust.discountNote.trim()]);
+
+const discountError = computed(() => {
+    if (!adjust.row || adjust.discountType === 'NONE') return '';
+    const value = Number(adjust.discountValue);
+    if (!Number.isFinite(value) || value <= 0) return 'Enter a discount greater than zero.';
+    if (adjust.discountType === 'PERCENT' && value > 100) return 'A percentage discount cannot exceed 100.';
+    return '';
+});
+
+const openAdjust = (row: BillingOwner) => {
+    const discount = row.owner.discount;
+    adjust.row = row;
+    adjust.discountType = discount?.type ?? 'NONE';
+    adjust.discountValue = discount?.value ?? null;
+    adjust.discountThrough = throughValue(discount?.endsAt ?? null);
+    adjust.discountNote = discount?.note ?? '';
+    adjust.discountOriginal = discountKey();
+    adjust.stores = row.stores.map((store) => {
+        const through = throughValue(store.billingExemptEndsAt);
+        const note = store.billingExemptNote ?? '';
+        return {
+            id: store.id,
+            name: store.name,
+            storeType: store.storeType,
+            exempt: store.billingExempt,
+            through,
+            note,
+            original: storeKey(store.billingExempt, through, note),
+        };
+    });
+    adjust.saving = false;
+};
+
+const closeAdjust = () => {
+    if (adjust.saving) return;
+    adjust.row = null;
+};
+
+const saveAdjust = async () => {
+    const row = adjust.row;
+    if (!row || discountError.value) return;
+    adjust.saving = true;
+    try {
+        const calls: Promise<unknown>[] = [];
+        if (discountKey() !== adjust.discountOriginal) {
+            calls.push(
+                setOwnerDiscount(
+                    row.owner.id,
+                    adjust.discountType === 'NONE'
+                        ? null
+                        : {
+                              type: adjust.discountType,
+                              value: Number(adjust.discountValue),
+                              note: adjust.discountNote.trim() || null,
+                              through: toThrough(adjust.discountThrough),
+                          }
+                )
+            );
+        }
+        for (const store of adjust.stores) {
+            if (storeKey(store.exempt, store.through, store.note) === store.original) continue;
+            calls.push(
+                setStoreExemption(
+                    store.id,
+                    store.exempt ? { note: store.note.trim() || null, through: toThrough(store.through) } : null
+                )
+            );
+        }
+        if (calls.length === 0) {
+            adjust.row = null;
+            return;
+        }
+        await Promise.all(calls);
+        showToast(`Billing adjustments saved for ${row.owner.email}.`, 'success');
+        adjust.row = null;
+        await loadOwners();
+    } catch (e) {
+        showToast(errorMessage(e, 'Failed to save adjustments.'), 'error');
+    } finally {
+        adjust.saving = false;
     }
 };
 
@@ -646,9 +901,31 @@ onMounted(loadOwners);
 .ab-segment-btn { border: none; background: transparent; border-radius: 6px; padding: 0.3rem 0.7rem; font-size: 0.78rem; font-weight: 600; color: #64748b; cursor: pointer; }
 .ab-segment-btn--active { background: #fff; color: #0f172a; box-shadow: 0 1px 2px rgba(15,23,42,0.08); }
 .ab-lines { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.2rem; min-width: 200px; }
-.ab-line { display: flex; justify-content: space-between; gap: 0.75rem; font-size: 0.8rem; color: #334155; counter-increment: line; }
-.ab-line-name::before { content: counter(line) ". "; color: #94a3b8; }
-.ab-lines { counter-reset: line; }
+.ab-line { display: flex; justify-content: space-between; gap: 0.75rem; font-size: 0.8rem; color: #334155; }
+.ab-line--free { color: #64748b; }
+.ab-line-pos { color: #94a3b8; display: inline-block; min-width: 1rem; }
+.ab-line-free { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #047857; background: #ecfdf5; border-radius: 4px; padding: 0.05rem 0.35rem; align-self: center; }
+.ab-subtotal { font-size: 0.72rem; color: #94a3b8; text-decoration: line-through; }
+.ab-discount-line { font-size: 0.68rem; color: #047857; margin-top: 0.1rem; white-space: nowrap; }
+.ab-discount-tag { display: inline-block; margin-top: 0.3rem; font-size: 0.65rem; font-weight: 700; color: #047857; background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 999px; padding: 0.08rem 0.5rem; }
+.ab-discount-tag--inactive { color: #64748b; background: #f8fafc; border-color: #e2e8f0; text-decoration: line-through; }
+.ab-btn--plain { background: transparent; color: #475569; border: 1px solid #e2e8f0; }
+.ab-btn--plain:hover:not(:disabled) { background: #f1f5f9; }
+.ab-modal--wide { max-width: 560px; max-height: calc(100vh - 2rem); overflow-y: auto; }
+.ab-adjust-section { border-top: 1px solid #eef2f7; padding-top: 0.9rem; margin-top: 0.9rem; display: flex; flex-direction: column; gap: 0.6rem; align-items: flex-start; }
+.ab-adjust-heading { margin: 0; font-size: 0.85rem; font-weight: 700; color: #0f172a; }
+.ab-adjust-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 0.75rem; width: 100%; }
+.ab-adjust-grid .ab-field { margin-top: 0.25rem; }
+.ab-field--full { grid-column: 1 / -1; }
+.ab-field-hint { font-size: 0.72rem; color: #94a3b8; margin: 0; }
+.ab-field-error { font-size: 0.75rem; color: #b91c1c; margin: 0; }
+.ab-free-row { display: flex; flex-direction: column; gap: 0.4rem; width: 100%; padding: 0.4rem 0; border-bottom: 1px solid #f1f5f9; }
+.ab-free-row:last-child { border-bottom: none; }
+.ab-check { display: inline-flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: #0f172a; cursor: pointer; }
+.ab-check input { width: 16px; height: 16px; accent-color: #0d9488; }
+.ab-free-fields { display: flex; gap: 0.5rem; padding-left: 1.5rem; flex-wrap: wrap; }
+.ab-free-field { display: flex; flex-direction: column; gap: 0.2rem; flex: 1; min-width: 160px; }
+.ab-input--sm { padding: 0.4rem 0.6rem; font-size: 0.8rem; }
 .ab-line-fee { font-variant-numeric: tabular-nums; color: #64748b; white-space: nowrap; }
 .ab-line-tag { font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #7c3aed; background: #f5f3ff; border-radius: 4px; padding: 0.05rem 0.3rem; margin-left: 0.25rem; }
 .ab-changed { font-size: 0.68rem; color: #b45309; margin-top: 0.15rem; }
@@ -667,6 +944,7 @@ onMounted(loadOwners);
 
 @media (max-width: 640px) {
     .ab-search { max-width: none; min-width: 0; width: 100%; }
+    .ab-adjust-grid { grid-template-columns: 1fr; }
 }
 </style>
 
