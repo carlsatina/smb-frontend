@@ -50,6 +50,10 @@
                             <span class="adash-stat-label">Billable stores</span>
                             <span class="adash-stat-value">{{ stats.billing.billableStores }}</span>
                         </div>
+                        <div v-if="stats.billing.suspendedOwners > 0" class="adash-stat-row">
+                            <span class="adash-stat-label">Read-only (non-payment)</span>
+                            <span class="adash-stat-value adash-stat-value--warn">{{ stats.billing.suspendedOwners }}</span>
+                        </div>
                         <div v-if="stats.billing.freeStores > 0" class="adash-stat-row">
                             <span class="adash-stat-label">Free stores</span>
                             <span class="adash-stat-value">{{ stats.billing.freeStores }}</span>

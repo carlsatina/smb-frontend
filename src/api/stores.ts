@@ -28,6 +28,8 @@ export const listStores = () => {
             aiApiKeyLast4: string | null;
             role: string;
             permissions: string[];
+            billingSuspended: boolean;
+            billingOverdue: { year: number; month: number; amount: number }[];
         }>;
     }>('/api/v1/stores');
 };

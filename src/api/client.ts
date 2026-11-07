@@ -105,6 +105,12 @@ const refreshSession = async (admin: boolean) => {
 // they can no longer use. Announced once here so the app can move them off the
 // store rather than showing them a wall of failed requests.
 const maybeDispatchStoreSuspended = (errorBody: any) => {
+    // The store went read-only for non-payment: refresh store state so the
+    // app can show the billing banner. The refused action shows its own error.
+    if (typeof window !== 'undefined' && errorBody?.error?.code === 'BILLING_SUSPENDED') {
+        window.dispatchEvent(new CustomEvent('store:billing-suspended'));
+        return;
+    }
     if (typeof window !== 'undefined' && errorBody?.error?.code === 'MEMBER_SUSPENDED') {
         window.dispatchEvent(
             new CustomEvent('store:suspended', {

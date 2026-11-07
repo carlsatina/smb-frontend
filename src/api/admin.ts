@@ -61,7 +61,11 @@ export type BillingOwnerProfile = {
     email: string;
     fullName: string | null;
     discount: OwnerDiscount | null;
+    // Read-only lock for non-payment.
+    suspension: { suspendedAt: string; reason: string | null } | null;
 };
+
+export type OverdueMonth = { year: number; month: number; amount: number };
 
 export type BillingStatement = {
     id: string;
@@ -88,6 +92,10 @@ export type BillingOwner = {
     amount: number;
     stores: StoreBillingSettings[];
     statement: BillingStatement | null;
+    // This month's bill was sent, the month has ended, and it's unpaid.
+    overdue: boolean;
+    // Every overdue month for this owner.
+    overdueMonths: OverdueMonth[];
 };
 
 export type BillingHistoryEntry = BillingStatement & {
@@ -131,6 +139,7 @@ export type PlatformStats = {
         expectedRevenue: number;
         collectedRevenue: number;
         paidOwners: number;
+        suspendedOwners: number;
         pricing: BillingPricing;
     };
 };
@@ -171,7 +180,7 @@ export const setBillingPayment = (
     paid: boolean,
     note?: string | null
 ) =>
-    apiClient.request<{ statement: BillingStatement | null }>(`/api/v1/admin/billing/${ownerId}/payment`, {
+    apiClient.request<{ statement: BillingStatement | null; reinstated?: boolean }>(`/api/v1/admin/billing/${ownerId}/payment`, {
         method: 'PATCH',
         body: { month, year, paid, note: note ?? null },
     });
@@ -224,4 +233,10 @@ export const setStoreExemption = (
                   throughMonth: exemption.through?.throughMonth ?? null,
               }
             : { exempt: false },
+    });
+
+export const setOwnerSuspension = (ownerId: string, suspended: boolean, reason?: string | null) =>
+    apiClient.request<{ owner: BillingOwnerProfile }>(`/api/v1/admin/billing/owners/${ownerId}/suspension`, {
+        method: 'PATCH',
+        body: { suspended, reason: reason ?? null },
     });

@@ -1,5 +1,6 @@
 <template>
     <TopNav v-if="showTopNav" />
+    <BillingBanner v-if="showTopNav" />
     <ToastHost />
     <OfflineOverlay />
     <router-view />
@@ -10,6 +11,7 @@ import { computed, onBeforeUnmount, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import TopNav from '@/components/Navigation/TopNav.vue';
 import ToastHost from '@/components/ToastHost.vue';
+import BillingBanner from '@/components/BillingBanner.vue';
 import OfflineOverlay from '@/components/OfflineOverlay.vue';
 import { useUserContextStore } from '@/stores/userContext';
 import { useStoreContextStore } from '@/stores/storeContext';
@@ -51,6 +53,12 @@ const handleStoreSuspended = (event: Event) => {
     }
 };
 
+// A write was refused because the account went read-only for non-payment:
+// refresh stores so the billing banner reflects it.
+const handleBillingSuspended = () => {
+    storeContext.fetchStores();
+};
+
 // Keep the member's permissions current when the owner changes them mid-session:
 // refresh after a refused request and when the window regains focus (throttled).
 let lastPermissionRefresh = 0;
@@ -69,6 +77,7 @@ onMounted(() => {
     window.addEventListener('auth:logout', handleAuthLogout);
     window.addEventListener('auth:login', handleAuthLogin);
     window.addEventListener('store:suspended', handleStoreSuspended);
+    window.addEventListener('store:billing-suspended', handleBillingSuspended);
     window.addEventListener('permissions:stale', refreshPermissions);
     window.addEventListener('focus', refreshPermissions);
 });
@@ -77,6 +86,7 @@ onBeforeUnmount(() => {
     window.removeEventListener('auth:logout', handleAuthLogout);
     window.removeEventListener('auth:login', handleAuthLogin);
     window.removeEventListener('store:suspended', handleStoreSuspended);
+    window.removeEventListener('store:billing-suspended', handleBillingSuspended);
     window.removeEventListener('permissions:stale', refreshPermissions);
     window.removeEventListener('focus', refreshPermissions);
 });

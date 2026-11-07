@@ -27,6 +27,10 @@ export type StoreSummary = {
     aiApiKeyLast4: string | null;
     role: string;
     permissions: string[];
+    // The account is read-only for non-payment (applies to every member).
+    billingSuspended: boolean;
+    // Sent, unpaid bills for months that have ended (owners/admins only).
+    billingOverdue: { year: number; month: number; amount: number }[];
 };
 
 export const useStoreContextStore = defineStore('storeContext', {

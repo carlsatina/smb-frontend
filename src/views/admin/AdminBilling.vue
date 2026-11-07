@@ -88,6 +88,12 @@
                             <td>
                                 <div class="ab-owner-email">{{ row.owner.email }}</div>
                                 <div v-if="row.owner.fullName" class="ab-muted">{{ row.owner.fullName }}</div>
+                                <span v-if="row.owner.suspension" class="ab-suspended-tag" :title="row.owner.suspension.reason ?? ''">
+                                    Read-only since {{ formatDate(row.owner.suspension.suspendedAt) }}
+                                </span>
+                                <span v-else-if="row.overdueMonths.length > 0" class="ab-overdue-tag">
+                                    {{ row.overdueMonths.length }} overdue · {{ formatPeso(overdueTotal(row)) }}
+                                </span>
                                 <span
                                     v-if="row.owner.discount"
                                     class="ab-discount-tag"
@@ -128,6 +134,7 @@
                             <td>
                                 <div class="ab-status">
                                     <span v-if="row.statement?.paidAt" class="ab-pill ab-pill--paid">Paid</span>
+                                    <span v-else-if="row.overdue" class="ab-pill ab-pill--overdue">Overdue</span>
                                     <span v-else-if="row.statement?.sentAt" class="ab-pill ab-pill--sent">Sent</span>
                                     <span v-else class="ab-pill ab-pill--draft">Not sent</span>
                                     <span v-if="row.statement?.paidAt" class="ab-muted">
@@ -169,6 +176,22 @@
                                         @click="markUnpaid(row)"
                                     >
                                         Mark unpaid
+                                    </button>
+                                    <button
+                                        v-if="row.owner.suspension"
+                                        class="ab-btn ab-btn--ghost"
+                                        :disabled="busyOwnerId === row.owner.id"
+                                        @click="reinstate(row)"
+                                    >
+                                        Reinstate
+                                    </button>
+                                    <button
+                                        v-else-if="row.overdueMonths.length > 0"
+                                        class="ab-btn ab-btn--ghost ab-btn--danger"
+                                        :disabled="busyOwnerId === row.owner.id"
+                                        @click="openSuspend(row)"
+                                    >
+                                        Suspend
                                     </button>
                                 </div>
                             </td>
@@ -280,6 +303,38 @@
             </div>
         </div>
 
+        <!-- Suspend for non-payment modal -->
+        <div v-if="suspend.row" class="ab-modal-backdrop" @click.self="closeSuspend">
+            <div class="ab-modal">
+                <h2 class="ab-modal-title">Suspend for non-payment</h2>
+                <p class="ab-modal-sub">
+                    Make every store owned by <strong>{{ suspend.row.owner.email }}</strong> read-only.
+                    Staff and the owner can still view and export data, but can't make sales or change anything.
+                </p>
+                <div class="ab-modal-summary">
+                    <div v-for="m in suspend.row.overdueMonths" :key="`${m.year}-${m.month}`" class="ab-summary-row">
+                        <span class="ab-summary-label">{{ periodLabel(m.month, m.year) }}</span>
+                        <span class="ab-summary-value">{{ formatPeso(m.amount) }}</span>
+                    </div>
+                    <div class="ab-summary-row ab-summary-row--total">
+                        <span class="ab-summary-label">Overdue</span>
+                        <span class="ab-summary-value">{{ formatPeso(overdueTotal(suspend.row)) }}</span>
+                    </div>
+                </div>
+                <label class="ab-field">
+                    <span class="ab-field-label">Reason (optional, admin-only)</span>
+                    <input v-model="suspend.reason" class="ab-input" type="text" maxlength="200" placeholder="e.g. No reply to October reminder" />
+                </label>
+                <p class="ab-modal-note">Access comes back automatically once every overdue bill is marked paid, or you can reinstate manually.</p>
+                <div class="ab-modal-footer">
+                    <button class="ab-btn ab-btn--ghost" :disabled="Boolean(busyOwnerId)" @click="closeSuspend">Cancel</button>
+                    <button class="ab-btn ab-btn--danger-solid" :disabled="Boolean(busyOwnerId)" @click="submitSuspend">
+                        {{ busyOwnerId ? 'Suspending…' : 'Suspend' }}
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <!-- Adjust (discount + free stores) modal -->
         <div v-if="adjust.row" class="ab-modal-backdrop" @click.self="closeAdjust">
             <div class="ab-modal ab-modal--wide">
@@ -368,6 +423,7 @@ import {
     sendBillingNotice,
     setBillingPayment,
     setOwnerDiscount,
+    setOwnerSuspension,
     setStoreExemption,
     type BillingDiscountType,
     type BillingHistoryEntry,
@@ -381,7 +437,7 @@ import { useToast } from '@/composables/useToast';
 
 const { showToast } = useToast();
 
-type StatusFilter = 'all' | 'unpaid' | 'paid';
+type StatusFilter = 'all' | 'unpaid' | 'paid' | 'overdue' | 'suspended';
 
 const view = ref<'statements' | 'history'>('statements');
 
@@ -396,6 +452,8 @@ const statusOptions: { value: StatusFilter; label: string }[] = [
     { value: 'all', label: 'All' },
     { value: 'unpaid', label: 'Unpaid' },
     { value: 'paid', label: 'Paid' },
+    { value: 'overdue', label: 'Overdue' },
+    { value: 'suspended', label: 'Read-only' },
 ];
 
 const confirm = reactive<{ row: BillingOwner | null; mode: 'send' | 'paid'; note: string }>({
@@ -460,6 +518,8 @@ const visibleOwners = computed(() => {
         const paid = Boolean(row.statement?.paidAt);
         if (statusFilter.value === 'paid' && !paid) return false;
         if (statusFilter.value === 'unpaid' && (paid || displayAmount(row) <= 0)) return false;
+        if (statusFilter.value === 'overdue' && row.overdueMonths.length === 0) return false;
+        if (statusFilter.value === 'suspended' && !row.owner.suspension) return false;
         if (!q) return true;
         return (
             row.owner.email.toLowerCase().includes(q) ||
@@ -561,7 +621,13 @@ const submitConfirm = async () => {
                 confirm.note.trim() || null
             );
             row.statement = result.statement;
-            showToast(`Marked ${row.owner.email} as paid for ${monthLabel.value}.`, 'success');
+            showToast(
+                result.reinstated
+                    ? `Marked paid — ${row.owner.email}'s stores are fully active again.`
+                    : `Marked ${row.owner.email} as paid for ${monthLabel.value}.`,
+                'success'
+            );
+            await loadOwners();
         }
         confirm.row = null;
     } catch (e) {
@@ -577,8 +643,53 @@ const markUnpaid = async (row: BillingOwner) => {
         const result = await setBillingPayment(row.owner.id, selectedMonth.value, selectedYear.value, false);
         row.statement = result.statement;
         showToast(`Marked ${row.owner.email} as unpaid.`, 'success');
+        await loadOwners();
     } catch (e) {
         showToast(errorMessage(e, 'Failed to update payment.'), 'error');
+    } finally {
+        busyOwnerId.value = null;
+    }
+};
+
+// ── Suspension for non-payment ───────────────────────────────
+const overdueTotal = (row: BillingOwner) => row.overdueMonths.reduce((sum, m) => sum + m.amount, 0);
+
+const suspend = reactive<{ row: BillingOwner | null; reason: string }>({ row: null, reason: '' });
+
+const openSuspend = (row: BillingOwner) => {
+    suspend.row = row;
+    suspend.reason = '';
+};
+
+const closeSuspend = () => {
+    if (busyOwnerId.value) return;
+    suspend.row = null;
+};
+
+const submitSuspend = async () => {
+    const row = suspend.row;
+    if (!row) return;
+    busyOwnerId.value = row.owner.id;
+    try {
+        const result = await setOwnerSuspension(row.owner.id, true, suspend.reason.trim() || null);
+        row.owner = result.owner;
+        showToast(`${row.owner.email}'s stores are now read-only.`, 'success');
+        suspend.row = null;
+    } catch (e) {
+        showToast(errorMessage(e, 'Failed to suspend.'), 'error');
+    } finally {
+        busyOwnerId.value = null;
+    }
+};
+
+const reinstate = async (row: BillingOwner) => {
+    busyOwnerId.value = row.owner.id;
+    try {
+        const result = await setOwnerSuspension(row.owner.id, false);
+        row.owner = result.owner;
+        showToast(`${row.owner.email}'s stores are fully active again.`, 'success');
+    } catch (e) {
+        showToast(errorMessage(e, 'Failed to reinstate.'), 'error');
     } finally {
         busyOwnerId.value = null;
     }
@@ -909,6 +1020,11 @@ onMounted(loadOwners);
 .ab-discount-line { font-size: 0.68rem; color: #047857; margin-top: 0.1rem; white-space: nowrap; }
 .ab-discount-tag { display: inline-block; margin-top: 0.3rem; font-size: 0.65rem; font-weight: 700; color: #047857; background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 999px; padding: 0.08rem 0.5rem; }
 .ab-discount-tag--inactive { color: #64748b; background: #f8fafc; border-color: #e2e8f0; text-decoration: line-through; }
+.ab-pill--overdue { background: #fee2e2; color: #b91c1c; }
+.ab-suspended-tag { display: inline-block; margin-top: 0.3rem; font-size: 0.65rem; font-weight: 700; color: #fff; background: #b91c1c; border-radius: 999px; padding: 0.1rem 0.5rem; }
+.ab-overdue-tag { display: inline-block; margin-top: 0.3rem; font-size: 0.65rem; font-weight: 700; color: #b91c1c; background: #fef2f2; border: 1px solid #fecaca; border-radius: 999px; padding: 0.08rem 0.5rem; }
+.ab-btn--danger-solid { background: #b91c1c; }
+.ab-btn--danger-solid:hover:not(:disabled) { background: #991b1b; }
 .ab-btn--plain { background: transparent; color: #475569; border: 1px solid #e2e8f0; }
 .ab-btn--plain:hover:not(:disabled) { background: #f1f5f9; }
 .ab-modal--wide { max-width: 560px; max-height: calc(100vh - 2rem); overflow-y: auto; }
