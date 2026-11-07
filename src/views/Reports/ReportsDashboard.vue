@@ -524,7 +524,7 @@
                                 <dt>Voided sales ({{ salesSummary.voidCount }})</dt>
                                 <dd>{{ formatMoney(salesSummary.voidedSales) }}</dd>
                             </div>
-                            <div v-if="canUseExpenses" class="breakdown-row breakdown-row--muted">
+                            <div class="breakdown-row breakdown-row--muted">
                                 <dt>Expenses</dt>
                                 <dd>−{{ formatMoney(expenseSummary.total) }}</dd>
                             </div>
@@ -705,7 +705,7 @@
                         </div>
                     </section>
 
-                    <section v-if="canUseIngredients" class="report-card" :class="{ 'report-card--wide': !canUsePurchaseOrders }">
+                    <section class="report-card">
                         <div class="card-header">
                             <div>
                                 <h2>Ingredient usage</h2>
@@ -730,7 +730,7 @@
                         </div>
                     </section>
 
-                    <section v-if="canUsePurchaseOrders" class="report-card" :class="{ 'report-card--wide': !canUseIngredients }">
+                    <section class="report-card">
                         <div class="card-header">
                             <div>
                                 <h2>Purchasing</h2>
@@ -891,15 +891,12 @@ import { suppressLoading, resumeLoading } from '@/composables/useLoading';
 import PullToRefresh from '@/components/PullToRefresh.vue';
 import HeroSparkline from './HeroSparkline.vue';
 import { useStoreContextStore } from '@/stores/storeContext';
-import { useUserContextStore } from '@/stores/userContext';
 import { canAccess } from '@/utils/roleAccess';
-import { hasPlanFeature } from '@/utils/planAccess';
 import SkeletonLoader from '@/components/SkeletonLoader.vue';
 
 const route = useRoute();
 const router = useRouter();
 const storeContext = useStoreContextStore();
-const userContext = useUserContextStore();
 
 const padDateValue = (value: number) => String(value).padStart(2, '0');
 const buildDateInput = (value: Date) =>
@@ -989,9 +986,6 @@ const employeePaymentMethods = computed(() => {
 const canViewReports = computed(() => canAccess(storeContext.currentStore, 'reports'));
 const isSingleDay = computed(() => filters.from === filters.to);
 
-const canUseIngredients = computed(() => hasPlanFeature(userContext.planTier, 'ingredients'));
-const canUsePurchaseOrders = computed(() => hasPlanFeature(userContext.planTier, 'purchaseOrders'));
-const canUseExpenses = computed(() => hasPlanFeature(userContext.planTier, 'expenses'));
 
 const showDatePopover = ref(false);
 const datePopoverRef = ref<HTMLElement | null>(null);
@@ -1137,24 +1131,16 @@ const loadReports = async () => {
             getProductsSold(storeId, { from: filters.from, to: filters.to, limit: 100 }),
             getProfitSummary(storeId, { from: filters.from, to: filters.to }),
             getLowStock(storeId, { limit: 8 }),
-            canUseIngredients.value
-                ? getIngredientUsage(storeId, { from: filters.from, to: filters.to, limit: 8 })
-                : Promise.resolve({ ingredients: [] as IngredientUsageRecord[] }),
-            canUsePurchaseOrders.value
-                ? getPurchaseSpend(storeId, { from: filters.from, to: filters.to, limit: 8 })
-                : Promise.resolve({ suppliers: [] as PurchaseSpendRecord[], summary: { totalSpend: 0, totalReceipts: 0, avgReceipt: 0 } as PurchaseSpendSummary }),
+            getIngredientUsage(storeId, { from: filters.from, to: filters.to, limit: 8 }),
+            getPurchaseSpend(storeId, { from: filters.from, to: filters.to, limit: 8 }),
             getProductMargins(storeId, { from: filters.from, to: filters.to, limit: 10 }),
             getPaymentMethodBreakdown(storeId, { from: filters.from, to: filters.to }),
             getSalesByChannel(storeId, { from: filters.from, to: filters.to }),
             getEmployeeSales(storeId, { from: filters.from, to: filters.to }),
-            canUseExpenses.value
-                ? getExpenseSummary(storeId, filters.from, filters.to)
-                : Promise.resolve({ range: { from: filters.from, to: filters.to }, total: 0, byCategory: [] }),
+            getExpenseSummary(storeId, filters.from, filters.to),
             getSalesSummary(storeId, { from: prev.from, to: prev.to }),
             getProfitSummary(storeId, { from: prev.from, to: prev.to }),
-            canUseExpenses.value
-                ? getExpenseSummary(storeId, prev.from, prev.to)
-                : Promise.resolve({ range: { from: prev.from, to: prev.to }, total: 0, byCategory: [] }),
+            getExpenseSummary(storeId, prev.from, prev.to),
         ] as const;
         resumeLoading();
         const [
@@ -1268,24 +1254,22 @@ const heroKpis = computed<HeroKpi[]>(() => {
             negative: profit.totalProfit < 0,
         },
     ];
-    if (canUseExpenses.value) {
-        kpis.push({
-            id: 'expenses',
-            label: 'Expenses',
-            value: formatMoney(expenseSummary.value.total),
-            delta: computeDelta(expenseSummary.value.total, prevExpenseTotal.value, true),
-        });
-        const prevNet = prevProfitTotal.value !== null && prevExpenseTotal.value !== null
-            ? prevProfitTotal.value - prevExpenseTotal.value
-            : null;
-        kpis.push({
-            id: 'net-after',
-            label: 'Net after expenses',
-            value: formatMoney(netAfterExpenses.value),
-            delta: computeDelta(netAfterExpenses.value, prevNet),
-            negative: netAfterExpenses.value < 0,
-        });
-    }
+    kpis.push({
+        id: 'expenses',
+        label: 'Expenses',
+        value: formatMoney(expenseSummary.value.total),
+        delta: computeDelta(expenseSummary.value.total, prevExpenseTotal.value, true),
+    });
+    const prevNet = prevProfitTotal.value !== null && prevExpenseTotal.value !== null
+        ? prevProfitTotal.value - prevExpenseTotal.value
+        : null;
+    kpis.push({
+        id: 'net-after',
+        label: 'Net after expenses',
+        value: formatMoney(netAfterExpenses.value),
+        delta: computeDelta(netAfterExpenses.value, prevNet),
+        negative: netAfterExpenses.value < 0,
+    });
     return kpis;
 });
 

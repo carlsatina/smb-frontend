@@ -1,4 +1,3 @@
-import type { PlanTier } from '@/utils/planAccess';
 import { apiClient } from './client';
 import type { SalesChannel } from '@/utils/salesChannels';
 
@@ -29,8 +28,6 @@ export const listStores = () => {
             aiApiKeyLast4: string | null;
             role: string;
             permissions: string[];
-            ownerPlanTier: PlanTier;
-            ownerSubscriptionActive: boolean;
         }>;
     }>('/api/v1/stores');
 };

@@ -14,7 +14,7 @@
                 <button
                     class="export-btn"
                     type="button"
-                    :disabled="auditExporting || !canExport"
+                    :disabled="auditExporting"
                     @click="exportAuditLog"
                 >
                     <mdicon name="download-outline" size="18" />
@@ -240,14 +240,11 @@ import { useRoute, useRouter } from 'vue-router';
 import { AuditLogRecord, exportAuditLogs, listAuditLogs } from '@/api/auditLogs';
 import { useToast } from '@/composables/useToast';
 import { useStoreContextStore } from '@/stores/storeContext';
-import { useUserContextStore } from '@/stores/userContext';
-import { hasPlanFeature, openPlanUpgradeModal } from '@/utils/planAccess';
 import { zonedDayStartIso, zonedDayEndIso } from '@/utils/datetime';
 
 const router = useRouter();
 const route = useRoute();
 const storeContext = useStoreContextStore();
-const userContext = useUserContextStore();
 const { showToast } = useToast();
 
 const auditLogs = ref<AuditLogRecord[]>([]);
@@ -278,8 +275,6 @@ const currentStoreLabel = computed(() => {
     return `${currentStore.value.name} - ${currentStore.value.currency}`;
 });
 
-const planKnown = computed(() => userContext.planTier !== null);
-const canExport = computed(() => planKnown.value && hasPlanFeature(userContext.planTier, 'importExport'));
 
 const normalizeDateParam = (value: unknown) => {
     if (typeof value !== 'string') return '';
@@ -414,10 +409,6 @@ const clearDateRange = async () => {
 
 const exportAuditLog = async () => {
     if (!currentStore.value || auditExporting.value) return;
-    if (!canExport.value) {
-        openPlanUpgradeModal('importExport');
-        return;
-    }
     auditExporting.value = true;
     try {
         const timeZone = storeContext.currentStore?.timezone || 'Asia/Manila';
@@ -668,7 +659,6 @@ onMounted(async () => {
     if (routeStoreId.value) {
         storeContext.setCurrentStore(routeStoreId.value);
     }
-    await userContext.fetchMe();
     const applied = await applyQueryFilters();
     if (!applied) {
         await loadAuditLogs();

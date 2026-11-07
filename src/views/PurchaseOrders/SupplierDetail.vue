@@ -24,14 +24,7 @@
                 </div>
             </header>
 
-            <PlanGate
-                v-if="isPlanLocked"
-                feature="purchaseOrders"
-                title="Suppliers are available on Standard."
-                description="Upgrade to Standard to manage supplier analytics and linked receipts."
-            />
-
-            <SkeletonLoader v-else-if="isLoading" :rows="4" label="Loading supplier…" />
+            <SkeletonLoader v-if="isLoading" :rows="4" label="Loading supplier…" />
 
             <div v-else-if="!supplier" class="panel-state">Supplier not found.</div>
 
@@ -265,9 +258,7 @@ import {
 import { useStoreContextStore } from '@/stores/storeContext';
 import { useToast } from '@/composables/useToast';
 import { canAccess } from '@/utils/roleAccess';
-import { hasPlanFeature } from '@/utils/planAccess';
 import { zonedDayStartIso, zonedDayEndIso } from '@/utils/datetime';
-import PlanGate from '@/components/PlanGate.vue';
 import SkeletonLoader from '@/components/SkeletonLoader.vue';
 
 const route = useRoute();
@@ -316,14 +307,6 @@ const currentStoreLabel = computed(() => {
 
 const canWrite = computed(() => canAccess(storeContext.currentStore, 'purchaseOrdersWrite'));
 // Use the store owner's plan tier for feature access (not the logged-in user's)
-const ownerPlanTier = computed(() => storeContext.currentStore?.ownerPlanTier ?? null);
-const ownerSubscriptionActive = computed(() => storeContext.currentStore?.ownerSubscriptionActive ?? false);
-const planKnown = computed(() => ownerPlanTier.value !== null);
-const isPlanLocked = computed(
-    () =>
-        !ownerSubscriptionActive.value ||
-        (planKnown.value && !hasPlanFeature(ownerPlanTier.value, 'purchaseOrders'))
-);
 const orderTotalPages = computed(() => Math.max(1, Math.ceil(ordersTotal.value / orderPageSize.value)));
 const receiptTotalPages = computed(() => Math.max(1, Math.ceil(receiptsTotal.value / receiptPageSize.value)));
 const receiptTotalSpend = computed(() => receiptSummary.value?.totalSpend ?? 0);
@@ -338,10 +321,6 @@ const toIsoRange = (value: string, endOfDay: boolean) => {
 };
 
 const loadSupplier = async () => {
-    if (isPlanLocked.value) {
-        supplier.value = null;
-        return;
-    }
     if (!routeStoreId.value || !supplierId.value) {
         supplier.value = null;
         return;
@@ -360,10 +339,6 @@ const loadSupplier = async () => {
 };
 
 const loadReceiptSummary = async () => {
-    if (isPlanLocked.value) {
-        receiptSummary.value = null;
-        return;
-    }
     if (!routeStoreId.value || !supplierId.value) {
         receiptSummary.value = null;
         return;
@@ -388,11 +363,6 @@ const loadReceiptSummary = async () => {
 };
 
 const loadOrders = async () => {
-    if (isPlanLocked.value) {
-        purchaseOrders.value = [];
-        ordersTotal.value = 0;
-        return;
-    }
     if (!routeStoreId.value || !supplierId.value) {
         purchaseOrders.value = [];
         ordersTotal.value = 0;
@@ -421,11 +391,6 @@ const loadOrders = async () => {
 };
 
 const loadReceipts = async () => {
-    if (isPlanLocked.value) {
-        receipts.value = [];
-        receiptsTotal.value = 0;
-        return;
-    }
     if (!routeStoreId.value || !supplierId.value) {
         receipts.value = [];
         receiptsTotal.value = 0;
@@ -589,13 +554,6 @@ const formatNumber = (value: number) => {
 };
 
 const loadAll = async () => {
-    if (isPlanLocked.value) {
-        supplier.value = null;
-        purchaseOrders.value = [];
-        receipts.value = [];
-        receiptSummary.value = null;
-        return;
-    }
     await Promise.all([loadSupplier(), loadOrders(), loadReceipts(), loadReceiptSummary()]);
 };
 

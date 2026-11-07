@@ -1,22 +1,19 @@
 <template>
     <TopNav v-if="showTopNav" />
     <ToastHost />
-    <PlanUpgradeModal :open="planModalOpen" :feature="planModalFeature" :message="planModalMessage" @close="closePlanModal" />
     <OfflineOverlay />
     <router-view />
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import TopNav from '@/components/Navigation/TopNav.vue';
 import ToastHost from '@/components/ToastHost.vue';
-import PlanUpgradeModal from '@/components/PlanUpgradeModal.vue';
 import OfflineOverlay from '@/components/OfflineOverlay.vue';
 import { useUserContextStore } from '@/stores/userContext';
 import { useStoreContextStore } from '@/stores/storeContext';
 import { useToast } from '@/composables/useToast';
-import type { PlanFeature } from '@/utils/planAccess';
 
 const route = useRoute();
 const router = useRouter();
@@ -31,9 +28,6 @@ const showTopNav = computed(() => {
     return !hideTopNavRoutes.has(routeName);
 });
 
-const planModalOpen = ref(false);
-const planModalFeature = ref<PlanFeature | null>(null);
-const planModalMessage = ref<string | null>(null);
 
 const handleAuthLogout = () => {
     userContext.clear();
@@ -57,19 +51,6 @@ const handleStoreSuspended = (event: Event) => {
     }
 };
 
-const handlePlanUpgrade = (event: Event) => {
-    const detail = (event as CustomEvent<{ feature?: PlanFeature | null; message?: string | null }>).detail;
-    planModalFeature.value = detail?.feature ?? null;
-    planModalMessage.value = detail?.message ?? null;
-    planModalOpen.value = true;
-};
-
-const closePlanModal = () => {
-    planModalOpen.value = false;
-    planModalFeature.value = null;
-    planModalMessage.value = null;
-};
-
 // Keep the member's permissions current when the owner changes them mid-session:
 // refresh after a refused request and when the window regains focus (throttled).
 let lastPermissionRefresh = 0;
@@ -87,7 +68,6 @@ onMounted(() => {
     }
     window.addEventListener('auth:logout', handleAuthLogout);
     window.addEventListener('auth:login', handleAuthLogin);
-    window.addEventListener('plan:upgrade', handlePlanUpgrade);
     window.addEventListener('store:suspended', handleStoreSuspended);
     window.addEventListener('permissions:stale', refreshPermissions);
     window.addEventListener('focus', refreshPermissions);
@@ -96,7 +76,6 @@ onMounted(() => {
 onBeforeUnmount(() => {
     window.removeEventListener('auth:logout', handleAuthLogout);
     window.removeEventListener('auth:login', handleAuthLogin);
-    window.removeEventListener('plan:upgrade', handlePlanUpgrade);
     window.removeEventListener('store:suspended', handleStoreSuspended);
     window.removeEventListener('permissions:stale', refreshPermissions);
     window.removeEventListener('focus', refreshPermissions);

@@ -6,10 +6,6 @@ export type MeResponse = {
         email: string;
         fullName?: string | null;
         emailVerified?: boolean;
-        subscriptionActive?: boolean;
-        planTier?: 'STARTER' | 'STANDARD' | 'GROWTH';
-        grantedPlan?: 'STARTER' | 'STANDARD' | 'GROWTH' | null;
-        grantedUntil?: string | null;
         isSuperAdmin?: boolean;
         features?: string[];
     };

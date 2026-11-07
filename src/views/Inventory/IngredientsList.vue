@@ -68,14 +68,7 @@
                 </div>
             </header>
 
-            <PlanGate
-                v-if="isPlanLocked"
-                feature="ingredients"
-                title="Ingredients require Standard plan"
-                description="Upgrade to Standard to manage ingredients and create recipe-based products."
-            />
-
-            <div v-else-if="!storeContext.currentStoreId && !isLoading" class="panel-state">
+            <div v-if="!storeContext.currentStoreId && !isLoading" class="panel-state">
                 Select or create a store to view ingredients.
             </div>
 
@@ -274,10 +267,8 @@ import {
 import { useStoreContextStore } from '@/stores/storeContext';
 import { useToast } from '@/composables/useToast';
 import { canAccess } from '@/utils/roleAccess';
-import { hasPlanFeature } from '@/utils/planAccess';
 import ConfirmModal from '@/components/ConfirmModal.vue';
 import IngredientModal from '@/components/IngredientModal.vue';
-import PlanGate from '@/components/PlanGate.vue';
 import CsvActionsMenu from '@/components/CsvActionsMenu.vue';
 import CsvImportPreviewModal from '@/components/CsvImportPreviewModal.vue';
 import SkeletonLoader from '@/components/SkeletonLoader.vue';
@@ -297,14 +288,6 @@ const pageSizeOptions = [10, 20, 50];
 
 const canWrite = computed(() => canAccess(storeContext.currentStore, 'inventoryAdjustments'));
 
-const ownerPlanTier = computed(() => storeContext.currentStore?.ownerPlanTier ?? null);
-const ownerSubscriptionActive = computed(() => storeContext.currentStore?.ownerSubscriptionActive ?? false);
-const planKnown = computed(() => ownerPlanTier.value !== null);
-const isPlanLocked = computed(
-    () =>
-        !ownerSubscriptionActive.value ||
-        (planKnown.value && !hasPlanFeature(ownerPlanTier.value, 'ingredients'))
-);
 
 // Catalog CSV import/export is limited to owners and admins with "Manage products & stock".
 const canAdmin = computed(
@@ -312,9 +295,7 @@ const canAdmin = computed(
         ['OWNER', 'ADMIN'].includes(storeContext.currentStore?.role ?? '') &&
         canAccess(storeContext.currentStore, 'inventoryAdjustments')
 );
-const canImportExport = computed(
-    () => canAdmin.value && ownerSubscriptionActive.value && hasPlanFeature(ownerPlanTier.value, 'importExport')
-);
+const canImportExport = computed(() => canAdmin.value);
 
 const showDeleteModal = ref(false);
 const ingredientToDelete = ref<IngredientResponse | null>(null);
@@ -426,12 +407,8 @@ const confirmImport = async () => {
 };
 
 const loadIngredients = async () => {
-    if (isPlanLocked.value) {
-        ingredients.value = [];
-        return;
-    }
     const storeId = storeContext.currentStoreId;
-    if (!storeId || isPlanLocked.value) {
+    if (!storeId) {
         ingredients.value = [];
         isLoading.value = false;
         return;
@@ -597,7 +574,7 @@ onMounted(async () => {
         if (routeStoreId && routeStoreId !== storeContext.currentStoreId) {
             storeContext.setCurrentStore(routeStoreId);
         }
-        if (!isPlanLocked.value && storeContext.currentStoreId) {
+        if (storeContext.currentStoreId) {
             await loadIngredients();
         } else {
             isLoading.value = false;
@@ -637,7 +614,6 @@ watch(
     () => storeContext.currentStoreId,
     async () => {
         page.value = 1;
-        if (isPlanLocked.value) return;
         await loadIngredients();
     }
 );

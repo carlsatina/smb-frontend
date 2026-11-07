@@ -35,27 +35,16 @@
                                 <template v-for="(grp, gi) in moreGroups" :key="grp.group">
                                     <div v-if="gi > 0" class="topnav__dropdown-divider"></div>
                                     <p class="topnav__dropdown-label">{{ grp.label }}</p>
-                                    <template v-for="item in grp.items" :key="item.key">
-                                        <RouterLink
-                                            v-if="!item.locked"
-                                            :to="`/stores/${currentStoreId}/${item.route}`"
-                                            class="topnav__dropdown-item"
-                                            @click="closeMore"
-                                        >
-                                            <mdicon :name="item.icon" size="18" />
-                                            <span>{{ item.label }}</span>
-                                        </RouterLink>
-                                        <button
-                                            v-else
-                                            type="button"
-                                            class="topnav__dropdown-item topnav__dropdown-item--locked"
-                                            @click="openUpgradeFromMore(item.upgradeFeature!)"
-                                        >
-                                            <mdicon :name="item.icon" size="18" />
-                                            <span>{{ item.label }}</span>
-                                            <mdicon name="lock" size="14" class="lock-icon" />
-                                        </button>
-                                    </template>
+                                    <RouterLink
+                                        v-for="item in grp.items"
+                                        :key="item.key"
+                                        :to="`/stores/${currentStoreId}/${item.route}`"
+                                        class="topnav__dropdown-item"
+                                        @click="closeMore"
+                                    >
+                                        <mdicon :name="item.icon" size="18" />
+                                        <span>{{ item.label }}</span>
+                                    </RouterLink>
                                 </template>
                             </div>
                         </Transition>
@@ -154,18 +143,6 @@
                                 <span class="topnav__pd-item-label">My Profile</span>
                             </RouterLink>
 
-                            <RouterLink
-                                to="/account/plan"
-                                class="topnav__pd-item"
-                                @click="closeProfile"
-                            >
-                                <span class="topnav__pd-item-icon">
-                                    <mdicon name="credit-card-outline" size="16" />
-                                </span>
-                                <span class="topnav__pd-item-label">My Plan</span>
-                                <span class="topnav__pd-item-tier">{{ effectivePlanLabel }}</span>
-                            </RouterLink>
-
                             <div class="topnav__pd-divider"></div>
 
                             <button
@@ -216,24 +193,20 @@
 
                     <template v-for="grp in moreGroups" :key="grp.group">
                         <p class="topnav__mobile-label">{{ grp.label }}</p>
-                        <template v-for="item in grp.items" :key="item.key">
-                            <RouterLink
-                                v-if="!item.locked"
-                                :to="`/stores/${currentStoreId}/${item.route}`"
-                                class="topnav__mobile-item"
-                                @click="closeMobileMenu"
-                            >
-                                <mdicon :name="item.icon" size="20" /><span>{{ item.label }}</span>
-                            </RouterLink>
-                        </template>
+                        <RouterLink
+                            v-for="item in grp.items"
+                            :key="item.key"
+                            :to="`/stores/${currentStoreId}/${item.route}`"
+                            class="topnav__mobile-item"
+                            @click="closeMobileMenu"
+                        >
+                            <mdicon :name="item.icon" size="20" /><span>{{ item.label }}</span>
+                        </RouterLink>
                     </template>
 
                     <p class="topnav__mobile-label">Account</p>
                     <RouterLink to="/account/profile" class="topnav__mobile-item" @click="closeMobileMenu">
                         <mdicon name="account-circle-outline" size="20" /><span>My Profile</span>
-                    </RouterLink>
-                    <RouterLink to="/account/plan" class="topnav__mobile-item" @click="closeMobileMenu">
-                        <mdicon name="credit-card-outline" size="20" /><span>My Plan</span>
                     </RouterLink>
                     <button type="button" class="topnav__mobile-item topnav__mobile-item--danger" @click="() => { closeMobileMenu(); handleLogout(); }">
                         <mdicon name="logout" size="20" /><span>Sign out</span>
@@ -309,7 +282,6 @@ import { logout } from '@/api/auth';
 import { useStoreContextStore } from '@/stores/storeContext';
 import { useUserContextStore } from '@/stores/userContext';
 import { canAccess, FeatureKey, getDefaultRouteForStore } from '@/utils/roleAccess';
-import { hasPlanFeature, openPlanUpgradeModal, getPlanConfig } from '@/utils/planAccess';
 import { useToast } from '@/composables/useToast';
 import TimeClockButton from '@/components/Navigation/TimeClockButton.vue';
 
@@ -349,10 +321,6 @@ const canViewExpenses = computed(() => canAccess(storeContext.currentStore, 'exp
 // Every member can open the schedule — staff read it, owners/admins edit it.
 // Warehouses are included: they have staff and shifts like any other store.
 const canViewSchedule = computed(() => canAccess(storeContext.currentStore, 'schedule'));
-const planKnown = computed(() => userContext.planTier !== null);
-const isPurchaseOrdersLocked = computed(() => planKnown.value && !hasPlanFeature(userContext.effectivePlan, 'purchaseOrders'));
-const isExpensesLocked = computed(() => planKnown.value && !hasPlanFeature(userContext.effectivePlan, 'expenses'));
-const isIngredientsLocked = computed(() => planKnown.value && !hasPlanFeature(userContext.effectivePlan, 'ingredients'));
 
 // ── Nav configuration ─────────────────────────────────────
 // Single source of truth for the store nav. `primaryLinks` render inline;
@@ -366,8 +334,6 @@ interface NavLink {
     route: string; // path suffix after /stores/:storeId/
     group: NavGroupKey;
     visible: boolean;
-    locked?: boolean;
-    upgradeFeature?: 'purchaseOrders' | 'expenses' | 'ingredients';
 }
 
 // Inline (primary) items per role. Owners/Admins get the focused set;
@@ -384,25 +350,22 @@ const allNavLinks = computed<NavLink[]>(() => [
     { key: 'pos', label: 'POS', icon: 'point-of-sale', route: 'pos', group: 'sell', visible: canViewPos.value },
     { key: 'products', label: 'Products', icon: 'package-variant', route: 'products', group: 'sell', visible: canViewProducts.value },
     { key: 'inventory', label: 'Inventory', icon: 'warehouse', route: 'inventory', group: 'sell', visible: canViewInventory.value },
-    { key: 'ingredients', label: 'Ingredients', icon: 'food-apple-outline', route: 'ingredients', group: 'sell', visible: canViewInventory.value, locked: isIngredientsLocked.value, upgradeFeature: 'ingredients' },
+    { key: 'ingredients', label: 'Ingredients', icon: 'food-apple-outline', route: 'ingredients', group: 'sell', visible: canViewInventory.value },
     { key: 'reports', label: 'Reports', icon: 'chart-line', route: 'reports', group: 'insights', visible: canViewReports.value },
     { key: 'daily-sales', label: 'Daily Sales', icon: 'cash-register', route: 'daily-sales', group: 'insights', visible: canViewDailySales.value },
     { key: 'ai-insights', label: 'AI Insights', icon: 'robot-happy-outline', route: 'ai-insights', group: 'insights', visible: canViewAi.value },
-    { key: 'purchase-orders', label: 'Purchases', icon: 'truck-delivery', route: 'purchase-orders', group: 'procurement', visible: canViewPurchaseOrders.value, locked: isPurchaseOrdersLocked.value, upgradeFeature: 'purchaseOrders' },
-    { key: 'suppliers', label: 'Suppliers', icon: 'account-group', route: 'suppliers', group: 'procurement', visible: canViewSuppliers.value, locked: isPurchaseOrdersLocked.value, upgradeFeature: 'purchaseOrders' },
-    { key: 'expenses', label: 'Expenses', icon: 'cash-minus', route: 'expenses', group: 'procurement', visible: canViewExpenses.value, locked: isExpensesLocked.value, upgradeFeature: 'expenses' },
+    { key: 'purchase-orders', label: 'Purchases', icon: 'truck-delivery', route: 'purchase-orders', group: 'procurement', visible: canViewPurchaseOrders.value },
+    { key: 'suppliers', label: 'Suppliers', icon: 'account-group', route: 'suppliers', group: 'procurement', visible: canViewSuppliers.value },
+    { key: 'expenses', label: 'Expenses', icon: 'cash-minus', route: 'expenses', group: 'procurement', visible: canViewExpenses.value },
     { key: 'schedule', label: 'Schedule', icon: 'calendar-account', route: 'schedule', group: 'settings', visible: canViewSchedule.value },
     { key: 'settings', label: 'Settings', icon: 'cog', route: 'settings', group: 'settings', visible: canViewSettings.value },
     { key: 'audit-logs', label: 'Audit Log', icon: 'history', route: 'audit-logs', group: 'settings', visible: canViewSettings.value },
 ]);
 
-// Inline links render as plain router links with no upgrade prompt, so
-// plan-locked items are kept out and fall back to the More menu, which
-// knows how to render the locked state.
 const primaryLinks = computed(() => {
     const keys = primaryKeys.value;
     return allNavLinks.value
-        .filter((l) => l.visible && !l.locked && keys.includes(l.key))
+        .filter((l) => l.visible && keys.includes(l.key))
         .sort((a, b) => keys.indexOf(a.key) - keys.indexOf(b.key));
 });
 
@@ -415,8 +378,7 @@ const groupLabels: Record<NavGroupKey, string> = {
 };
 
 const moreGroups = computed(() => {
-    // Exclude only links actually rendered inline, so a locked primary item
-    // still surfaces here with its upgrade prompt.
+    // Exclude links already rendered inline.
     const shownInline = new Set(primaryLinks.value.map((l) => l.key));
     return groupOrder
         .map((group) => ({
@@ -470,7 +432,6 @@ const userInitials = computed(() => {
     return (userContext.profile?.email?.[0] ?? 'U').toUpperCase();
 });
 
-const effectivePlanLabel = computed(() => getPlanConfig(userContext.effectivePlan).label);
 
 // ── Open/close state ──────────────────────────────────────
 const isMoreOpen = ref(false);
@@ -571,11 +532,6 @@ const handleLogout = async () => {
         window.dispatchEvent(new CustomEvent('auth:logout'));
         isLoggingOut.value = false;
     }
-};
-
-const openUpgradeFromMore = (feature: 'purchaseOrders' | 'expenses' | 'ingredients') => {
-    closeMore();
-    openPlanUpgradeModal(feature);
 };
 
 // ── Click outside & keyboard ──────────────────────────────
@@ -734,9 +690,6 @@ onBeforeUnmount(() => {
     background: rgba(255, 255, 255, 0.07);
     margin: 0.3rem 0.25rem;
 }
-.topnav__dropdown-item--locked { color: rgba(255, 255, 255, 0.35); cursor: default; }
-.topnav__dropdown-item--locked:hover { background: transparent; }
-.topnav__dropdown-item--locked .lock-icon { margin-left: auto; color: rgba(251, 191, 36, 0.7); }
 
 /* ── Right side ── */
 .topnav__right {

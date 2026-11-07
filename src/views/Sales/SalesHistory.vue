@@ -81,21 +81,19 @@
                             />
                         </div>
                         <div class="toolbar-right">
-                            <template v-if="canImportExport">
-                                <button class="ghost-button" :disabled="isExporting" @click="handleExport">
-                                    {{ isExporting ? 'Exporting…' : 'Export CSV' }}
-                                </button>
-                                <button v-if="canEdit" class="ghost-button" :disabled="isImporting" @click="triggerImport">
-                                    {{ isImporting ? 'Importing…' : 'Import CSV' }}
-                                </button>
-                                <input
-                                    ref="importFileInput"
-                                    type="file"
-                                    accept=".csv,text/csv"
-                                    style="display:none"
-                                    @change="handleImportFileSelected"
-                                />
-                            </template>
+                            <button class="ghost-button" :disabled="isExporting" @click="handleExport">
+                                {{ isExporting ? 'Exporting…' : 'Export CSV' }}
+                            </button>
+                            <button v-if="canEdit" class="ghost-button" :disabled="isImporting" @click="triggerImport">
+                                {{ isImporting ? 'Importing…' : 'Import CSV' }}
+                            </button>
+                            <input
+                                ref="importFileInput"
+                                type="file"
+                                accept=".csv,text/csv"
+                                style="display:none"
+                                @change="handleImportFileSelected"
+                            />
                             <button class="ghost-button" @click="goToPos">Back to POS</button>
                         </div>
                     </div>
@@ -374,17 +372,13 @@ import { exportSales, getSale, importSales, listSales, SaleDetail, SalesImportRe
 import { listStoreMembers, StoreMember } from '@/api/storeMembers';
 import { useToast } from '@/composables/useToast';
 import { useStoreContextStore } from '@/stores/storeContext';
-import { useUserContextStore } from '@/stores/userContext';
 import { canAccess } from '@/utils/roleAccess';
-import { hasPlanFeature } from '@/utils/planAccess';
 import { zonedDayStartIso, zonedDayEndIso } from '@/utils/datetime';
 
 const router = useRouter();
 const route = useRoute();
 const storeContext = useStoreContextStore();
-const userContext = useUserContextStore();
 const { showToast } = useToast();
-const canImportExport = computed(() => hasPlanFeature(userContext.effectivePlan, 'importExport'));
 const isExporting = ref(false);
 const isImporting = ref(false);
 const importProgress = ref(0);

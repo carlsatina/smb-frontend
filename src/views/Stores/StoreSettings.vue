@@ -48,10 +48,6 @@
                             <mdicon name="shield-account-outline" size="16" />
                             Roles &amp; permissions
                         </button>
-                        <button class="st-sidebar-item" :class="{ 'is-active': activeSection === 'plan' }" @click="activeSection = 'plan'">
-                            <mdicon name="crown-outline" size="16" />
-                            Plan &amp; subscription
-                        </button>
                         <button class="st-sidebar-item" :class="{ 'is-active': activeSection === 'ai' }" @click="activeSection = 'ai'">
                             <mdicon name="robot-outline" size="16" />
                             AI integration
@@ -370,8 +366,8 @@
                                                 :disabled="!canManageMembers || isOwnerLocked(member) || isSuspendingMember(member.id) || member.userId === currentUserId"
                                                 :title="
                                                     isSuspended(member)
-                                                        ? 'Restore access. Needs a free seat on the plan.'
-                                                        : 'Revoke access without removing them. Their history is kept and the seat is freed.'
+                                                        ? 'Restore access.'
+                                                        : 'Revoke access without removing them. Their history is kept.'
                                                 "
                                                 @click="toggleMemberSuspension(member)"
                                             >
@@ -462,109 +458,6 @@
                                         </div>
                                     </div>
                                 </div>
-                            </template>
-                        </section>
-
-                        <!-- ── Plan & subscription ── -->
-                        <section v-if="activeSection === 'plan'" class="st-section">
-                            <div class="st-section-header">
-                                <h2 class="st-section-title">Plan &amp; subscription</h2>
-                                <p class="st-section-sub">Compare plans and upgrade anytime. Plan is account-wide and applies to all your stores.</p>
-                            </div>
-
-                            <div v-if="userContext.isLoading && !userContext.hasLoaded" class="st-state">Loading plan details…</div>
-
-                            <template v-else>
-                                <!-- Summary bar -->
-                                <div class="st-plan-summary">
-                                    <div class="st-plan-summary-item">
-                                        <span class="st-plan-summary-label">Current plan</span>
-                                        <span class="st-plan-summary-value">{{ planConfig.label }}</span>
-                                    </div>
-                                    <div class="st-plan-summary-divider"></div>
-                                    <div class="st-plan-summary-item">
-                                        <span class="st-plan-summary-label">Status</span>
-                                        <span class="st-plan-summary-value" :class="userContext.subscriptionActive ? 'st-plan-active' : 'st-plan-inactive'">
-                                            {{ userContext.subscriptionActive ? 'Active' : 'Inactive' }}
-                                        </span>
-                                    </div>
-                                    <div class="st-plan-summary-divider"></div>
-                                    <div class="st-plan-summary-item">
-                                        <span class="st-plan-summary-label">Stores</span>
-                                        <span class="st-plan-summary-value">{{ storeUsage }} / {{ planConfig.maxStores }}</span>
-                                    </div>
-                                    <div class="st-plan-summary-divider"></div>
-                                    <div class="st-plan-summary-item">
-                                        <span class="st-plan-summary-label">Members per store</span>
-                                        <span class="st-plan-summary-value">Up to {{ planConfig.maxUsersPerStore }}</span>
-                                    </div>
-                                </div>
-
-                                <!-- Plan cards -->
-                                <div class="st-plan-header">
-                                    <h3 class="st-plan-heading">Choose your plan</h3>
-                                    <p class="st-section-sub">All plans include POS, inventory, products, and sales reports.</p>
-                                </div>
-
-                                <div class="st-plan-grid">
-                                    <div
-                                        v-for="plan in allPlans"
-                                        :key="plan.tier"
-                                        class="st-plan-card"
-                                        :class="{
-                                            'st-plan-card--current': plan.tier === userContext.planTier,
-                                            'st-plan-card--recommended': plan.tier === recommendedTier,
-                                        }"
-                                    >
-                                        <div class="st-plan-card-top">
-                                            <div class="st-plan-name-row">
-                                                <h4 class="st-plan-name">{{ plan.label }}</h4>
-                                                <span v-if="plan.tier === userContext.planTier" class="st-plan-pill st-plan-pill--current">Current</span>
-                                                <span v-else-if="plan.tier === recommendedTier" class="st-plan-pill st-plan-pill--recommended">Recommended</span>
-                                            </div>
-                                            <p class="st-plan-tagline">{{ planTaglines[plan.tier] }}</p>
-                                            <p class="st-plan-price">{{ planPrices[plan.tier] }}</p>
-                                        </div>
-                                        <div class="st-plan-limits">
-                                            <div class="st-plan-limit">
-                                                <mdicon name="store-outline" size="13" />
-                                                {{ plan.maxStores }} {{ plan.maxStores === 1 ? 'store' : 'stores' }}
-                                            </div>
-                                            <div class="st-plan-limit">
-                                                <mdicon name="account-group-outline" size="13" />
-                                                {{ plan.maxUsersPerStore }} members per store
-                                            </div>
-                                        </div>
-                                        <div class="st-plan-features">
-                                            <div class="st-plan-feature-group-label">Always included</div>
-                                            <div v-for="f in coreFeatures" :key="f.key" class="st-plan-feature-row">
-                                                <mdicon name="check" size="14" class="st-plan-check st-plan-check--yes" />
-                                                {{ f.label }}
-                                            </div>
-                                            <div class="st-plan-feature-group-label" style="margin-top:0.5rem">Advanced features</div>
-                                            <div v-for="f in advancedFeatures" :key="f.key" class="st-plan-feature-row" :class="{ 'st-plan-feature-row--locked': !plan.features[f.key] }">
-                                                <mdicon v-if="plan.features[f.key]" name="check" size="14" class="st-plan-check st-plan-check--yes" />
-                                                <mdicon v-else name="close" size="14" class="st-plan-check st-plan-check--no" />
-                                                {{ f.label }}
-                                            </div>
-                                        </div>
-                                        <div class="st-plan-card-footer">
-                                            <button v-if="plan.tier === userContext.planTier" class="st-plan-btn st-plan-btn--current" disabled>Current plan</button>
-                                            <button v-else-if="isDowngrade(plan.tier)" class="st-plan-btn st-plan-btn--ghost" :disabled="isUpgrading" @click="handlePlanAction(plan)">
-                                                {{ isUpgrading ? 'Updating…' : 'Downgrade' }}
-                                            </button>
-                                            <button v-else class="st-plan-btn st-plan-btn--upgrade" :disabled="isUpgrading" @click="handlePlanAction(plan)">
-                                                {{ isUpgrading ? 'Updating…' : `Upgrade to ${plan.label}` }}
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <p class="st-plan-note">
-                                    To change your plan, contact us at
-                                    <a href="mailto:support@arshii.app" class="st-plan-link">support@arshii.app</a>
-                                    and we'll get you sorted within 24 hours.
-                                </p>
                             </template>
                         </section>
 
@@ -754,7 +647,6 @@ import { useUserContextStore } from '@/stores/userContext';
 import { DEFAULT_CATEGORY_OPTIONS, DEFAULT_EXPENSE_CATEGORY_OPTIONS, DEFAULT_UNIT_OPTIONS } from '@/utils/catalogDefaults';
 import { getSubcategoriesFor, withSubcategories, type SubcategoryOptions } from '@/utils/subcategories';
 import { hasPermission } from '@/utils/roleAccess';
-import { getPlanConfig, planTierOrder, planConfigs, type PlanTier, type PlanFeature } from '@/utils/planAccess';
 import { getMe } from '@/api/auth';
 import ConfirmModal from '@/components/ConfirmModal.vue';
 import PullToRefresh from '@/components/PullToRefresh.vue';
@@ -826,7 +718,7 @@ const allPaymentMethods = [
     { value: 'OTHER', label: 'Other' },
 ];
 
-const activeSection = ref<'profile' | 'payment' | 'channels' | 'catalog' | 'team' | 'permissions' | 'plan' | 'ai' | 'danger'>('profile');
+const activeSection = ref<'profile' | 'payment' | 'channels' | 'catalog' | 'team' | 'permissions' | 'ai' | 'danger'>('profile');
 
 const isSaving = ref(false);
 const isCatalogSaving = ref(false);
@@ -1509,8 +1401,8 @@ const toggleMemberSuspension = (member: StoreMember) => {
     const suspend = !isSuspended(member);
     confirmModal.title = suspend ? 'Suspend member' : 'Reinstate member';
     confirmModal.message = suspend
-        ? `Suspend ${member.email}? They lose access to this store immediately, but keep their role and history and free up a seat on your plan. You can reinstate them later.`
-        : `Reinstate ${member.email}? They get their access back with the ${member.role} role. This needs a free seat on your plan.`;
+        ? `Suspend ${member.email}? They lose access to this store immediately, but keep their role and history. You can reinstate them later.`
+        : `Reinstate ${member.email}? They get their access back with the ${member.role} role.`;
     confirmModal.confirmText = suspend ? 'Suspend' : 'Reinstate';
     confirmModal.onConfirm = () => performSetMemberSuspension(member, suspend);
     confirmModal.show = true;
@@ -1605,41 +1497,6 @@ const inviteStatusClass = (status: string) => {
     return 'st-invite-status--expired';
 };
 
-// ── Plan & Subscription ───────────────────────────────────────
-const planConfig = computed(() => getPlanConfig(userContext.planTier));
-const storeUsage = computed(() => storeContext.stores.length);
-const allPlans = computed(() => planTierOrder.map((tier) => planConfigs[tier]));
-const currentTierIndex = computed(() => planTierOrder.indexOf(userContext.planTier ?? 'STARTER'));
-const recommendedTier = computed<PlanTier | null>(() => planTierOrder[currentTierIndex.value + 1] ?? null);
-const isDowngrade = (tier: PlanTier) => planTierOrder.indexOf(tier) < currentTierIndex.value;
-const isUpgrading = ref(false);
-
-const planTaglines: Record<PlanTier, string> = {
-    STARTER: 'Everything you need to get started — free forever.',
-    STANDARD: 'Advanced workflows for growing operations.',
-    GROWTH: 'Multi-store power for scaling businesses.',
-};
-const planPrices: Record<PlanTier, string> = {
-    STARTER: 'Free',
-    STANDARD: 'Contact us',
-    GROWTH: 'Contact us',
-};
-const coreFeatures = [
-    { key: 'pos' as const, label: 'Point of sale (POS)' },
-    { key: 'inventory' as const, label: 'Inventory tracking' },
-    { key: 'products' as const, label: 'Product management' },
-    { key: 'reports' as const, label: 'Sales reports' },
-];
-const advancedFeatures: { key: PlanFeature; label: string }[] = [
-    { key: 'ingredients', label: 'Ingredients & raw materials' },
-    { key: 'recipes', label: 'Recipes & product costing' },
-    { key: 'purchaseOrders', label: 'Purchase orders & suppliers' },
-    { key: 'importExport', label: 'Data exports (CSV)' },
-];
-const handlePlanAction = (plan: typeof allPlans.value[0]) => {
-    showToast(`To switch to ${plan.label}, contact us at support@arshii.app.`, 'info');
-};
-
 // Pull-to-refresh: refetch stores/profile; the currentStore watcher below
 // resets the form and reloads the team section when the store data changes.
 const refreshSettings = async () => {
@@ -1658,7 +1515,7 @@ onMounted(async () => {
 
     // Support deep-linking via ?section=team etc.
     const qs = route.query.section as string | undefined;
-    if (qs && ['profile', 'payment', 'channels', 'catalog', 'team', 'permissions', 'plan', 'ai', 'danger'].includes(qs)) {
+    if (qs && ['profile', 'payment', 'channels', 'catalog', 'team', 'permissions', 'ai', 'danger'].includes(qs)) {
         activeSection.value = qs as typeof activeSection.value;
     }
 
@@ -1850,8 +1707,7 @@ watch(
     color: var(--c-accent);
 }
 
-.st-sidebar-item .mdi,
-.st-plan-limit .mdi {
+.st-sidebar-item .mdi {
     display: inline-flex;
     flex-shrink: 0;
 }
@@ -2640,97 +2496,6 @@ watch(
 .st-invite-status--accepted { background: rgba(16, 185, 129, 0.15); color: #047857; }
 .st-invite-status--expired { background: #f1f5f9; color: #64748b; }
 
-/* ── Plan section ── */
-.st-plan-summary {
-    background: var(--c-bg);
-    border: 1px solid var(--c-border);
-    border-radius: 12px;
-    padding: 1rem 1.5rem;
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 0;
-}
-.st-plan-summary-item { display: flex; flex-direction: column; gap: 0.2rem; padding: 0.2rem 1.25rem 0.2rem 0; flex: 1; min-width: 110px; }
-.st-plan-summary-item:first-child { padding-left: 0; }
-.st-plan-summary-divider { width: 1px; height: 32px; background: var(--c-border); margin-right: 1.25rem; flex-shrink: 0; }
-.st-plan-summary-label { font-size: 0.66rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; color: var(--c-muted); }
-.st-plan-summary-value { font-size: 0.95rem; font-weight: 700; color: var(--c-text); }
-.st-plan-active { color: var(--c-accent-dark); }
-.st-plan-inactive { color: #b91c1c; }
-
-.st-plan-header { display: flex; flex-direction: column; gap: 0.2rem; }
-.st-plan-heading { font-size: 1.05rem; font-weight: 700; margin: 0; color: var(--c-text); }
-
-.st-plan-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 1rem;
-    align-items: start;
-}
-
-.st-plan-card {
-    background: var(--c-surface);
-    border: 1.5px solid var(--c-border);
-    border-radius: 14px;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    transition: box-shadow 0.15s, border-color 0.15s;
-}
-.st-plan-card:hover { box-shadow: 0 6px 20px rgba(15,23,42,0.07); }
-.st-plan-card--current { border-color: var(--c-accent); box-shadow: 0 0 0 3px rgba(13,148,136,0.1); }
-.st-plan-card--recommended:not(.st-plan-card--current) { border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,0.09); }
-
-.st-plan-card-top { padding: 1.25rem 1.25rem 1rem; border-bottom: 1px solid var(--c-border); }
-.st-plan-name-row { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.35rem; }
-.st-plan-name { font-size: 1.05rem; font-weight: 800; margin: 0; color: var(--c-text); letter-spacing: -0.02em; }
-.st-plan-pill { padding: 0.12rem 0.5rem; border-radius: 999px; font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
-.st-plan-pill--current { background: rgba(13,148,136,0.12); color: var(--c-accent-dark); }
-.st-plan-pill--recommended { background: rgba(99,102,241,0.12); color: #4f46e5; }
-.st-plan-tagline { font-size: 0.8rem; color: var(--c-muted); margin: 0 0 0.75rem; line-height: 1.5; }
-.st-plan-price { font-size: 1.35rem; font-weight: 800; color: var(--c-text); margin: 0; letter-spacing: -0.03em; }
-
-.st-plan-limits {
-    padding: 0.85rem 1.25rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0.4rem;
-    border-bottom: 1px solid var(--c-border);
-    background: var(--c-bg);
-}
-.st-plan-limit { display: flex; align-items: center; gap: 0.45rem; font-size: 0.8rem; font-weight: 500; color: var(--c-text); }
-.st-plan-limit svg { color: var(--c-muted); flex-shrink: 0; }
-
-.st-plan-features { padding: 1rem 1.25rem; display: flex; flex-direction: column; gap: 0.5rem; flex: 1; }
-.st-plan-feature-group-label { font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--c-muted); padding-bottom: 0.2rem; border-bottom: 1px solid var(--c-border); }
-.st-plan-feature-row { display: flex; align-items: center; gap: 0.5rem; font-size: 0.82rem; color: var(--c-text); }
-.st-plan-feature-row--locked { color: var(--c-muted); }
-.st-plan-check--yes { color: var(--c-accent); flex-shrink: 0; }
-.st-plan-check--no { color: #cbd5e1; flex-shrink: 0; }
-
-.st-plan-card-footer { padding: 1rem 1.25rem; border-top: 1px solid var(--c-border); }
-.st-plan-btn {
-    width: 100%;
-    padding: 0.6rem 1rem;
-    border-radius: 8px;
-    font-size: 0.875rem;
-    font-weight: 600;
-    font-family: var(--app-font-sans);
-    cursor: pointer;
-    transition: background 0.15s, border-color 0.15s;
-}
-.st-plan-btn--current { background: rgba(13,148,136,0.08); border: 1.5px solid rgba(13,148,136,0.22); color: var(--c-accent-dark); cursor: default; }
-.st-plan-btn--upgrade { background: var(--c-accent); border: none; color: white; }
-.st-plan-btn--upgrade:hover { background: var(--c-accent-dark); }
-.st-plan-btn--ghost { background: transparent; border: 1.5px solid var(--c-border); color: var(--c-muted); }
-.st-plan-btn--ghost:hover { border-color: #cbd5e1; color: var(--c-text); }
-.st-plan-btn:disabled { opacity: 0.6; cursor: not-allowed; }
-
-.st-plan-note { font-size: 0.82rem; color: var(--c-muted); margin: 0; text-align: center; }
-.st-plan-link { color: var(--c-accent-dark); font-weight: 500; text-decoration: none; }
-.st-plan-link:hover { text-decoration: underline; }
-
 /* ── Responsive ── */
 
 /* Tablet: sidebar collapses to horizontal tab strip */
@@ -2790,16 +2555,7 @@ watch(
     }
 }
 
-/* Plan grid: 3-col → 1-col at 900px */
 @media (max-width: 900px) {
-    .st-plan-grid {
-        grid-template-columns: 1fr;
-        max-width: 420px;
-    }
-    .st-plan-summary-divider { display: none; }
-    .st-plan-summary-item { padding: 0; min-width: calc(50% - 0.5rem); flex: none; }
-    .st-plan-summary { gap: 0.75rem; }
-
     .st-invite-form {
         grid-template-columns: 1fr;
     }
@@ -2828,8 +2584,6 @@ watch(
         flex-direction: column;
         align-items: flex-start;
     }
-
-    .st-plan-summary-item { min-width: 100%; }
 }
 
 /* ── Archive store modal ── */

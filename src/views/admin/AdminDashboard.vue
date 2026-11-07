@@ -20,8 +20,8 @@
                     <span class="adash-kpi-label">Active stores</span>
                 </div>
                 <div class="adash-kpi">
-                    <span class="adash-kpi-value">{{ stats.activeSubscriptions.toLocaleString() }}</span>
-                    <span class="adash-kpi-label">Active subscriptions</span>
+                    <span class="adash-kpi-value">{{ formatPeso(stats.billing.expectedRevenue) }}</span>
+                    <span class="adash-kpi-label">Billable in {{ billingMonthLabel }}</span>
                 </div>
                 <div class="adash-kpi">
                     <span class="adash-kpi-value">+{{ stats.newUsersThisMonth.toLocaleString() }}</span>
@@ -31,47 +31,51 @@
 
             <!-- Second row -->
             <div class="adash-row">
-                <!-- Plan breakdown -->
+                <!-- Collection progress -->
                 <div class="adash-card">
-                    <h2 class="adash-card-title">Users by plan</h2>
-                    <div class="adash-plan-list">
-                        <div v-for="tier in planTiers" :key="tier.key" class="adash-plan-row">
-                            <div class="adash-plan-info">
-                                <span class="adash-plan-dot" :class="`adash-plan-dot--${tier.key.toLowerCase()}`"></span>
-                                <span class="adash-plan-name">{{ tier.label }}</span>
-                            </div>
-                            <div class="adash-plan-bar-wrap">
-                                <div
-                                    class="adash-plan-bar"
-                                    :class="`adash-plan-bar--${tier.key.toLowerCase()}`"
-                                    :style="{ width: barWidth(tier.key) }"
-                                ></div>
-                            </div>
-                            <span class="adash-plan-count">{{ (stats.planBreakdown[tier.key] ?? 0).toLocaleString() }}</span>
-                        </div>
+                    <h2 class="adash-card-title">{{ billingMonthLabel }} collections</h2>
+                    <div class="adash-progress-head">
+                        <span class="adash-progress-amount">{{ formatPeso(stats.billing.collectedRevenue) }}</span>
+                        <span class="adash-progress-of">of {{ formatPeso(stats.billing.expectedRevenue) }} collected</span>
                     </div>
-                </div>
-
-                <!-- Grants & admin -->
-                <div class="adash-card">
-                    <h2 class="adash-card-title">Access overrides</h2>
+                    <div class="adash-progress-track">
+                        <div class="adash-progress-bar" :style="{ width: collectedWidth }"></div>
+                    </div>
                     <div class="adash-stat-list">
                         <div class="adash-stat-row">
-                            <span class="adash-stat-label">Complimentary grants</span>
-                            <span class="adash-stat-value">{{ stats.grantedPlans }}</span>
+                            <span class="adash-stat-label">Paying owners</span>
+                            <span class="adash-stat-value">{{ stats.billing.paidOwners }} / {{ stats.billing.billableOwners }}</span>
                         </div>
                         <div class="adash-stat-row">
-                            <span class="adash-stat-label">Inactive subscriptions</span>
-                            <span class="adash-stat-value adash-stat-value--warn">
-                                {{ stats.totalUsers - stats.activeSubscriptions }}
+                            <span class="adash-stat-label">Billable stores</span>
+                            <span class="adash-stat-value">{{ stats.billing.billableStores }}</span>
+                        </div>
+                        <div class="adash-stat-row">
+                            <span class="adash-stat-label">Outstanding</span>
+                            <span class="adash-stat-value" :class="{ 'adash-stat-value--warn': outstanding > 0 }">
+                                {{ formatPeso(outstanding) }}
                             </span>
                         </div>
                     </div>
                     <div class="adash-card-action">
-                        <RouterLink :to="{ name: 'admin-users' }" class="adash-link">
-                            Manage users →
+                        <RouterLink :to="{ name: 'admin-billing' }" class="adash-link">
+                            Open billing →
                         </RouterLink>
                     </div>
+                </div>
+
+                <!-- Pricing -->
+                <div class="adash-card">
+                    <h2 class="adash-card-title">Per-store pricing</h2>
+                    <div class="adash-stat-list">
+                        <div v-for="tier in pricingTiers" :key="tier.label" class="adash-stat-row">
+                            <span class="adash-stat-label">{{ tier.label }}</span>
+                            <span class="adash-stat-value">{{ formatPeso(tier.fee) }}<span class="adash-per">/mo</span></span>
+                        </div>
+                    </div>
+                    <p class="adash-note">
+                        Each owner's stores are ranked oldest first. Warehouses count as stores. All features are included.
+                    </p>
                 </div>
             </div>
         </template>
@@ -89,22 +93,34 @@ const stats = ref<PlatformStats | null>(null);
 
 const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 
-const planTiers = [
-    { key: 'STARTER', label: 'Starter' },
-    { key: 'STANDARD', label: 'Standard' },
-    { key: 'GROWTH', label: 'Growth' },
-];
+const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const billingMonthLabel = computed(() =>
+    stats.value ? `${MONTH_NAMES[stats.value.billing.month - 1]} ${stats.value.billing.year}` : ''
+);
 
-const maxPlanCount = computed(() => {
-    if (!stats.value) return 1;
-    return Math.max(1, ...planTiers.map((t) => stats.value!.planBreakdown[t.key] ?? 0));
+const outstanding = computed(() =>
+    stats.value ? Math.max(0, stats.value.billing.expectedRevenue - stats.value.billing.collectedRevenue) : 0
+);
+
+const collectedWidth = computed(() => {
+    if (!stats.value || stats.value.billing.expectedRevenue <= 0) return '0%';
+    const ratio = stats.value.billing.collectedRevenue / stats.value.billing.expectedRevenue;
+    return `${Math.min(100, Math.round(ratio * 100))}%`;
 });
 
-const barWidth = (key: string) => {
-    if (!stats.value) return '0%';
-    const count = stats.value.planBreakdown[key] ?? 0;
-    return `${Math.round((count / maxPlanCount.value) * 100)}%`;
-};
+const ordinal = (n: number) => (n === 1 ? '1st' : n === 2 ? '2nd' : n === 3 ? '3rd' : `${n}th`);
+
+const pricingTiers = computed(() => {
+    if (!stats.value) return [];
+    const { storeFees, additionalStoreFee } = stats.value.billing.pricing;
+    return [
+        ...storeFees.map((fee, i) => ({ label: `${ordinal(i + 1)} store`, fee })),
+        { label: `${ordinal(storeFees.length + 1)} store onward`, fee: additionalStoreFee },
+    ];
+});
+
+const formatPeso = (amount: number) =>
+    `₱${amount.toLocaleString('en-PH', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
 
 onMounted(async () => {
     loading.value = true;
@@ -202,54 +218,36 @@ onMounted(async () => {
     letter-spacing: -0.01em;
 }
 
-/* Plan breakdown */
-.adash-plan-list { display: flex; flex-direction: column; gap: 0.75rem; }
+/* Collection progress */
+.adash-progress-head { display: flex; align-items: baseline; gap: 0.5rem; flex-wrap: wrap; }
 
-.adash-plan-row {
-    display: grid;
-    grid-template-columns: 100px 1fr 40px;
-    align-items: center;
-    gap: 0.75rem;
+.adash-progress-amount {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: #0f172a;
+    letter-spacing: -0.03em;
 }
 
-.adash-plan-info { display: flex; align-items: center; gap: 0.5rem; }
+.adash-progress-of { font-size: 0.82rem; color: #64748b; }
 
-.adash-plan-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    flex-shrink: 0;
-}
-
-.adash-plan-dot--starter { background: #94a3b8; }
-.adash-plan-dot--standard { background: #0d9488; }
-.adash-plan-dot--growth { background: #6366f1; }
-
-.adash-plan-name { font-size: 0.82rem; font-weight: 500; color: #334155; }
-
-.adash-plan-bar-wrap {
+.adash-progress-track {
     height: 8px;
     background: #f1f5f9;
     border-radius: 99px;
     overflow: hidden;
+    margin-top: -0.5rem;
 }
 
-.adash-plan-bar {
+.adash-progress-bar {
     height: 100%;
     border-radius: 99px;
+    background: #0d9488;
     transition: width 0.4s ease;
 }
 
-.adash-plan-bar--starter { background: #94a3b8; }
-.adash-plan-bar--standard { background: #0d9488; }
-.adash-plan-bar--growth { background: #6366f1; }
+.adash-per { font-size: 0.75rem; font-weight: 500; color: #64748b; margin-left: 0.1rem; }
 
-.adash-plan-count {
-    font-size: 0.82rem;
-    font-weight: 700;
-    color: #0f172a;
-    text-align: right;
-}
+.adash-note { font-size: 0.8rem; color: #64748b; line-height: 1.5; margin: 0; }
 
 /* Stat list */
 .adash-stat-list { display: flex; flex-direction: column; gap: 0.75rem; flex: 1; }

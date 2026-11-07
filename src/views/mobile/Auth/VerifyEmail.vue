@@ -14,7 +14,7 @@
                     <div class="auth-card-lite">
                         <span class="auth-kicker">Step 2</span>
                         <span class="auth-metric">Start setup</span>
-                        <span class="auth-sub">Activate subscription</span>
+                        <span class="auth-sub">Create your first store</span>
                     </div>
                 </div>
                 <div class="auth-footer">

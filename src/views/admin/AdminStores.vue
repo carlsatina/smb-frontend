@@ -3,7 +3,7 @@
         <header class="as-header">
             <div>
                 <h1 class="as-title">Stores</h1>
-                <p class="as-sub">Sales activity per store — use the month filter for billing.</p>
+                <p class="as-sub">Sales activity per store. Monthly fees are managed on the Billing page.</p>
             </div>
             <div class="as-header-kpis">
                 <div class="as-kpi">
@@ -37,19 +37,6 @@
 
             <input v-model="search" class="as-search" type="text" placeholder="Search store or owner email…" />
 
-            <label class="as-fee-wrap">
-                <span class="as-fee-label">Fee / receipt</span>
-                <span class="as-fee-input-wrap">
-                    <span class="as-fee-currency">₱</span>
-                    <input v-model.number="feeRate" class="as-fee-input" type="number" min="0" step="0.01" />
-                </span>
-            </label>
-
-            <label class="as-filter-toggle">
-                <input v-model="perReceiptOnly" type="checkbox" />
-                <span>Per-receipt only</span>
-            </label>
-
             <div class="as-sort-wrap">
                 <label class="as-sort-label">Sort</label>
                 <select v-model="sortBy" class="as-sort-select">
@@ -69,9 +56,9 @@
                         <tr>
                             <th>Store</th>
                             <th>Owner</th>
-                            <th>Plan</th>
+                            <th>Created</th>
                             <th class="as-th-num">Receipts ({{ monthLabel }})</th>
-                            <th class="as-th-num">Convenience fee</th>
+                            <th class="as-th-num">Receipts (all time)</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -88,26 +75,16 @@
                             <td>
                                 <div v-if="store.owner" class="as-owner-email">{{ store.owner.email }}</div>
                                 <div v-else class="as-muted">No owner</div>
-                                <span v-if="store.owner?.payPerReceipt" class="as-billing-badge">Per receipt</span>
                             </td>
-                            <td>
-                                <span v-if="store.owner" class="as-plan-badge" :class="`as-plan-badge--${(store.owner.grantedPlan || store.owner.planTier).toLowerCase()}`">
-                                    {{ store.owner.grantedPlan || store.owner.planTier }}
-                                    <span v-if="store.owner.grantedPlan" class="as-grant-tag">granted</span>
-                                </span>
-                                <span v-else class="as-muted">—</span>
-                            </td>
+                            <td><span class="as-muted">{{ formatDate(store.createdAt) }}</span></td>
                             <td class="as-td-num">
                                 <span class="as-num" :class="store.salesThisMonth > 0 ? 'as-num--active' : 'as-num--zero'">
                                     {{ store.salesThisMonth.toLocaleString() }}
                                 </span>
                             </td>
                             <td class="as-td-num">
-                                <span
-                                    class="as-num"
-                                    :class="store.owner?.payPerReceipt && store.salesThisMonth > 0 ? 'as-num--active' : 'as-num--zero'"
-                                >
-                                    {{ formatPeso(convenienceFee(store)) }}
+                                <span class="as-num" :class="store.totalSales > 0 ? 'as-num--active' : 'as-num--zero'">
+                                    {{ store.totalSales.toLocaleString() }}
                                 </span>
                             </td>
                         </tr>
@@ -124,12 +101,6 @@
                     <button class="as-page-btn" :disabled="page === 1" @click="loadPage(page - 1)">←</button>
                     <span class="as-page-info">Page {{ page }} of {{ totalPages }}</span>
                     <button class="as-page-btn" :disabled="page === totalPages" @click="loadPage(page + 1)">→</button>
-                </div>
-                <!-- Per-receipt billing summary -->
-                <div v-if="perReceiptStoreCount > 0" class="as-billing-hint">
-                    <span class="as-billing-dot"></span>
-                    {{ perReceiptStoreCount }} per-receipt store{{ perReceiptStoreCount !== 1 ? 's' : '' }} in {{ monthLabel }}
-                    — {{ totalBillableReceipts.toLocaleString() }} receipts, {{ formatPeso(totalBillableMonth) }} billable
                 </div>
             </div>
         </template>
@@ -157,8 +128,6 @@ const selectedYear = ref(now.getFullYear());
 
 const search = ref('');
 const sortBy = ref<'salesThisMonth' | 'createdAt'>('salesThisMonth');
-const feeRate = ref(1); // ₱ per receipt convenience fee
-const perReceiptOnly = ref(false);
 
 const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
@@ -186,7 +155,6 @@ const goToCurrentMonth = () => {
 const filteredStores = computed(() => {
     const q = search.value.trim().toLowerCase();
     return stores.value.filter((s) => {
-        if (perReceiptOnly.value && !s.owner?.payPerReceipt) return false;
         if (!q) return true;
         return s.name.toLowerCase().includes(q) || (s.owner?.email ?? '').toLowerCase().includes(q);
     });
@@ -201,20 +169,8 @@ const sortedStores = computed(() => {
 const totalSalesAllTime = computed(() => stores.value.reduce((acc, s) => acc + s.totalSales, 0));
 const totalSalesMonth = computed(() => stores.value.reduce((acc, s) => acc + s.salesThisMonth, 0));
 
-// Per-receipt billing
-const safeFeeRate = computed(() => (Number.isFinite(feeRate.value) && feeRate.value >= 0 ? feeRate.value : 0));
-const convenienceFee = (store: AdminStore) =>
-    store.owner?.payPerReceipt ? store.salesThisMonth * safeFeeRate.value : 0;
-
-const perReceiptStores = computed(() => stores.value.filter((s) => s.owner?.payPerReceipt));
-const perReceiptStoreCount = computed(() => perReceiptStores.value.length);
-const totalBillableReceipts = computed(() =>
-    perReceiptStores.value.reduce((acc, s) => acc + s.salesThisMonth, 0)
-);
-const totalBillableMonth = computed(() => totalBillableReceipts.value * safeFeeRate.value);
-
-const formatPeso = (amount: number) =>
-    `₱${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const formatDate = (iso: string) =>
+    new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 
 const loadPage = async (p: number) => {
     loading.value = true;
@@ -388,42 +344,6 @@ onMounted(() => loadPage(1));
 
 .as-search:focus { border-color: #0d9488; box-shadow: 0 0 0 3px rgba(13,148,136,0.1); }
 
-/* Fee rate */
-.as-fee-wrap { display: flex; align-items: center; gap: 0.5rem; }
-.as-fee-label { font-size: 0.8rem; color: #64748b; white-space: nowrap; }
-.as-fee-input-wrap {
-    display: inline-flex;
-    align-items: center;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    background: #fff;
-    padding: 0 0.5rem;
-}
-.as-fee-input-wrap:focus-within { border-color: #0d9488; box-shadow: 0 0 0 3px rgba(13,148,136,0.1); }
-.as-fee-currency { font-size: 0.875rem; color: #64748b; }
-.as-fee-input {
-    width: 64px;
-    border: none;
-    outline: none;
-    padding: 0.5rem 0.25rem;
-    font-size: 0.875rem;
-    color: #0f172a;
-    background: transparent;
-}
-
-/* Per-receipt filter */
-.as-filter-toggle {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.45rem;
-    font-size: 0.8rem;
-    color: #64748b;
-    cursor: pointer;
-    user-select: none;
-    white-space: nowrap;
-}
-.as-filter-toggle input { width: 15px; height: 15px; accent-color: #0d9488; cursor: pointer; }
-
 /* Sort */
 .as-sort-wrap { display: flex; align-items: center; gap: 0.5rem; }
 .as-sort-label { font-size: 0.8rem; color: #64748b; white-space: nowrap; }
@@ -504,45 +424,6 @@ onMounted(() => loadPage(1));
 
 .as-owner-email { font-size: 0.85rem; color: #334155; word-break: break-all; }
 
-.as-billing-badge {
-    display: inline-block;
-    margin-top: 0.25rem;
-    font-size: 0.6rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    padding: 0.12rem 0.45rem;
-    border-radius: 4px;
-    background: #fef3c7;
-    color: #92400e;
-}
-
-.as-plan-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    padding: 0.2rem 0.55rem;
-    border-radius: 999px;
-    font-size: 0.65rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.07em;
-}
-
-.as-plan-badge--starter { background: #f1f5f9; color: #64748b; }
-.as-plan-badge--standard { background: #eff6ff; color: #1d4ed8; }
-.as-plan-badge--growth { background: #f0fdf4; color: #166534; }
-
-.as-grant-tag {
-    font-size: 0.58rem;
-    background: rgba(234,179,8,0.15);
-    color: #92400e;
-    padding: 0.1rem 0.35rem;
-    border-radius: 3px;
-    font-weight: 700;
-    text-transform: uppercase;
-}
-
 .as-num { font-size: 0.875rem; font-weight: 700; color: #0f172a; }
 .as-num--active { color: #0d9488; }
 .as-num--zero { color: #cbd5e1; font-weight: 600; }
@@ -581,27 +462,6 @@ onMounted(() => loadPage(1));
 .as-page-btn:hover:not(:disabled) { border-color: #0d9488; color: #0d9488; }
 .as-page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .as-page-info { font-size: 0.82rem; color: #64748b; }
-
-/* Billing summary hint */
-.as-billing-hint {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 0.82rem;
-    color: #64748b;
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    padding: 0.5rem 0.875rem;
-}
-
-.as-billing-dot {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: #0d9488;
-    flex-shrink: 0;
-}
 
 /* States */
 .as-state { padding: 2rem; text-align: center; color: #64748b; background: #f8fafc; border-radius: 10px; }

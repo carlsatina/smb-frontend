@@ -65,14 +65,7 @@
                 </div>
             </header>
 
-            <PlanGate
-                v-if="isPlanLocked"
-                feature="purchaseOrders"
-                title="Purchase orders are available on Standard."
-                description="Upgrade to Standard to review order details, update suppliers, and receive inventory."
-            />
-
-            <SkeletonLoader v-else-if="isLoading" :rows="6" label="Loading purchase order…" />
+            <SkeletonLoader v-if="isLoading" :rows="6" label="Loading purchase order…" />
 
             <div v-else-if="!purchaseOrder" class="panel-state">Purchase order not found.</div>
 
@@ -431,8 +424,6 @@ import { useToast } from '@/composables/useToast';
 import { useStoreContextStore } from '@/stores/storeContext';
 import { canAccess } from '@/utils/roleAccess';
 import { todayStr } from '@/utils/datetime';
-import { hasPlanFeature } from '@/utils/planAccess';
-import PlanGate from '@/components/PlanGate.vue';
 import ConfirmModal from '@/components/ConfirmModal.vue';
 import SkeletonLoader from '@/components/SkeletonLoader.vue';
 
@@ -445,14 +436,6 @@ const purchaseOrder = ref<PurchaseOrderDetail | null>(null);
 const suppliers = ref<Supplier[]>([]);
 const isLoading = ref(false);
 // Use the store owner's plan tier for feature access (not the logged-in user's)
-const ownerPlanTier = computed(() => storeContext.currentStore?.ownerPlanTier ?? null);
-const ownerSubscriptionActive = computed(() => storeContext.currentStore?.ownerSubscriptionActive ?? false);
-const planKnown = computed(() => ownerPlanTier.value !== null);
-const isPlanLocked = computed(
-    () =>
-        !ownerSubscriptionActive.value ||
-        (planKnown.value && !hasPlanFeature(ownerPlanTier.value, 'purchaseOrders'))
-);
 const isSubmitting = ref(false);
 const isUpdatingStatus = ref(false);
 const isUpdatingDetails = ref(false);
@@ -513,10 +496,6 @@ const prettyStatus = (status: string) => STATUS_LABELS[status] ?? status.replace
 const stepLabel = (status: string) => STEP_LABELS[status] ?? status.replace(/_/g, ' ');
 
 const loadPurchaseOrder = async () => {
-    if (isPlanLocked.value) {
-        purchaseOrder.value = null;
-        return;
-    }
     if (!routeStoreId.value || !routePurchaseOrderId.value) return;
     isLoading.value = true;
     try {
@@ -529,10 +508,6 @@ const loadPurchaseOrder = async () => {
 };
 
 const loadSuppliers = async () => {
-    if (isPlanLocked.value) {
-        suppliers.value = [];
-        return;
-    }
     if (!routeStoreId.value) {
         suppliers.value = [];
         return;
@@ -919,14 +894,12 @@ onMounted(async () => {
     if (routeStoreId.value) {
         storeContext.setCurrentStore(routeStoreId.value);
     }
-    if (isPlanLocked.value) return;
     await Promise.all([loadPurchaseOrder(), loadSuppliers()]);
 });
 
 watch(
     () => route.params.purchaseOrderId,
     async () => {
-        if (isPlanLocked.value) return;
         await loadPurchaseOrder();
     }
 );
@@ -937,7 +910,6 @@ watch(
         if (!storeId) return;
         storeContext.setCurrentStore(storeId);
         showSupplierForm.value = false;
-        if (isPlanLocked.value) return;
         await loadSuppliers();
     }
 );

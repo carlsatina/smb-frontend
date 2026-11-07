@@ -19,9 +19,6 @@
             </header>
 
             <form class="product-form" @submit.prevent="save">
-                <div v-if="form.type === 'RECIPE' && isRecipePlanLocked" class="form-alert form-alert--warning">
-                    Upgrade to Standard to build recipe products.
-                </div>
                 <div v-if="isRecipeMissing" class="form-alert form-alert--warning">
                     Recipe products need at least one ingredient line before they can be activated.
                 </div>
@@ -62,13 +59,11 @@
                                 class="type-card"
                                 :class="{ 'type-card--selected': form.type === 'RECIPE' }"
                                 :aria-pressed="form.type === 'RECIPE'"
-                                :disabled="isRecipePlanLocked"
                                 @click="form.type = 'RECIPE'"
                             >
                                 <mdicon name="chef-hat" size="18" class="type-card-icon" />
                                 <span class="type-card-title">
                                     Recipe
-                                    <mdicon v-if="isRecipePlanLocked" name="lock-outline" size="13" class="type-card-lock" />
                                 </span>
                                 <span class="type-card-sub">Made from ingredients, deducted per sale</span>
                             </button>
@@ -362,13 +357,7 @@
                             {{ formatMoney(recipeSummary.estimatedCost) }} / unit
                         </span>
                     </div>
-                    <PlanGate
-                        v-if="isRecipePlanLocked"
-                        feature="recipes"
-                        title="Recipes are available on Standard."
-                        description="Upgrade to Standard to add ingredients and recipe lines."
-                    />
-                    <div v-else class="recipe-editor">
+                    <div class="recipe-editor">
                         <div v-if="recipeLoading" class="panel-state">Loading recipe lines…</div>
                         <div v-else>
                             <div v-if="recipeError" class="form-alert form-alert--error">{{ recipeError }}</div>
@@ -463,13 +452,7 @@
                         <h2>Takeout packaging</h2>
                         <p>Deducted from inventory only when this product is sold as takeout.</p>
                     </div>
-                    <PlanGate
-                        v-if="!canEditPackaging"
-                        feature="ingredients"
-                        title="Packaging tracking needs ingredients."
-                        description="Upgrade to track packaging items as ingredients deducted on takeout."
-                    />
-                    <div v-else-if="!isEdit" class="recipe-empty">
+                    <div v-if="!isEdit" class="recipe-empty">
                         <p>Save the product first, then add its takeout packaging here.</p>
                     </div>
                     <div v-else class="recipe-editor">
@@ -621,13 +604,10 @@ import { listPackagingLines, updatePackagingLines } from '@/api/productPackaging
 import { updateStore } from '@/api/stores';
 import { useToast } from '@/composables/useToast';
 import { useStoreContextStore } from '@/stores/storeContext';
-import { useUserContextStore } from '@/stores/userContext';
-import { hasPlanFeature, openPlanUpgradeModal } from '@/utils/planAccess';
 import { DEFAULT_CATEGORY_OPTIONS, DEFAULT_UNIT_OPTIONS } from '@/utils/catalogDefaults';
 import { getSubcategoriesFor, withSubcategories } from '@/utils/subcategories';
 import { hasPermission } from '@/utils/roleAccess';
 import { activeChannels, computeChannelPrice, type SalesChannel } from '@/utils/salesChannels';
-import PlanGate from '@/components/PlanGate.vue';
 import IngredientModal from '@/components/IngredientModal.vue';
 import SearchableSelect from '@/components/SearchableSelect.vue';
 
@@ -654,24 +634,9 @@ type PackagingLineDraft = {
 const router = useRouter();
 const route = useRoute();
 const storeContext = useStoreContextStore();
-const userContext = useUserContextStore();
 
 const productId = computed(() => route.params.productId as string | undefined);
 const isEdit = computed(() => Boolean(productId.value));
-// Use the store owner's plan tier for feature access (not the logged-in user's)
-const ownerPlanTier = computed(() => storeContext.currentStore?.ownerPlanTier ?? null);
-const ownerSubscriptionActive = computed(() => storeContext.currentStore?.ownerSubscriptionActive ?? false);
-const planKnown = computed(() => ownerPlanTier.value !== null);
-const canUseIngredients = computed(() => planKnown.value && hasPlanFeature(ownerPlanTier.value, 'ingredients'));
-const canUseRecipes = computed(() => planKnown.value && hasPlanFeature(ownerPlanTier.value, 'recipes'));
-const isRecipePlanLocked = computed(() => {
-    // Don't lock if we haven't loaded store context yet
-    if (!planKnown.value) return false;
-    // Lock if owner's subscription is inactive AND on starter plan
-    if (!ownerSubscriptionActive.value && ownerPlanTier.value === 'STARTER') return true;
-    // Lock if owner's plan doesn't support ingredients or recipes
-    return !canUseIngredients.value || !canUseRecipes.value;
-});
 const currentStoreLabel = computed(() => {
     const store = storeContext.currentStore;
     if (!store) return 'your store';
@@ -817,7 +782,6 @@ const isLineLowStock = (key: string) =>
     recipePreviewLines.value.find((line) => line.key === key)?.isLowStock ?? false;
 const saveDisabled = computed(() => {
     if (isSaving.value || isSaveBlocked.value) return true;
-    if (form.value.type === 'RECIPE' && isRecipePlanLocked.value) return true;
     return false;
 });
 
@@ -1192,10 +1156,6 @@ const loadProduct = async () => {
 };
 
 const loadIngredients = async () => {
-    if (isRecipePlanLocked.value) {
-        ingredients.value = [];
-        return;
-    }
     const storeId = storeContext.currentStoreId;
     if (!storeId) {
         ingredients.value = [];
@@ -1222,7 +1182,7 @@ const loadIngredients = async () => {
 
 const loadIngredientStock = async () => {
     const storeId = storeContext.currentStoreId;
-    if (!storeId || form.value.type !== 'RECIPE' || isRecipePlanLocked.value) {
+    if (!storeId || form.value.type !== 'RECIPE') {
         ingredientStock.value = [];
         return;
     }
@@ -1240,7 +1200,7 @@ const loadIngredientStock = async () => {
 };
 
 const loadRecipeLines = async () => {
-    if (!storeContext.currentStoreId || !productId.value || form.value.type !== 'RECIPE' || isRecipePlanLocked.value) {
+    if (!storeContext.currentStoreId || !productId.value || form.value.type !== 'RECIPE') {
         recipeLines.value = [];
         return;
     }
@@ -1314,10 +1274,6 @@ const lineCost = (line: RecipeLineDraft) => {
 };
 
 const saveRecipeLines = async () => {
-    if (isRecipePlanLocked.value) {
-        openPlanUpgradeModal('recipes');
-        return;
-    }
     if (!storeContext.currentStoreId || !productId.value) return;
     recipeError.value = '';
     recipeSuccess.value = false;
@@ -1365,8 +1321,6 @@ const packagingIngredients = computed(() =>
     ingredients.value.filter((ingredient) => ingredient.category === 'PACKAGING')
 );
 
-const canEditPackaging = computed(() => planKnown.value && canUseIngredients.value);
-
 const packagingIngredientOptions = (line: PackagingLineDraft) => {
     const selectedIds = new Set(packagingLines.value.map((item) => item.ingredientId).filter(Boolean));
     return packagingIngredients.value
@@ -1386,7 +1340,7 @@ const packagingLineError = (line: PackagingLineDraft) => {
 };
 
 const loadPackagingLines = async () => {
-    if (!storeContext.currentStoreId || !productId.value || !canEditPackaging.value) {
+    if (!storeContext.currentStoreId || !productId.value) {
         packagingLines.value = [];
         return;
     }
@@ -1422,10 +1376,6 @@ const removePackagingLine = (index: number) => {
 };
 
 const savePackagingLines = async () => {
-    if (!canEditPackaging.value) {
-        openPlanUpgradeModal('ingredients');
-        return;
-    }
     if (!storeContext.currentStoreId || !productId.value) return;
     packagingError.value = '';
     packagingSuccess.value = false;
@@ -1469,10 +1419,6 @@ const savePackagingLines = async () => {
 };
 
 const openIngredientModal = () => {
-    if (isRecipePlanLocked.value) {
-        openPlanUpgradeModal('ingredients');
-        return;
-    }
     showIngredientModal.value = true;
 };
 
@@ -1494,10 +1440,6 @@ const onIngredientCreated = async (ingredient: { id: string; name: string; unit:
 const save = async () => {
     if (!storeContext.currentStoreId) return;
     formError.value = '';
-    if (form.value.type === 'RECIPE' && isRecipePlanLocked.value) {
-        openPlanUpgradeModal('recipes');
-        return;
-    }
     if (isSaveBlocked.value) {
         formError.value = 'Finish or remove incomplete recipe lines before saving.';
         return;
@@ -1554,8 +1496,6 @@ const goToIngredients = () => {
 };
 
 onMounted(async () => {
-    // Ensure user context is loaded for plan feature checks
-    await userContext.fetchMe();
     if (!storeContext.stores.length) {
         await storeContext.fetchStores();
     }
@@ -2085,7 +2025,6 @@ watch(
     color: var(--c-text);
 }
 
-.type-card-lock { color: var(--c-muted); }
 
 .type-card-sub {
     font-size: 0.75rem;

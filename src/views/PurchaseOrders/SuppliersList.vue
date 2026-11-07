@@ -81,14 +81,7 @@
                 </div>
             </header>
 
-            <PlanGate
-                v-if="isPlanLocked"
-                feature="purchaseOrders"
-                title="Suppliers are available on Standard."
-                description="Upgrade to Standard to manage suppliers and connect them to purchase orders."
-            />
-
-            <div v-else-if="!storeContext.currentStoreId && !isLoading" class="panel-state">
+            <div v-if="!storeContext.currentStoreId && !isLoading" class="panel-state">
                 Select or create a store to manage suppliers.
             </div>
 
@@ -199,8 +192,6 @@ import { createSupplier, deleteSupplier, listSuppliers, Supplier, updateSupplier
 import { useToast } from '@/composables/useToast';
 import { useStoreContextStore } from '@/stores/storeContext';
 import { canAccess } from '@/utils/roleAccess';
-import { hasPlanFeature } from '@/utils/planAccess';
-import PlanGate from '@/components/PlanGate.vue';
 import ConfirmModal from '@/components/ConfirmModal.vue';
 import SkeletonLoader from '@/components/SkeletonLoader.vue';
 
@@ -246,14 +237,6 @@ const currentStoreLabel = computed(() => {
 });
 
 const canWrite = computed(() => canAccess(storeContext.currentStore, 'purchaseOrdersWrite'));
-const ownerPlanTier = computed(() => storeContext.currentStore?.ownerPlanTier ?? null);
-const ownerSubscriptionActive = computed(() => storeContext.currentStore?.ownerSubscriptionActive ?? false);
-const planKnown = computed(() => ownerPlanTier.value !== null);
-const isPlanLocked = computed(
-    () =>
-        !ownerSubscriptionActive.value ||
-        (planKnown.value && !hasPlanFeature(ownerPlanTier.value, 'purchaseOrders'))
-);
 
 const filteredSuppliers = computed(() => {
     const query = searchQuery.value.trim().toLowerCase();
@@ -283,10 +266,6 @@ const changePage = (nextPage: number) => {
 };
 
 const loadSuppliers = async () => {
-    if (isPlanLocked.value) {
-        suppliers.value = [];
-        return;
-    }
     const storeId = storeContext.currentStoreId;
     if (!storeId) {
         suppliers.value = [];
@@ -445,7 +424,7 @@ onMounted(async () => {
         if (routeStoreId && routeStoreId !== storeContext.currentStoreId) {
             storeContext.setCurrentStore(routeStoreId);
         }
-        if (isPlanLocked.value || !storeContext.currentStoreId) {
+        if (!storeContext.currentStoreId) {
             isLoading.value = false;
             return;
         }
@@ -469,7 +448,6 @@ watch(
     () => storeContext.currentStoreId,
     async () => {
         page.value = 1;
-        if (isPlanLocked.value) return;
         await loadSuppliers();
     }
 );

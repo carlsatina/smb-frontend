@@ -36,15 +36,6 @@
                             </div>
                         </div>
 
-                        <div v-else-if="showSubscribeCta" class="st-modal-body">
-                            <div class="st-modal-gate">
-                                <p>An active subscription is required to create stores.</p>
-                                <button type="button" class="st-btn-primary" @click="goToAccountPlan">
-                                    View subscription plans →
-                                </button>
-                            </div>
-                        </div>
-
                         <form v-else class="st-modal-body" @submit.prevent="createNewStore">
                             <label class="form-field">
                                 Store name
@@ -176,7 +167,6 @@
                                             'store-action--active': action.active,
                                             'store-action--primary': action.primary,
                                             'store-action--pill': action.pill,
-                                            'store-action--locked': action.lockedFeature,
                                         }"
                                         @click="handleStoreAction(action)"
                                     >
@@ -204,7 +194,6 @@
                                             'store-action--active': action.active,
                                             'store-action--primary': action.primary,
                                             'store-action--pill': action.pill,
-                                            'store-action--locked': action.lockedFeature,
                                         }"
                                         @click="handleStoreAction(action)"
                                     >
@@ -226,7 +215,6 @@
                                             'store-action--active': action.active,
                                             'store-action--primary': action.primary,
                                             'store-action--pill': action.pill,
-                                            'store-action--locked': action.lockedFeature,
                                         }"
                                         @click="handleStoreAction(action)"
                                     >
@@ -244,7 +232,6 @@
                                             'store-action--active': action.active,
                                             'store-action--primary': action.primary,
                                             'store-action--pill': action.pill,
-                                            'store-action--locked': action.lockedFeature,
                                         }"
                                         tabindex="-1"
                                         :data-action-key="action.key"
@@ -281,7 +268,6 @@ import type { StoreSummary } from '@/stores/storeContext';
 import { useToast } from '@/composables/useToast';
 import { canAccess, FeatureKey, type StoreAccess } from '@/utils/roleAccess';
 import { useUserContextStore } from '@/stores/userContext';
-import { hasPlanFeature, openPlanUpgradeModal, PlanFeature } from '@/utils/planAccess';
 
 const router = useRouter();
 const storeContext = useStoreContextStore();
@@ -333,8 +319,7 @@ const baseCurrencyOptions = [
     'VND',
 ];
 
-const subscriptionActive = computed(() => userContext.subscriptionActive);
-const isSubscriptionLoading = computed(() => userContext.isLoading && !userContext.hasLoaded);
+const isAccountLoading = computed(() => userContext.isLoading && !userContext.hasLoaded);
 const isStoresLoading = computed(() => storeContext.isLoading || !storeContext.hasLoaded);
 const isEmailVerified = computed(() => userContext.profile?.emailVerified === true);
 const storeNameInputRef = ref<HTMLInputElement | null>(null);
@@ -349,16 +334,10 @@ const currentStoreRole = computed(() => storeContext.currentStore?.role || 'N/A'
 const hasOwnerRole = computed(() => storeContext.stores.some((store) => store.role === 'OWNER'));
 const canCreateStore = computed(() => {
     if (!isEmailVerified.value) return false;
-    if (subscriptionActive.value !== true) return false;
     if (storeContext.stores.length === 0) return true;
     return hasOwnerRole.value;
 });
-const isRoleRestricted = computed(
-    () => subscriptionActive.value === true && storeContext.stores.length > 0 && !hasOwnerRole.value
-);
-const showSubscribeCta = computed(
-    () => !isSubscriptionLoading.value && isEmailVerified.value && subscriptionActive.value !== true && !isRoleRestricted.value
-);
+const isRoleRestricted = computed(() => storeContext.stores.length > 0 && !hasOwnerRole.value);
 type StoreAction = {
     key: string;
     label: string;
@@ -367,7 +346,6 @@ type StoreAction = {
     active?: boolean;
     primary?: boolean;
     pill?: boolean;
-    lockedFeature?: PlanFeature;
 };
 
 const openMenuId = ref<string | null>(null);
@@ -375,8 +353,6 @@ const actionLayouts = ref<Record<string, { inline: string[]; overflow: string[] 
 const actionContainerRefs = new Map<string, HTMLElement>();
 const actionMeasureRefs = new Map<string, HTMLElement>();
 
-const planKnown = computed(() => userContext.planTier !== null);
-const isPurchaseOrdersLocked = computed(() => planKnown.value && !hasPlanFeature(userContext.planTier, 'purchaseOrders'));
 const timezoneOptions = computed(() => {
     if (storeForm.timezone && !baseTimezoneOptions.includes(storeForm.timezone)) {
         return [storeForm.timezone, ...baseTimezoneOptions];
@@ -422,7 +398,6 @@ const getStoreActions = (store: StoreSummary): StoreAction[] => [
         label: 'Purchase orders',
         visible: canAccessFeature(store, 'purchaseOrders'),
         onClick: () => goToPurchaseOrders(store.id),
-        lockedFeature: isPurchaseOrdersLocked.value ? 'purchaseOrders' : undefined,
     },
     {
         key: 'reports',
@@ -456,11 +431,6 @@ const getOverflowStoreActions = (store: StoreSummary) => {
 };
 
 const handleStoreAction = (action: StoreAction) => {
-    if (action.lockedFeature) {
-        openPlanUpgradeModal(action.lockedFeature);
-        openMenuId.value = null;
-        return;
-    }
     action.onClick();
     openMenuId.value = null;
 };
@@ -551,26 +521,23 @@ const computeAllLayouts = () => {
 };
 
 const emptyMessage = computed(() => {
-    if (isSubscriptionLoading.value) return 'Checking subscription status...';
+    if (isAccountLoading.value) return 'Loading your account...';
     if (!isEmailVerified.value) return 'Verify your email to create a store or accept invites.';
-    if (subscriptionActive.value) return 'Create your first store to unlock inventory and POS flows.';
-    return 'Subscribe to create a store, or ask an owner to invite you to an existing one.';
+    return 'Create your first store to unlock inventory and POS flows.';
 });
 const createStoreSubtitle = computed(() => {
-    if (isSubscriptionLoading.value) return 'Checking subscription status...';
+    if (isAccountLoading.value) return 'Loading your account...';
     if (!isEmailVerified.value) return 'Verify your email to unlock store creation.';
     if (isRoleRestricted.value) return 'Only owners can create additional stores.';
-    if (subscriptionActive.value) return 'Set the defaults that drive pricing and inventory controls.';
-    return 'An active subscription is required to create stores.';
+    return 'Set the defaults that drive pricing and inventory controls.';
 });
 const createStoreHint = computed(() => {
-    if (isSubscriptionLoading.value) return 'Please wait while we verify your subscription.';
+    if (isAccountLoading.value) return 'Please wait while we load your account.';
     if (!isEmailVerified.value) return 'Check your inbox for a verification link, or resend it from the verify page.';
     if (isRoleRestricted.value) {
         return 'Ask an owner to create a new store or request an ownership role.';
     }
-    if (subscriptionActive.value) return 'Set the defaults that drive pricing and inventory controls.';
-    return 'Activate your subscription to unlock store creation or request an invite to join an existing store.';
+    return 'Set the defaults that drive pricing and inventory controls.';
 });
 
 const resetForm = () => {
@@ -660,9 +627,6 @@ const goToReports = (storeId: string) => {
     router.push(`/stores/${storeId}/reports`);
 };
 
-const goToAccountPlan = () => {
-    router.push('/account/plan');
-};
 
 const refreshStores = async () => {
     await Promise.all([
@@ -1110,19 +1074,6 @@ watch(
 .store-action--primary:hover {
     background: var(--c-accent-dark);
     border-color: var(--c-accent-dark);
-}
-
-.store-action--locked {
-    opacity: 0.55;
-    border-style: dashed;
-    color: var(--c-muted);
-}
-
-.store-action--locked:hover {
-    background: transparent;
-    color: var(--c-muted);
-    border-color: var(--c-border);
-    border-style: dashed;
 }
 
 .store-action:disabled {

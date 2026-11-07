@@ -119,7 +119,6 @@
                             <button class="pill" :class="{ active: typeFilter === 'ALL' }" @click="typeFilter = 'ALL'">All</button>
                             <button class="pill" :class="{ active: typeFilter === 'PRODUCT' }" @click="typeFilter = 'PRODUCT'">Products</button>
                             <button
-                                v-if="showIngredients"
                                 class="pill"
                                 :class="{ active: typeFilter === 'INGREDIENT' }"
                                 @click="typeFilter = 'INGREDIENT'"
@@ -341,7 +340,6 @@ import { batchTransferStock, listStock, StockItem } from '@/api/inventory';
 import { useStoreContextStore } from '@/stores/storeContext';
 import { useUserContextStore } from '@/stores/userContext';
 import { canAccess } from '@/utils/roleAccess';
-import { hasPlanFeature } from '@/utils/planAccess';
 import DailyInventoryReportView from './DailyInventoryReportView.vue';
 
 const router = useRouter();
@@ -375,10 +373,6 @@ const page = ref(1);
 const pageSize = ref(10);
 const pageSizeOptions = [10, 20, 50];
 
-const ownerPlanTier = computed(() => storeContext.currentStore?.ownerPlanTier ?? null);
-const planKnown = computed(() => ownerPlanTier.value !== null);
-const canUseIngredients = computed(() => planKnown.value && hasPlanFeature(ownerPlanTier.value, 'ingredients'));
-const showIngredients = computed(() => !planKnown.value || canUseIngredients.value);
 
 const loadStock = async () => {
     const storeId = storeContext.currentStoreId;
@@ -682,14 +676,6 @@ watch(() => statusFilter.value, () => { page.value = 1; });
 watch(() => typeFilter.value, () => { page.value = 1; });
 watch(() => pageSize.value, () => { page.value = 1; });
 
-watch(
-    () => canUseIngredients.value,
-    (allowed) => {
-        if (!allowed && typeFilter.value === 'INGREDIENT') {
-            typeFilter.value = 'PRODUCT';
-        }
-    }
-);
 
 watch(
     () => filteredStock.value.length,

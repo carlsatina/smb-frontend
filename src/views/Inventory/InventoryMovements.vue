@@ -16,7 +16,7 @@
                     <div class="header-actions">
                         <button
                             class="ghost-button"
-                            :disabled="isExporting || !canExport || !storeContext.currentStoreId"
+                            :disabled="isExporting || !storeContext.currentStoreId"
                             @click="exportMovements"
                         >
                             <mdicon name="download-outline" size="16" />
@@ -227,7 +227,6 @@ import { listMovements, MovementRecord } from '@/api/inventory';
 import { useToast } from '@/composables/useToast';
 import { useStoreContextStore } from '@/stores/storeContext';
 import { canAccess } from '@/utils/roleAccess';
-import { hasPlanFeature, openPlanUpgradeModal } from '@/utils/planAccess';
 import { zonedDayStartIso, zonedDayEndIso } from '@/utils/datetime';
 import SkeletonLoader from '@/components/SkeletonLoader.vue';
 
@@ -327,9 +326,6 @@ const clearDateFilter = async () => {
 };
 
 // Use the store owner's plan tier for feature access (not the logged-in user's)
-const ownerPlanTier = computed(() => storeContext.currentStore?.ownerPlanTier ?? null);
-const planKnown = computed(() => ownerPlanTier.value !== null);
-const canExport = computed(() => planKnown.value && hasPlanFeature(ownerPlanTier.value, 'importExport'));
 
 const currentStoreLabel = computed(() => {
     const store = storeContext.currentStore;
@@ -468,10 +464,6 @@ const exportMovements = async () => {
     const storeId = storeContext.currentStoreId;
     if (!storeId) return;
     if (isExporting.value) return;
-    if (!canExport.value) {
-        openPlanUpgradeModal('importExport');
-        return;
-    }
     isExporting.value = true;
     try {
         const timeZone = storeContext.currentStore?.timezone || 'Asia/Manila';

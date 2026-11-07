@@ -1,17 +1,12 @@
 import { apiClient } from './client';
-import type { PlanTier } from '@/utils/planAccess';
 
 export type AdminUser = {
     id: string;
     email: string;
     fullName?: string | null;
-    planTier: PlanTier;
-    grantedPlan: PlanTier | null;
-    grantedUntil: string | null;
-    subscriptionActive: boolean;
-    payPerReceipt: boolean;
     isSuperAdmin: boolean;
     emailVerified: boolean;
+    ownedStores: number;
     createdAt: string;
 };
 
@@ -23,39 +18,48 @@ export type AdminStore = {
     createdAt: string;
     totalSales: number;
     salesThisMonth: number;
-    owner: {
-        id: string;
-        email: string;
-        planTier: PlanTier;
-        grantedPlan: PlanTier | null;
-        grantedUntil: string | null;
-        subscriptionActive: boolean;
-        payPerReceipt: boolean;
-    } | null;
-};
-
-export type BillingStore = {
-    id: string;
-    name: string;
-    currency: string;
     owner: { id: string; email: string } | null;
-    receiptCount: number;
-    lastBilledAt: string | null;
-    lastBilledAmount: number | null;
-    lastBilledReceipts: number | null;
 };
 
-export type BillingHistoryEntry = {
-    id: string;
+export type BillingPricing = {
+    currency: string;
+    storeFees: number[];
+    additionalStoreFee: number;
+};
+
+export type BillingLine = {
+    storeId: string;
     storeName: string;
-    sentToEmail: string;
+    storeType: string;
+    position: number;
+    fee: number;
+};
+
+export type BillingStatement = {
+    id: string;
+    storeCount: number;
+    lines: BillingLine[];
+    amount: number;
+    sentAt: string | null;
+    sentToEmail: string | null;
     sentByEmail: string | null;
+    sendCount: number;
+    paidAt: string | null;
+    paymentNote: string | null;
+};
+
+export type BillingOwner = {
+    owner: { id: string; email: string; fullName: string | null };
+    lines: BillingLine[];
+    amount: number;
+    statement: BillingStatement | null;
+};
+
+export type BillingHistoryEntry = BillingStatement & {
     year: number;
     month: number;
-    receiptCount: number;
-    feeRate: number;
-    amount: number;
-    sentAt: string;
+    ownerEmail: string;
+    ownerName: string | null;
 };
 
 export type PaginatedResponse<T> = {
@@ -82,10 +86,17 @@ export const getAdminStores = (page = 1, month?: number, year?: number) => {
 export type PlatformStats = {
     totalUsers: number;
     totalStores: number;
-    activeSubscriptions: number;
-    grantedPlans: number;
     newUsersThisMonth: number;
-    planBreakdown: Record<string, number>;
+    billing: {
+        month: number;
+        year: number;
+        billableOwners: number;
+        billableStores: number;
+        expectedRevenue: number;
+        collectedRevenue: number;
+        paidOwners: number;
+        pricing: BillingPricing;
+    };
 };
 
 export const getAdminStats = () =>
@@ -94,50 +105,39 @@ export const getAdminStats = () =>
 export const getAdminMetrics = () =>
     apiClient.request<{ metrics: unknown[] }>('/api/v1/admin/metrics');
 
-export const updateUserPlan = (userId: string, planTier: PlanTier, subscriptionActive: boolean) =>
-    apiClient.request<{ user: AdminUser }>(`/api/v1/admin/users/${userId}/plan`, {
-        method: 'PATCH',
-        body: { planTier, subscriptionActive },
-    });
-
-export const grantUserPlan = (userId: string, grantedPlan: PlanTier, grantedUntil?: string | null) =>
-    apiClient.request<{ user: AdminUser }>(`/api/v1/admin/users/${userId}/grant`, {
-        method: 'PATCH',
-        body: { grantedPlan, grantedUntil: grantedUntil ?? null },
-    });
-
-export const revokeUserGrant = (userId: string) =>
-    apiClient.request<{ user: AdminUser }>(`/api/v1/admin/users/${userId}/grant`, {
-        method: 'DELETE',
-    });
-
 export const updateSuperAdmin = (userId: string, isSuperAdmin: boolean) =>
     apiClient.request<{ user: { id: string; email: string; isSuperAdmin: boolean } }>(
         `/api/v1/admin/users/${userId}/super-admin`,
         { method: 'PATCH', body: { isSuperAdmin } }
     );
 
-export const updateBillingMode = (userId: string, payPerReceipt: boolean) =>
-    apiClient.request<{ user: { id: string; email: string; payPerReceipt: boolean } }>(
-        `/api/v1/admin/users/${userId}/billing-mode`,
-        { method: 'PATCH', body: { payPerReceipt } }
-    );
-
-export const getBillingStores = (month: number, year: number) =>
-    apiClient.request<{ stores: BillingStore[]; month: number; year: number }>(
+export const getBillingOwners = (month: number, year: number) =>
+    apiClient.request<{ owners: BillingOwner[]; month: number; year: number; pricing: BillingPricing }>(
         `/api/v1/admin/billing?month=${month}&year=${year}`
     );
 
 export type SendBillingResult = {
     sent: boolean;
     message?: string;
-    notice?: { sentAt: string; amount: number; receiptCount: number; sentToEmail: string };
+    statement?: BillingStatement;
 };
 
-export const sendBillingNotice = (storeId: string, month: number, year: number, feeRate: number) =>
-    apiClient.request<SendBillingResult>(`/api/v1/admin/billing/${storeId}/send`, {
+export const sendBillingNotice = (ownerId: string, month: number, year: number) =>
+    apiClient.request<SendBillingResult>(`/api/v1/admin/billing/${ownerId}/send`, {
         method: 'POST',
-        body: { month, year, feeRate },
+        body: { month, year },
+    });
+
+export const setBillingPayment = (
+    ownerId: string,
+    month: number,
+    year: number,
+    paid: boolean,
+    note?: string | null
+) =>
+    apiClient.request<{ statement: BillingStatement | null }>(`/api/v1/admin/billing/${ownerId}/payment`, {
+        method: 'PATCH',
+        body: { month, year, paid, note: note ?? null },
     });
 
 export const getBillingHistory = (month?: number, year?: number) => {

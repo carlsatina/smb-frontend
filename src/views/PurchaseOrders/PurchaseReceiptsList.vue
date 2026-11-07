@@ -14,7 +14,7 @@
                     <div class="header-actions">
                         <button
                             class="ghost-button"
-                            :disabled="isExporting || !storeContext.currentStoreId || !canExport"
+                            :disabled="isExporting || !storeContext.currentStoreId"
                             @click="exportReceipts"
                         >
                             <mdicon name="download-outline" size="16" />
@@ -24,14 +24,7 @@
                 </div>
             </header>
 
-            <PlanGate
-                v-if="isPlanLocked"
-                feature="purchaseOrders"
-                title="Receipts are available on Standard."
-                description="Upgrade to Standard to review receiving analytics and export receipts."
-            />
-
-            <div v-else-if="!storeContext.currentStoreId && !isLoading" class="panel-state">
+            <div v-if="!storeContext.currentStoreId && !isLoading" class="panel-state">
                 Select or create a store to view receipts.
             </div>
 
@@ -227,9 +220,7 @@ import {
 import { listSuppliers, Supplier } from '@/api/suppliers';
 import { useToast } from '@/composables/useToast';
 import { useStoreContextStore } from '@/stores/storeContext';
-import { hasPlanFeature, openPlanUpgradeModal } from '@/utils/planAccess';
 import { zonedDayStartIso, zonedDayEndIso } from '@/utils/datetime';
-import PlanGate from '@/components/PlanGate.vue';
 import SkeletonLoader from '@/components/SkeletonLoader.vue';
 
 const router = useRouter();
@@ -261,27 +252,12 @@ const currentStoreLabel = computed(() => {
 });
 
 // Use the store owner's plan tier for feature access (not the logged-in user's)
-const ownerPlanTier = computed(() => storeContext.currentStore?.ownerPlanTier ?? null);
-const ownerSubscriptionActive = computed(() => storeContext.currentStore?.ownerSubscriptionActive ?? false);
-const planKnown = computed(() => ownerPlanTier.value !== null);
-const isPlanLocked = computed(
-    () =>
-        !ownerSubscriptionActive.value ||
-        (planKnown.value && !hasPlanFeature(ownerPlanTier.value, 'purchaseOrders'))
-);
-const canExport = computed(() => planKnown.value && hasPlanFeature(ownerPlanTier.value, 'importExport'));
 
 const hasActiveFilters = computed(() =>
     Boolean(searchQuery.value.trim() || supplierFilter.value || supplierNameFilter.value || fromDate.value || toDate.value)
 );
 
 const loadReceipts = async () => {
-    if (isPlanLocked.value) {
-        receipts.value = [];
-        total.value = 0;
-        isLoading.value = false;
-        return;
-    }
     const storeId = storeContext.currentStoreId;
     if (!storeId) {
         receipts.value = [];
@@ -317,11 +293,6 @@ const loadReceipts = async () => {
 };
 
 const loadSummary = async () => {
-    if (isPlanLocked.value) {
-        summary.value = null;
-        isSummaryLoading.value = false;
-        return;
-    }
     const storeId = storeContext.currentStoreId;
     if (!storeId) {
         summary.value = null;
@@ -353,10 +324,6 @@ const loadSummary = async () => {
 };
 
 const loadSuppliers = async () => {
-    if (isPlanLocked.value) {
-        suppliers.value = [];
-        return;
-    }
     const storeId = storeContext.currentStoreId;
     if (!storeId) {
         suppliers.value = [];
@@ -487,10 +454,6 @@ const downloadCsv = (filename: string, rows: Array<Array<string | number | null 
 const exportReceipts = async () => {
     const storeId = storeContext.currentStoreId;
     if (!storeId || isExporting.value) return;
-    if (!canExport.value) {
-        openPlanUpgradeModal('importExport');
-        return;
-    }
     isExporting.value = true;
     try {
         const timeZone = storeContext.currentStore?.timezone || 'Asia/Manila';
@@ -559,7 +522,7 @@ onMounted(async () => {
         if (routeStoreId && routeStoreId !== storeContext.currentStoreId) {
             storeContext.setCurrentStore(routeStoreId);
         }
-        if (isPlanLocked.value || !storeContext.currentStoreId) {
+        if (!storeContext.currentStoreId) {
             isLoading.value = false;
             isSummaryLoading.value = false;
             return;
@@ -588,7 +551,6 @@ watch(
 watch(
     () => storeContext.currentStoreId,
     async () => {
-        if (isPlanLocked.value) return;
         supplierFilter.value = '';
         supplierNameFilter.value = '';
         const applied = await applyQueryFilters();
@@ -602,7 +564,6 @@ watch(
 watch(
     () => pageSize.value,
     async () => {
-        if (isPlanLocked.value) return;
         page.value = 1;
         await loadReceipts();
     }
@@ -618,7 +579,6 @@ watch(supplierFilter, (value) => {
 let searchDebounce: ReturnType<typeof setTimeout> | undefined;
 
 watch(searchQuery, () => {
-    if (isPlanLocked.value) return;
     if (isApplyingQuery.value) return;
     if (searchDebounce) {
         clearTimeout(searchDebounce);
@@ -630,7 +590,6 @@ watch(searchQuery, () => {
 });
 
 const applyQueryFilters = async () => {
-    if (isPlanLocked.value) return false;
     const query = route.query;
     const hasQuery = ['supplierId', 'supplierName', 'from', 'to', 'q'].some((key) => query[key] !== undefined);
     if (!hasQuery) return false;

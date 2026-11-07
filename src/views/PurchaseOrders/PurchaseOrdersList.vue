@@ -27,14 +27,7 @@
                 </div>
             </header>
 
-            <PlanGate
-                v-if="isPlanLocked"
-                feature="purchaseOrders"
-                title="Purchase orders are available on Standard."
-                description="Upgrade to Standard to manage suppliers, draft purchase orders, and receive inventory."
-            />
-
-            <div v-else-if="!storeContext.currentStoreId && !isLoading" class="panel-state">
+            <div v-if="!storeContext.currentStoreId && !isLoading" class="panel-state">
                 Select or create a store to manage purchase orders.
             </div>
 
@@ -200,9 +193,7 @@ import SkeletonLoader from '@/components/SkeletonLoader.vue';
 import { listPurchaseOrders, PurchaseOrderSummary } from '@/api/purchaseOrders';
 import { listSuppliers, Supplier } from '@/api/suppliers';
 import { useStoreContextStore } from '@/stores/storeContext';
-import { hasPlanFeature } from '@/utils/planAccess';
 import { zonedDayStartIso, zonedDayEndIso } from '@/utils/datetime';
-import PlanGate from '@/components/PlanGate.vue';
 
 const router = useRouter();
 const route = useRoute();
@@ -233,12 +224,6 @@ const statusOptions = [
     { value: 'CANCELLED', label: 'Cancelled' },
 ];
 
-const ownerPlanTier = computed(() => storeContext.currentStore?.ownerPlanTier ?? null);
-const ownerSubscriptionActive = computed(() => storeContext.currentStore?.ownerSubscriptionActive ?? false);
-const planKnown = computed(() => ownerPlanTier.value !== null);
-const isPlanLocked = computed(
-    () => !ownerSubscriptionActive.value || (planKnown.value && !hasPlanFeature(ownerPlanTier.value, 'purchaseOrders'))
-);
 
 const totalPages = computed(() => {
     if (totalCount.value === 0) return 0;
@@ -266,7 +251,6 @@ const emptyMessage = computed(() =>
 );
 
 const loadOrders = async () => {
-    if (isPlanLocked.value) { purchaseOrders.value = []; totalCount.value = 0; openCountValue.value = 0; receivedCountValue.value = 0; isLoading.value = false; return; }
     const storeId = storeContext.currentStoreId;
     if (!storeId) { purchaseOrders.value = []; totalCount.value = 0; openCountValue.value = 0; receivedCountValue.value = 0; isLoading.value = false; return; }
     isLoading.value = true;
@@ -298,7 +282,6 @@ const loadOrders = async () => {
 };
 
 const loadSuppliers = async () => {
-    if (isPlanLocked.value) { suppliers.value = []; return; }
     const storeId = storeContext.currentStoreId;
     if (!storeId) { suppliers.value = []; return; }
     const data = await listSuppliers(storeId);
@@ -373,7 +356,6 @@ const isSoon = (order: PurchaseOrderSummary) => {
 };
 
 const applyQueryFilters = async () => {
-    if (isPlanLocked.value) return false;
     const query = route.query;
     const hasQuery = ['status', 'supplierId', 'from', 'to', 'q'].some((key) => query[key] !== undefined);
     if (!hasQuery) return false;
@@ -400,7 +382,7 @@ onMounted(async () => {
         await storeContext.fetchStores();
         const routeStoreId = route.params.storeId as string | undefined;
         if (routeStoreId && routeStoreId !== storeContext.currentStoreId) storeContext.setCurrentStore(routeStoreId);
-        if (isPlanLocked.value || !storeContext.currentStoreId) {
+        if (!storeContext.currentStoreId) {
             isLoading.value = false;
             return;
         }
@@ -413,7 +395,7 @@ onMounted(async () => {
 });
 
 watch(() => storeContext.currentStoreId, async () => {
-    if (isPlanLocked.value || !storeContext.currentStoreId) {
+    if (!storeContext.currentStoreId) {
         isLoading.value = false;
         return;
     }
@@ -426,18 +408,18 @@ watch(() => storeContext.currentStoreId, async () => {
 
 watch(() => route.query, async () => { await applyQueryFilters(); });
 
-watch(statusFilter, async () => { if (isPlanLocked.value || isApplyingQuery.value) return; page.value = 1; await loadOrders(); });
-watch(supplierFilter, async () => { if (isPlanLocked.value || isApplyingQuery.value) return; page.value = 1; await loadOrders(); });
-watch([fromDate, toDate], async () => { if (isPlanLocked.value || isApplyingQuery.value) return; page.value = 1; await loadOrders(); });
+watch(statusFilter, async () => { if (isApplyingQuery.value) return; page.value = 1; await loadOrders(); });
+watch(supplierFilter, async () => { if (isApplyingQuery.value) return; page.value = 1; await loadOrders(); });
+watch([fromDate, toDate], async () => { if (isApplyingQuery.value) return; page.value = 1; await loadOrders(); });
 
 let searchDebounce: ReturnType<typeof setTimeout> | undefined;
 watch(searchQuery, () => {
-    if (isPlanLocked.value || isApplyingQuery.value) return;
+    if (isApplyingQuery.value) return;
     clearTimeout(searchDebounce);
     searchDebounce = setTimeout(() => { page.value = 1; loadOrders(); }, 300);
 });
 
-watch(() => pageSize.value, async () => { if (isPlanLocked.value) return; page.value = 1; await loadOrders(); });
+watch(() => pageSize.value, async () => { page.value = 1; await loadOrders(); });
 
 watch(() => totalCount.value, async () => {
     if (page.value > totalPages.value && totalPages.value > 0) { page.value = totalPages.value; await loadOrders(); }

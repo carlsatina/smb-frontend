@@ -3,27 +3,30 @@
         <header class="ab-header">
             <div>
                 <h1 class="ab-title">Billing</h1>
-                <p class="ab-sub">Per-receipt convenience-fee billing for stores not on a subscription.</p>
+                <p class="ab-sub">
+                    Monthly per-store fees, billed to each owner.
+                    <span v-if="pricingText">{{ pricingText }}</span>
+                </p>
             </div>
             <div class="ab-header-kpis">
                 <div class="ab-kpi">
-                    <span class="ab-kpi-value">{{ stores.length }}</span>
-                    <span class="ab-kpi-label">Per-receipt stores</span>
+                    <span class="ab-kpi-value">{{ billableOwners.length }}</span>
+                    <span class="ab-kpi-label">Billable owners</span>
                 </div>
                 <div class="ab-kpi">
-                    <span class="ab-kpi-value">{{ totalReceipts.toLocaleString() }}</span>
-                    <span class="ab-kpi-label">Receipts in {{ monthLabel }}</span>
-                </div>
-                <div class="ab-kpi ab-kpi--accent">
                     <span class="ab-kpi-value">{{ formatPeso(totalDue) }}</span>
                     <span class="ab-kpi-label">Billable in {{ monthLabel }}</span>
+                </div>
+                <div class="ab-kpi ab-kpi--accent">
+                    <span class="ab-kpi-value">{{ formatPeso(totalCollected) }}</span>
+                    <span class="ab-kpi-label">Collected</span>
                 </div>
             </div>
         </header>
 
         <!-- Tabs -->
         <div class="ab-tabs">
-            <button class="ab-tab" :class="{ 'ab-tab--active': view === 'send' }" @click="view = 'send'">Send bills</button>
+            <button class="ab-tab" :class="{ 'ab-tab--active': view === 'statements' }" @click="view = 'statements'">Statements</button>
             <button class="ab-tab" :class="{ 'ab-tab--active': view === 'history' }" @click="view = 'history'">History</button>
         </div>
 
@@ -48,163 +51,203 @@
                 <button v-if="!isCurrentMonth" class="ab-today-btn" @click="goToCurrentMonth">This month</button>
             </div>
 
-            <label v-if="view === 'send'" class="ab-fee-wrap">
-                <span class="ab-fee-label">Fee / receipt</span>
-                <span class="ab-fee-input-wrap">
-                    <span class="ab-fee-currency">₱</span>
-                    <input v-model.number="feeRate" class="ab-fee-input" type="number" min="0" step="0.01" />
-                </span>
-            </label>
+            <template v-if="view === 'statements'">
+                <input v-model="search" class="ab-search" type="search" placeholder="Search owner or store…" />
+                <div class="ab-segment" role="group" aria-label="Payment status">
+                    <button
+                        v-for="option in statusOptions"
+                        :key="option.value"
+                        class="ab-segment-btn"
+                        :class="{ 'ab-segment-btn--active': statusFilter === option.value }"
+                        @click="statusFilter = option.value"
+                    >
+                        {{ option.label }}
+                    </button>
+                </div>
+            </template>
         </div>
 
-        <!-- Send bills view -->
-        <template v-if="view === 'send'">
-        <div v-if="loading" class="ab-state">Loading billing...</div>
-        <div v-else-if="error" class="ab-state ab-state--error">{{ error }}</div>
+        <!-- Statements view -->
+        <template v-if="view === 'statements'">
+            <div v-if="loading" class="ab-state">Loading billing...</div>
+            <div v-else-if="error" class="ab-state ab-state--error">{{ error }}</div>
 
-        <template v-else>
-            <div class="ab-table-wrap">
+            <div v-else class="ab-table-wrap">
                 <table class="ab-table">
                     <thead>
                         <tr>
-                            <th>Store</th>
                             <th>Owner</th>
-                            <th class="ab-th-num">Receipts ({{ monthLabel }})</th>
-                            <th class="ab-th-num">Amount due</th>
-                            <th>Last billed</th>
-                            <th class="ab-th-action">Action</th>
+                            <th>Stores</th>
+                            <th class="ab-th-num">Amount</th>
+                            <th>Status</th>
+                            <th class="ab-th-action">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="store in stores" :key="store.id">
-                            <td><div class="ab-store-name">{{ store.name }}</div></td>
+                        <tr v-for="row in visibleOwners" :key="row.owner.id">
                             <td>
-                                <span v-if="store.owner" class="ab-owner-email">{{ store.owner.email }}</span>
-                                <span v-else class="ab-muted">No owner</span>
-                            </td>
-                            <td class="ab-td-num">
-                                <span class="ab-num" :class="store.receiptCount > 0 ? 'ab-num--active' : 'ab-num--zero'">
-                                    {{ store.receiptCount.toLocaleString() }}
-                                </span>
-                            </td>
-                            <td class="ab-td-num">
-                                <span class="ab-num" :class="store.receiptCount > 0 ? 'ab-num--active' : 'ab-num--zero'">
-                                    {{ formatPeso(amountDue(store)) }}
-                                </span>
+                                <div class="ab-owner-email">{{ row.owner.email }}</div>
+                                <div v-if="row.owner.fullName" class="ab-muted">{{ row.owner.fullName }}</div>
                             </td>
                             <td>
-                                <div v-if="store.lastBilledAt" class="ab-last-billed">
-                                    <span class="ab-last-date">{{ formatDateTime(store.lastBilledAt) }}</span>
-                                    <span class="ab-last-amount">{{ formatPeso(store.lastBilledAmount ?? 0) }}</span>
+                                <ol class="ab-lines">
+                                    <li v-for="line in displayLines(row)" :key="line.storeId" class="ab-line">
+                                        <span class="ab-line-name">
+                                            {{ line.storeName }}
+                                            <span v-if="line.storeType === 'WAREHOUSE'" class="ab-line-tag">Warehouse</span>
+                                        </span>
+                                        <span class="ab-line-fee">{{ formatPeso(line.fee) }}</span>
+                                    </li>
+                                    <li v-if="displayLines(row).length === 0" class="ab-muted">No stores this month</li>
+                                </ol>
+                            </td>
+                            <td class="ab-td-num">
+                                <span class="ab-num" :class="displayAmount(row) > 0 ? 'ab-num--active' : 'ab-num--zero'">
+                                    {{ formatPeso(displayAmount(row)) }}
+                                </span>
+                                <div v-if="hasChangedSinceSent(row)" class="ab-changed" :title="`Sent as ${formatPeso(row.statement!.amount)}`">
+                                    Changed since sent
                                 </div>
-                                <span v-else class="ab-muted">Not billed</span>
+                            </td>
+                            <td>
+                                <div class="ab-status">
+                                    <span v-if="row.statement?.paidAt" class="ab-pill ab-pill--paid">Paid</span>
+                                    <span v-else-if="row.statement?.sentAt" class="ab-pill ab-pill--sent">Sent</span>
+                                    <span v-else class="ab-pill ab-pill--draft">Not sent</span>
+                                    <span v-if="row.statement?.paidAt" class="ab-muted">
+                                        {{ formatDate(row.statement.paidAt) }}<template v-if="row.statement.paymentNote"> · {{ row.statement.paymentNote }}</template>
+                                    </span>
+                                    <span v-else-if="row.statement?.sentAt" class="ab-muted">
+                                        {{ formatDateTime(row.statement.sentAt) }}<template v-if="row.statement.sendCount > 1"> · sent {{ row.statement.sendCount }}×</template>
+                                    </span>
+                                </div>
                             </td>
                             <td class="ab-td-action">
-                                <button
-                                    class="ab-btn"
-                                    :class="store.lastBilledAt ? 'ab-btn--ghost' : ''"
-                                    :disabled="!store.owner || store.receiptCount === 0"
-                                    :title="!store.owner ? 'No owner email' : store.receiptCount === 0 ? 'No receipts to bill' : ''"
-                                    @click="openConfirm(store)"
-                                >
-                                    {{ store.lastBilledAt ? 'Resend bill' : 'Send bill' }}
-                                </button>
+                                <div class="ab-actions">
+                                    <button
+                                        class="ab-btn ab-btn--ghost"
+                                        :disabled="displayLines(row).length === 0 || busyOwnerId === row.owner.id"
+                                        @click="openSendConfirm(row)"
+                                    >
+                                        {{ row.statement?.sentAt ? 'Resend' : 'Send bill' }}
+                                    </button>
+                                    <button
+                                        v-if="!row.statement?.paidAt"
+                                        class="ab-btn"
+                                        :disabled="displayLines(row).length === 0 || busyOwnerId === row.owner.id"
+                                        @click="openPaidConfirm(row)"
+                                    >
+                                        Mark paid
+                                    </button>
+                                    <button
+                                        v-else
+                                        class="ab-btn ab-btn--ghost ab-btn--danger"
+                                        :disabled="busyOwnerId === row.owner.id"
+                                        @click="markUnpaid(row)"
+                                    >
+                                        Mark unpaid
+                                    </button>
+                                </div>
                             </td>
                         </tr>
-                        <tr v-if="stores.length === 0">
-                            <td colspan="6" class="ab-empty">
-                                No per-receipt stores. Mark a user as “Bill per receipt” in the Users page first.
+                        <tr v-if="visibleOwners.length === 0">
+                            <td colspan="5" class="ab-empty">
+                                {{ owners.length === 0 ? `No store owners to bill for ${monthLabel}.` : 'No owners match these filters.' }}
                             </td>
                         </tr>
                     </tbody>
                 </table>
             </div>
         </template>
-        </template>
 
         <!-- History view -->
         <template v-else>
             <div v-if="historyLoading" class="ab-state">Loading history...</div>
-            <template v-else>
-                <div class="ab-table-wrap">
-                    <table class="ab-table">
-                        <thead>
-                            <tr>
-                                <th>Sent</th>
-                                <th>Store</th>
-                                <th>Billed to</th>
-                                <th>Period</th>
-                                <th class="ab-th-num">Receipts</th>
-                                <th class="ab-th-num">Amount</th>
-                                <th>Sent by</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr v-for="entry in history" :key="entry.id">
-                                <td class="ab-date-cell">{{ formatDateTime(entry.sentAt) }}</td>
-                                <td><span class="ab-store-name">{{ entry.storeName }}</span></td>
-                                <td><span class="ab-owner-email">{{ entry.sentToEmail }}</span></td>
-                                <td>{{ periodLabel(entry.month, entry.year) }}</td>
-                                <td class="ab-td-num"><span class="ab-num">{{ entry.receiptCount.toLocaleString() }}</span></td>
-                                <td class="ab-td-num"><span class="ab-num ab-num--active">{{ formatPeso(entry.amount) }}</span></td>
-                                <td><span class="ab-muted">{{ entry.sentByEmail ?? '—' }}</span></td>
-                            </tr>
-                            <tr v-if="history.length === 0">
-                                <td colspan="7" class="ab-empty">No bills have been sent yet.</td>
-                            </tr>
-                        </tbody>
-                        <tfoot v-if="history.length > 0">
-                            <tr class="ab-history-total">
-                                <td colspan="4">{{ history.length }} bill{{ history.length !== 1 ? 's' : '' }}</td>
-                                <td class="ab-td-num"><span class="ab-num">{{ totalHistoryReceipts.toLocaleString() }}</span></td>
-                                <td class="ab-td-num"><span class="ab-num">{{ formatPeso(totalHistoryAmount) }}</span></td>
-                                <td></td>
-                            </tr>
-                        </tfoot>
-                    </table>
-                </div>
-            </template>
+            <div v-else class="ab-table-wrap">
+                <table class="ab-table">
+                    <thead>
+                        <tr>
+                            <th>Period</th>
+                            <th>Owner</th>
+                            <th class="ab-th-num">Stores</th>
+                            <th class="ab-th-num">Amount</th>
+                            <th>Sent</th>
+                            <th>Paid</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="entry in history" :key="entry.id">
+                            <td class="ab-date-cell">{{ periodLabel(entry.month, entry.year) }}</td>
+                            <td><span class="ab-owner-email">{{ entry.ownerEmail }}</span></td>
+                            <td class="ab-td-num"><span class="ab-num">{{ entry.storeCount }}</span></td>
+                            <td class="ab-td-num"><span class="ab-num ab-num--active">{{ formatPeso(entry.amount) }}</span></td>
+                            <td>
+                                <span v-if="entry.sentAt" class="ab-date-cell">{{ formatDateTime(entry.sentAt) }}</span>
+                                <span v-else class="ab-muted">—</span>
+                                <div v-if="entry.sentByEmail" class="ab-muted">by {{ entry.sentByEmail }}</div>
+                            </td>
+                            <td>
+                                <span v-if="entry.paidAt" class="ab-pill ab-pill--paid">{{ formatDate(entry.paidAt) }}</span>
+                                <span v-else class="ab-pill ab-pill--sent">Unpaid</span>
+                                <div v-if="entry.paymentNote" class="ab-muted">{{ entry.paymentNote }}</div>
+                            </td>
+                        </tr>
+                        <tr v-if="history.length === 0">
+                            <td colspan="6" class="ab-empty">No statements have been sent or paid yet.</td>
+                        </tr>
+                    </tbody>
+                    <tfoot v-if="history.length > 0">
+                        <tr class="ab-history-total">
+                            <td colspan="3">{{ history.length }} statement{{ history.length !== 1 ? 's' : '' }}</td>
+                            <td class="ab-td-num"><span class="ab-num">{{ formatPeso(totalHistoryAmount) }}</span></td>
+                            <td colspan="2">{{ formatPeso(totalHistoryPaid) }} paid</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
         </template>
 
-        <!-- Confirm send modal -->
-        <div v-if="confirm.store" class="ab-modal-backdrop" @click.self="closeConfirm">
+        <!-- Send / mark-paid confirm modal -->
+        <div v-if="confirm.row" class="ab-modal-backdrop" @click.self="closeConfirm">
             <div class="ab-modal">
-                <h2 class="ab-modal-title">Send bill</h2>
+                <h2 class="ab-modal-title">{{ confirm.mode === 'send' ? 'Send bill' : 'Mark as paid' }}</h2>
                 <p class="ab-modal-sub">
-                    Send a billing email to <strong>{{ confirm.store.owner?.email }}</strong>?
+                    <template v-if="confirm.mode === 'send'">
+                        Email the {{ monthLabel }} statement to <strong>{{ confirm.row.owner.email }}</strong>?
+                    </template>
+                    <template v-else>
+                        Record payment from <strong>{{ confirm.row.owner.email }}</strong> for {{ monthLabel }}.
+                    </template>
                 </p>
 
                 <div class="ab-modal-summary">
-                    <div class="ab-summary-row">
-                        <span class="ab-summary-label">Store</span>
-                        <span class="ab-summary-value">{{ confirm.store.name }}</span>
-                    </div>
-                    <div class="ab-summary-row">
-                        <span class="ab-summary-label">Period</span>
-                        <span class="ab-summary-value">{{ monthLabel }}</span>
-                    </div>
-                    <div class="ab-summary-row">
-                        <span class="ab-summary-label">Receipts</span>
-                        <span class="ab-summary-value">{{ confirm.store.receiptCount.toLocaleString() }}</span>
-                    </div>
-                    <div class="ab-summary-row">
-                        <span class="ab-summary-label">Fee / receipt</span>
-                        <span class="ab-summary-value">{{ formatPeso(safeFeeRate) }}</span>
+                    <div v-for="line in displayLines(confirm.row)" :key="line.storeId" class="ab-summary-row">
+                        <span class="ab-summary-label">{{ line.position }}. {{ line.storeName }}</span>
+                        <span class="ab-summary-value">{{ formatPeso(line.fee) }}</span>
                     </div>
                     <div class="ab-summary-row ab-summary-row--total">
                         <span class="ab-summary-label">Total due</span>
-                        <span class="ab-summary-value">{{ formatPeso(amountDue(confirm.store)) }}</span>
+                        <span class="ab-summary-value">{{ formatPeso(displayAmount(confirm.row)) }}</span>
                     </div>
                 </div>
 
-                <p v-if="confirm.store.lastBilledAt" class="ab-modal-note">
-                    This store was already billed for {{ monthLabel }} on {{ formatDateTime(confirm.store.lastBilledAt) }}. Sending again will record an additional bill in the history.
+                <label v-if="confirm.mode === 'paid'" class="ab-field">
+                    <span class="ab-field-label">Payment note (optional)</span>
+                    <input v-model="confirm.note" class="ab-input" type="text" maxlength="500" placeholder="e.g. GCash ref 1234567" />
+                </label>
+
+                <p v-if="confirm.mode === 'send' && confirm.row.statement?.sentAt" class="ab-modal-note">
+                    Already sent on {{ formatDateTime(confirm.row.statement.sentAt) }}. Sending again emails the current breakdown.
+                </p>
+                <p v-if="confirm.mode === 'send' && confirm.row.statement?.paidAt" class="ab-modal-note">
+                    This month is already paid, so the email repeats the amount that was paid.
                 </p>
 
                 <div class="ab-modal-footer">
-                    <button class="ab-btn ab-btn--ghost" :disabled="sending" @click="closeConfirm">Cancel</button>
-                    <button class="ab-btn" :disabled="sending" @click="confirmSend">
-                        {{ sending ? 'Sending…' : 'Send bill' }}
+                    <button class="ab-btn ab-btn--ghost" :disabled="Boolean(busyOwnerId)" @click="closeConfirm">Cancel</button>
+                    <button class="ab-btn" :disabled="Boolean(busyOwnerId)" @click="submitConfirm">
+                        <template v-if="busyOwnerId">{{ confirm.mode === 'send' ? 'Sending…' : 'Saving…' }}</template>
+                        <template v-else>{{ confirm.mode === 'send' ? 'Send bill' : 'Mark paid' }}</template>
                     </button>
                 </div>
             </div>
@@ -216,114 +259,142 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import {
     getBillingHistory,
-    getBillingStores,
+    getBillingOwners,
     sendBillingNotice,
+    setBillingPayment,
     type BillingHistoryEntry,
-    type BillingStore,
+    type BillingLine,
+    type BillingOwner,
+    type BillingPricing,
 } from '@/api/admin';
 import { useToast } from '@/composables/useToast';
 
 const { showToast } = useToast();
 
-const view = ref<'send' | 'history'>('send');
+type StatusFilter = 'all' | 'unpaid' | 'paid';
+
+const view = ref<'statements' | 'history'>('statements');
 
 const loading = ref(false);
 const error = ref<string | null>(null);
-const stores = ref<BillingStore[]>([]);
-const confirm = reactive<{ store: BillingStore | null }>({ store: null });
-const sending = ref(false);
+const owners = ref<BillingOwner[]>([]);
+const pricing = ref<BillingPricing | null>(null);
+const busyOwnerId = ref<string | null>(null);
+const search = ref('');
+const statusFilter = ref<StatusFilter>('all');
+const statusOptions: { value: StatusFilter; label: string }[] = [
+    { value: 'all', label: 'All' },
+    { value: 'unpaid', label: 'Unpaid' },
+    { value: 'paid', label: 'Paid' },
+];
+
+const confirm = reactive<{ row: BillingOwner | null; mode: 'send' | 'paid'; note: string }>({
+    row: null,
+    mode: 'send',
+    note: '',
+});
 
 const history = ref<BillingHistoryEntry[]>([]);
 const historyLoading = ref(false);
 const historyFilterByMonth = ref(false);
 
-const now = new Date();
-const selectedMonth = ref(now.getMonth() + 1);
-const selectedYear = ref(now.getFullYear());
-const feeRate = ref(1);
+// Billing months are in Philippine time, matching the backend.
+const manilaToday = () => {
+    const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit' })
+        .formatToParts(new Date());
+    return {
+        year: Number(parts.find((p) => p.type === 'year')?.value),
+        month: Number(parts.find((p) => p.type === 'month')?.value),
+    };
+};
+const today = manilaToday();
+const selectedMonth = ref(today.month);
+const selectedYear = ref(today.year);
 
 const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-const monthLabel = computed(() => `${MONTH_NAMES[selectedMonth.value - 1]} ${selectedYear.value}`);
-const isCurrentMonth = computed(() =>
-    selectedMonth.value === now.getMonth() + 1 && selectedYear.value === now.getFullYear()
-);
-
-const safeFeeRate = computed(() => (Number.isFinite(feeRate.value) && feeRate.value >= 0 ? feeRate.value : 0));
-const amountDue = (store: BillingStore) => store.receiptCount * safeFeeRate.value;
-
-const totalReceipts = computed(() => stores.value.reduce((acc, s) => acc + s.receiptCount, 0));
-const totalDue = computed(() => totalReceipts.value * safeFeeRate.value);
-
-const totalHistoryReceipts = computed(() => history.value.reduce((acc, e) => acc + e.receiptCount, 0));
-const totalHistoryAmount = computed(() => history.value.reduce((acc, e) => acc + e.amount, 0));
-
 const periodLabel = (month: number, year: number) => `${MONTH_NAMES[month - 1]} ${year}`;
+const monthLabel = computed(() => periodLabel(selectedMonth.value, selectedYear.value));
+const isCurrentMonth = computed(() => selectedMonth.value === today.month && selectedYear.value === today.year);
 
 const formatPeso = (amount: number) =>
-    `₱${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
+    `₱${amount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const formatDate = (iso: string) =>
+    new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 const formatDateTime = (iso: string) =>
     new Date(iso).toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+const pricingText = computed(() => {
+    if (!pricing.value) return '';
+    const ordinal = (n: number) => (n === 1 ? '1st' : n === 2 ? '2nd' : n === 3 ? '3rd' : `${n}th`);
+    const tiers = pricing.value.storeFees.map((fee, i) => `${ordinal(i + 1)} store ${formatPeso(fee)}`);
+    tiers.push(`${ordinal(pricing.value.storeFees.length + 1)}+ ${formatPeso(pricing.value.additionalStoreFee)} each`);
+    return `${tiers.join(', ')}.`;
+});
+
+// A paid statement is frozen at what was paid; otherwise show live pricing.
+const displayLines = (row: BillingOwner): BillingLine[] =>
+    row.statement?.paidAt ? row.statement.lines : row.lines;
+const displayAmount = (row: BillingOwner) =>
+    row.statement?.paidAt ? row.statement.amount : row.amount;
+const hasChangedSinceSent = (row: BillingOwner) =>
+    Boolean(row.statement?.sentAt && !row.statement.paidAt && row.statement.amount !== row.amount);
+
+const billableOwners = computed(() => owners.value.filter((row) => displayLines(row).length > 0));
+const totalDue = computed(() => billableOwners.value.reduce((acc, row) => acc + displayAmount(row), 0));
+const totalCollected = computed(() =>
+    billableOwners.value.filter((row) => row.statement?.paidAt).reduce((acc, row) => acc + displayAmount(row), 0)
+);
+
+const visibleOwners = computed(() => {
+    const q = search.value.trim().toLowerCase();
+    return owners.value.filter((row) => {
+        const paid = Boolean(row.statement?.paidAt);
+        if (statusFilter.value === 'paid' && !paid) return false;
+        if (statusFilter.value === 'unpaid' && (paid || displayLines(row).length === 0)) return false;
+        if (!q) return true;
+        return (
+            row.owner.email.toLowerCase().includes(q) ||
+            (row.owner.fullName ?? '').toLowerCase().includes(q) ||
+            displayLines(row).some((line) => line.storeName.toLowerCase().includes(q))
+        );
+    });
+});
+
+const totalHistoryAmount = computed(() => history.value.reduce((acc, e) => acc + e.amount, 0));
+const totalHistoryPaid = computed(() =>
+    history.value.filter((e) => e.paidAt).reduce((acc, e) => acc + e.amount, 0)
+);
 
 const shiftMonth = (dir: 1 | -1) => {
     let m = selectedMonth.value + dir;
     let y = selectedYear.value;
     if (m > 12) { m = 1; y++; }
     if (m < 1) { m = 12; y--; }
-    if (y > now.getFullYear() || (y === now.getFullYear() && m > now.getMonth() + 1)) return;
+    if (y > today.year || (y === today.year && m > today.month)) return;
     selectedMonth.value = m;
     selectedYear.value = y;
 };
 
 const goToCurrentMonth = () => {
-    selectedMonth.value = now.getMonth() + 1;
-    selectedYear.value = now.getFullYear();
+    selectedMonth.value = today.month;
+    selectedYear.value = today.year;
 };
 
-const loadStores = async () => {
+const errorMessage = (e: unknown, fallback: string) =>
+    (e as { body?: { error?: { message?: string } } })?.body?.error?.message || fallback;
+
+const loadOwners = async () => {
     loading.value = true;
     error.value = null;
     try {
-        const data = await getBillingStores(selectedMonth.value, selectedYear.value);
-        stores.value = data.stores;
-    } catch (e: any) {
-        error.value = e?.body?.error?.message || 'Failed to load billing.';
-        showToast(error.value ?? 'Error', 'error');
+        const data = await getBillingOwners(selectedMonth.value, selectedYear.value);
+        owners.value = data.owners;
+        pricing.value = data.pricing;
+    } catch (e) {
+        error.value = errorMessage(e, 'Failed to load billing.');
+        showToast(error.value, 'error');
     } finally {
         loading.value = false;
-    }
-};
-
-const openConfirm = (store: BillingStore) => {
-    if (!store.owner || store.receiptCount === 0) return;
-    confirm.store = store;
-};
-
-const closeConfirm = () => {
-    if (sending.value) return;
-    confirm.store = null;
-};
-
-const confirmSend = async () => {
-    const store = confirm.store;
-    if (!store || !store.owner || store.receiptCount === 0) return;
-
-    sending.value = true;
-    try {
-        const result = await sendBillingNotice(store.id, selectedMonth.value, selectedYear.value, safeFeeRate.value);
-        if (result.sent && result.notice) {
-            store.lastBilledAt = result.notice.sentAt;
-            store.lastBilledAmount = result.notice.amount;
-            store.lastBilledReceipts = result.notice.receiptCount;
-            showToast(`Bill sent to ${store.owner.email}.`, 'success');
-            confirm.store = null;
-        } else {
-            showToast(result.message || 'Email could not be sent.', 'error');
-        }
-    } catch (e: any) {
-        showToast(e?.body?.error?.message || 'Failed to send bill.', 'error');
-    } finally {
-        sending.value = false;
     }
 };
 
@@ -334,15 +405,78 @@ const loadHistory = async () => {
             ? await getBillingHistory(selectedMonth.value, selectedYear.value)
             : await getBillingHistory();
         history.value = data.entries;
-    } catch (e: any) {
-        showToast(e?.body?.error?.message || 'Failed to load history.', 'error');
+    } catch (e) {
+        showToast(errorMessage(e, 'Failed to load history.'), 'error');
     } finally {
         historyLoading.value = false;
     }
 };
 
+const openSendConfirm = (row: BillingOwner) => {
+    if (displayLines(row).length === 0) return;
+    confirm.row = row;
+    confirm.mode = 'send';
+};
+
+const openPaidConfirm = (row: BillingOwner) => {
+    if (displayLines(row).length === 0) return;
+    confirm.row = row;
+    confirm.mode = 'paid';
+    confirm.note = '';
+};
+
+const closeConfirm = () => {
+    if (busyOwnerId.value) return;
+    confirm.row = null;
+};
+
+const submitConfirm = async () => {
+    const row = confirm.row;
+    if (!row) return;
+    busyOwnerId.value = row.owner.id;
+    try {
+        if (confirm.mode === 'send') {
+            const result = await sendBillingNotice(row.owner.id, selectedMonth.value, selectedYear.value);
+            if (!result.sent || !result.statement) {
+                showToast(result.message || 'Email could not be sent.', 'error');
+                return;
+            }
+            row.statement = result.statement;
+            showToast(`Bill sent to ${row.owner.email}.`, 'success');
+        } else {
+            const result = await setBillingPayment(
+                row.owner.id,
+                selectedMonth.value,
+                selectedYear.value,
+                true,
+                confirm.note.trim() || null
+            );
+            row.statement = result.statement;
+            showToast(`Marked ${row.owner.email} as paid for ${monthLabel.value}.`, 'success');
+        }
+        confirm.row = null;
+    } catch (e) {
+        showToast(errorMessage(e, 'Something went wrong.'), 'error');
+    } finally {
+        busyOwnerId.value = null;
+    }
+};
+
+const markUnpaid = async (row: BillingOwner) => {
+    busyOwnerId.value = row.owner.id;
+    try {
+        const result = await setBillingPayment(row.owner.id, selectedMonth.value, selectedYear.value, false);
+        row.statement = result.statement;
+        showToast(`Marked ${row.owner.email} as unpaid.`, 'success');
+    } catch (e) {
+        showToast(errorMessage(e, 'Failed to update payment.'), 'error');
+    } finally {
+        busyOwnerId.value = null;
+    }
+};
+
 watch([selectedMonth, selectedYear], () => {
-    loadStores();
+    loadOwners();
     if (view.value === 'history' && historyFilterByMonth.value) loadHistory();
 });
 
@@ -354,7 +488,7 @@ watch(historyFilterByMonth, () => {
     if (view.value === 'history') loadHistory();
 });
 
-onMounted(loadStores);
+onMounted(loadOwners);
 </script>
 
 <style scoped>
@@ -383,12 +517,6 @@ onMounted(loadStores);
 .ab-month-label { font-size: 0.875rem; font-weight: 700; color: #0f172a; min-width: 130px; text-align: center; padding: 0 0.25rem; }
 .ab-today-btn { font-size: 0.72rem; font-weight: 600; color: #0d9488; background: rgba(13, 148, 136, 0.08); border: none; border-radius: 6px; padding: 0.25rem 0.6rem; cursor: pointer; white-space: nowrap; }
 .ab-today-btn:hover { background: rgba(13, 148, 136, 0.15); }
-.ab-fee-wrap { display: flex; align-items: center; gap: 0.5rem; }
-.ab-fee-label { font-size: 0.8rem; color: #64748b; white-space: nowrap; }
-.ab-fee-input-wrap { display: inline-flex; align-items: center; border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; padding: 0 0.5rem; }
-.ab-fee-input-wrap:focus-within { border-color: #0d9488; box-shadow: 0 0 0 3px rgba(13,148,136,0.1); }
-.ab-fee-currency { font-size: 0.875rem; color: #64748b; }
-.ab-fee-input { width: 64px; border: none; outline: none; padding: 0.5rem 0.25rem; font-size: 0.875rem; color: #0f172a; background: transparent; }
 
 /* Tabs */
 .ab-tabs { display: flex; gap: 0.25rem; border-bottom: 1px solid #e2e8f0; }
@@ -444,9 +572,6 @@ onMounted(loadStores);
 .ab-num--active { color: #0d9488; }
 .ab-num--zero { color: #cbd5e1; font-weight: 600; }
 
-.ab-last-billed { display: flex; flex-direction: column; gap: 0.1rem; }
-.ab-last-date { font-size: 0.8rem; color: #334155; }
-.ab-last-amount { font-size: 0.72rem; color: #94a3b8; }
 
 .ab-btn { border: none; border-radius: 8px; padding: 0.45rem 0.85rem; font-size: 0.8rem; font-weight: 600; background: #0d9488; color: #fff; cursor: pointer; white-space: nowrap; transition: background 0.12s; }
 .ab-btn:hover:not(:disabled) { background: #0f766e; }
@@ -514,4 +639,34 @@ onMounted(loadStores);
     gap: 0.5rem;
     margin-top: 1.25rem;
 }
+/* Statements */
+.ab-search { min-width: 220px; flex: 1; max-width: 320px; padding: 0.5rem 0.75rem; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 0.85rem; color: #0f172a; background: #fff; }
+.ab-search:focus { outline: none; border-color: #0d9488; box-shadow: 0 0 0 3px rgba(13,148,136,0.1); }
+.ab-segment { display: inline-flex; background: #f1f5f9; border-radius: 8px; padding: 0.2rem; gap: 0.15rem; }
+.ab-segment-btn { border: none; background: transparent; border-radius: 6px; padding: 0.3rem 0.7rem; font-size: 0.78rem; font-weight: 600; color: #64748b; cursor: pointer; }
+.ab-segment-btn--active { background: #fff; color: #0f172a; box-shadow: 0 1px 2px rgba(15,23,42,0.08); }
+.ab-lines { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.2rem; min-width: 200px; }
+.ab-line { display: flex; justify-content: space-between; gap: 0.75rem; font-size: 0.8rem; color: #334155; counter-increment: line; }
+.ab-line-name::before { content: counter(line) ". "; color: #94a3b8; }
+.ab-lines { counter-reset: line; }
+.ab-line-fee { font-variant-numeric: tabular-nums; color: #64748b; white-space: nowrap; }
+.ab-line-tag { font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #7c3aed; background: #f5f3ff; border-radius: 4px; padding: 0.05rem 0.3rem; margin-left: 0.25rem; }
+.ab-changed { font-size: 0.68rem; color: #b45309; margin-top: 0.15rem; }
+.ab-status { display: flex; flex-direction: column; gap: 0.2rem; align-items: flex-start; }
+.ab-pill { display: inline-flex; padding: 0.12rem 0.5rem; border-radius: 999px; font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
+.ab-pill--paid { background: #d1fae5; color: #065f46; }
+.ab-pill--sent { background: #fef3c7; color: #92400e; }
+.ab-pill--draft { background: #f1f5f9; color: #64748b; }
+.ab-actions { display: inline-flex; gap: 0.4rem; justify-content: flex-end; flex-wrap: wrap; }
+.ab-btn--danger { color: #b91c1c; border-color: #fecaca; }
+.ab-btn--danger:hover:not(:disabled) { background: #fef2f2; }
+.ab-field { display: flex; flex-direction: column; gap: 0.35rem; margin-top: 1rem; }
+.ab-field-label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: #64748b; }
+.ab-input { padding: 0.55rem 0.75rem; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 0.875rem; color: #0f172a; background: #f8fafc; }
+.ab-input:focus { outline: none; border-color: #0d9488; box-shadow: 0 0 0 3px rgba(13,148,136,0.1); }
+
+@media (max-width: 640px) {
+    .ab-search { max-width: none; min-width: 0; width: 100%; }
+}
 </style>
+

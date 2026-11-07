@@ -10,7 +10,7 @@
                     <h1>New purchase order</h1>
                     <p>Select a supplier, add line items, and set an expected delivery date for {{ currentStoreLabel }}.</p>
                 </div>
-                <div v-if="!isPlanLocked" class="form-header-actions">
+                <div class="form-header-actions">
                     <button type="button" class="ghost-button ghost-button--sm" @click="goBack">Cancel</button>
                     <button class="primary-button primary-button--sm" type="button" :disabled="isCreateDisabled" @click="createOrder">
                         {{ isSubmitting ? 'Creating…' : 'Create purchase order' }}
@@ -18,14 +18,7 @@
                 </div>
             </header>
 
-            <PlanGate
-                v-if="isPlanLocked"
-                feature="purchaseOrders"
-                title="Purchase orders are available on Standard."
-                description="Upgrade to Standard to create purchase orders and receive inventory."
-            />
-
-            <form v-else class="po-form" @submit.prevent="createOrder">
+            <form class="po-form" @submit.prevent="createOrder">
                 <div class="po-form-layout">
                     <!-- ── Sidebar: Supplier, delivery & summary ── -->
                     <div class="po-form-sidebar">
@@ -287,8 +280,6 @@ import { createSupplier, listSuppliers, Supplier } from '@/api/suppliers';
 import { useToast } from '@/composables/useToast';
 import { useStoreContextStore } from '@/stores/storeContext';
 import { canAccess } from '@/utils/roleAccess';
-import { hasPlanFeature } from '@/utils/planAccess';
-import PlanGate from '@/components/PlanGate.vue';
 import SearchableSelect from '@/components/SearchableSelect.vue';
 
 const router = useRouter();
@@ -328,12 +319,6 @@ const lineItems = ref<Array<{
 }>>([]);
 
 const canWrite = computed(() => canAccess(storeContext.currentStore, 'purchaseOrdersWrite'));
-const ownerPlanTier = computed(() => storeContext.currentStore?.ownerPlanTier ?? null);
-const ownerSubscriptionActive = computed(() => storeContext.currentStore?.ownerSubscriptionActive ?? false);
-const planKnown = computed(() => ownerPlanTier.value !== null);
-const isPlanLocked = computed(
-    () => !ownerSubscriptionActive.value || (planKnown.value && !hasPlanFeature(ownerPlanTier.value, 'purchaseOrders'))
-);
 
 const currentStoreLabel = computed(() => {
     const store = storeContext.currentStore;
@@ -578,7 +563,7 @@ onMounted(async () => {
     await storeContext.fetchStores();
     const routeStoreId = route.params.storeId as string | undefined;
     if (routeStoreId && routeStoreId !== storeContext.currentStoreId) storeContext.setCurrentStore(routeStoreId);
-    if (!isPlanLocked.value) await Promise.all([loadProducts(), loadIngredients(), loadSuppliers()]);
+    await Promise.all([loadProducts(), loadIngredients(), loadSuppliers()]);
 });
 
 watch(() => supplierSelection.value, (v) => { if (v !== 'CUSTOM') formState.supplierName = ''; });

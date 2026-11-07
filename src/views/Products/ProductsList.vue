@@ -68,7 +68,7 @@
 
             <template v-else>
                 <!-- STAT STRIP (doubles as catalog filter) -->
-                <SkeletonLoader v-if="isLoading" variant="kpi" :count="showRecipeStats ? 3 : 2" />
+                <SkeletonLoader v-if="isLoading" variant="kpi" :count="3" />
                 <div v-else class="stat-strip" role="group" aria-label="Filter by product type">
                     <button
                         type="button"
@@ -91,7 +91,6 @@
                         <span class="stat-label">Ready-made</span>
                     </button>
                     <button
-                        v-if="showRecipeStats"
                         type="button"
                         class="stat"
                         :class="{ 'stat--active': catalogFilter === 'RECIPE' }"
@@ -271,9 +270,7 @@ import PullToRefresh from '@/components/PullToRefresh.vue';
 import { useRoute, useRouter } from 'vue-router';
 import { deleteProduct, exportProducts, importProducts, ImportResult, listProducts } from '@/api/products';
 import { useStoreContextStore } from '@/stores/storeContext';
-import { useUserContextStore } from '@/stores/userContext';
 import { canAccess } from '@/utils/roleAccess';
-import { hasPlanFeature } from '@/utils/planAccess';
 import ConfirmModal from '@/components/ConfirmModal.vue';
 import SkeletonLoader from '@/components/SkeletonLoader.vue';
 import CsvActionsMenu from '@/components/CsvActionsMenu.vue';
@@ -297,7 +294,6 @@ type ProductRow = {
 const router = useRouter();
 const route = useRoute();
 const storeContext = useStoreContextStore();
-const userContext = useUserContextStore();
 const products = ref<ProductRow[]>([]);
 const isLoading = ref(true);
 const searchQuery = ref('');
@@ -310,7 +306,6 @@ const canWrite = computed(() => canAccess(storeContext.currentStore, 'productsWr
 // Catalog CSV import/export is limited to owners and admins (server enforces the same).
 const canImportExport = computed(
     () =>
-        hasPlanFeature(userContext.effectivePlan, 'importExport') &&
         ['OWNER', 'ADMIN'].includes(storeContext.currentStore?.role ?? '') &&
         canAccess(storeContext.currentStore, 'productsWrite')
 );
@@ -536,8 +531,6 @@ const recipeMissingCount = computed(() => products.value.filter((p) => isMissing
 
 // Hide the Recipes stat for stores that have no recipe products and whose plan
 // doesn't include recipes — it would always read 0.
-const canUseRecipes = computed(() => hasPlanFeature(storeContext.currentStore?.ownerPlanTier ?? null, 'recipes'));
-const showRecipeStats = computed(() => recipeProducts.value > 0 || canUseRecipes.value);
 
 const currentStoreLabel = computed(() => {
     const store = storeContext.currentStore;

@@ -232,52 +232,46 @@
                     <div class="section-intro center-intro">
                         <div class="eyebrow">Pricing</div>
                         <h2>Simple, honest pricing.</h2>
-                        <p class="section-desc">Start small. Scale when you're ready. No hidden fees, no annual lock-in.</p>
+                        <p class="section-desc">One price per store, every feature included. No tiers, no hidden fees.</p>
                     </div>
                     <div class="pricing-grid">
-                        <div class="price-card">
-                            <div class="pc-tier">Starter</div>
-                            <div class="pc-price">Free<span class="pc-period"> forever</span></div>
-                            <p class="pc-desc">For kiosks and single-staff shops getting started.</p>
-                            <router-link to="/register" class="btn btn-outline w-full">Start for free</router-link>
-                            <ul class="pc-list">
-                                <li><span class="check">✓</span>1 store, up to 2 users</li>
-                                <li><span class="check">✓</span>Products + inventory ledger</li>
-                                <li><span class="check">✓</span>Basic sales &amp; POS</li>
-                                <li><span class="check">✓</span>Sales reports &amp; stock alerts</li>
-                                <li><span class="check">✓</span>Email support</li>
-                            </ul>
-                        </div>
                         <div class="price-card price-card-featured">
-                            <div class="pc-badge">Most popular</div>
-                            <div class="pc-tier">Standard</div>
-                            <div class="pc-price">PHP 899<span class="pc-period">/month</span></div>
-                            <p class="pc-desc">For cafes, restaurants, and food stalls with recipes.</p>
+                            <div class="pc-tier">First store</div>
+                            <div class="pc-price">PHP 500<span class="pc-period">/month</span></div>
+                            <p class="pc-desc">Everything you need to run one shop, cafe, or stall.</p>
                             <router-link to="/register" class="btn btn-primary w-full">Get started</router-link>
                             <ul class="pc-list">
-                                <li><span class="check">✓</span>1 store, up to 5 users</li>
+                                <li><span class="check">✓</span>POS, products + inventory ledger</li>
                                 <li><span class="check">✓</span>Ingredients + recipes</li>
                                 <li><span class="check">✓</span>Purchase orders + receiving</li>
-                                <li><span class="check">✓</span>Full inventory ledger</li>
-                                <li><span class="check">✓</span>Export to CSV</li>
-                                <li><span class="check">✓</span>Priority email support</li>
+                                <li><span class="check">✓</span>Reports, expenses + CSV export</li>
+                                <li><span class="check">✓</span>Unlimited staff accounts</li>
                             </ul>
                         </div>
                         <div class="price-card">
-                            <div class="pc-tier">Growth</div>
-                            <div class="pc-price">PHP 1,499<span class="pc-period">/month</span></div>
-                            <p class="pc-desc">For multi-location businesses with more staff and volume.</p>
+                            <div class="pc-tier">Second store</div>
+                            <div class="pc-price">PHP 400<span class="pc-period">/month</span></div>
+                            <p class="pc-desc">Add a branch or a warehouse when you're ready.</p>
                             <router-link to="/register" class="btn btn-outline w-full">Get started</router-link>
                             <ul class="pc-list">
-                                <li><span class="check">✓</span>Up to 3 stores, 10 users each</li>
-                                <li><span class="check">✓</span>Everything in Standard</li>
+                                <li><span class="check">✓</span>Every feature, same as your first store</li>
+                                <li><span class="check">✓</span>Stock transfers between stores</li>
+                                <li><span class="check">✓</span>One login for all your stores</li>
+                            </ul>
+                        </div>
+                        <div class="price-card">
+                            <div class="pc-tier">Third store onward</div>
+                            <div class="pc-price">PHP 300<span class="pc-period">/month each</span></div>
+                            <p class="pc-desc">For multi-location businesses that keep growing.</p>
+                            <router-link to="/register" class="btn btn-outline w-full">Get started</router-link>
+                            <ul class="pc-list">
+                                <li><span class="check">✓</span>Every feature, every store</li>
                                 <li><span class="check">✓</span>Multi-store operations</li>
-                                <li><span class="check">✓</span>Higher catalog capacity</li>
-                                <li><span class="check">✓</span>Dedicated support</li>
+                                <li><span class="check">✓</span>Lower price per store as you scale</li>
                             </ul>
                         </div>
                     </div>
-                    <p class="pricing-note">Starter is free forever. Standard and Growth include a 14-day free trial. Upgrade or downgrade anytime from Store Settings.</p>
+                    <p class="pricing-note">Pay only for the stores you run. Warehouses count as stores. Billed monthly — no annual lock-in.</p>
                 </div>
             </section>
 

@@ -1,7 +1,6 @@
 import type { SalesChannel } from '@/utils/salesChannels';
 import { defineStore } from 'pinia';
 import { listStores } from '@/api/stores';
-import type { PlanTier } from '@/utils/planAccess';
 
 export type StoreType = 'RETAIL' | 'WAREHOUSE';
 
@@ -28,8 +27,6 @@ export type StoreSummary = {
     aiApiKeyLast4: string | null;
     role: string;
     permissions: string[];
-    ownerPlanTier: PlanTier;
-    ownerSubscriptionActive: boolean;
 };
 
 export const useStoreContextStore = defineStore('storeContext', {

@@ -124,19 +124,6 @@ const maybeDispatchPermissionsStale = (status: number, errorBody: any) => {
     }
 };
 
-const maybeDispatchPlanUpgrade = (errorBody: any) => {
-    const errorCode = errorBody?.error?.code;
-    if (typeof window !== 'undefined' && (errorCode === 'PLAN_LIMIT' || errorCode === 'SUBSCRIPTION_REQUIRED')) {
-        window.dispatchEvent(
-            new CustomEvent('plan:upgrade', {
-                detail: {
-                    message: errorBody?.error?.message || 'Upgrade required to access this feature.',
-                },
-            })
-        );
-    }
-};
-
 export const apiClient = {
     async request<T>(path: string, options: RequestOptions = {}) {
         const showOverlay = !options.silent && !isLoadingSuppressed();
@@ -168,7 +155,6 @@ export const apiClient = {
                 } catch (error) {
                     errorBody = null;
                 }
-                maybeDispatchPlanUpgrade(errorBody);
                 maybeDispatchStoreSuspended(errorBody);
                 maybeDispatchPermissionsStale(response.status, errorBody);
                 throw { status: response.status, body: errorBody };
@@ -213,7 +199,6 @@ export const apiClient = {
                 } catch (error) {
                     errorBody = null;
                 }
-                maybeDispatchPlanUpgrade(errorBody);
                 maybeDispatchStoreSuspended(errorBody);
                 maybeDispatchPermissionsStale(response.status, errorBody);
                 throw { status: response.status, body: errorBody };
@@ -249,7 +234,6 @@ export const apiClient = {
             if (!response.ok) {
                 let errorBody: any = null;
                 try { errorBody = await response.json(); } catch { errorBody = null; }
-                maybeDispatchPlanUpgrade(errorBody);
                 maybeDispatchStoreSuspended(errorBody);
                 maybeDispatchPermissionsStale(response.status, errorBody);
                 throw { status: response.status, body: errorBody };

@@ -34,14 +34,7 @@
                 </div>
             </header>
 
-            <PlanGate
-                v-if="isPlanLocked"
-                feature="purchaseOrders"
-                title="Receipt details are available on Standard."
-                description="Upgrade to Standard to review receipts, suppliers, and receiving history."
-            />
-
-            <SkeletonLoader v-else-if="isLoading" :rows="5" label="Loading receipt…" />
+            <SkeletonLoader v-if="isLoading" :rows="5" label="Loading receipt…" />
 
             <div v-else-if="!receipt" class="panel-state">Receipt not found.</div>
 
@@ -132,8 +125,6 @@ import { useRoute, useRouter } from 'vue-router';
 import { getPurchaseReceipt, PurchaseReceiptDetail } from '@/api/purchaseOrders';
 import { useToast } from '@/composables/useToast';
 import { useStoreContextStore } from '@/stores/storeContext';
-import { hasPlanFeature } from '@/utils/planAccess';
-import PlanGate from '@/components/PlanGate.vue';
 import SkeletonLoader from '@/components/SkeletonLoader.vue';
 
 const route = useRoute();
@@ -144,14 +135,6 @@ const { showToast } = useToast();
 const receipt = ref<PurchaseReceiptDetail | null>(null);
 const isLoading = ref(false);
 // Use the store owner's plan tier for feature access (not the logged-in user's)
-const ownerPlanTier = computed(() => storeContext.currentStore?.ownerPlanTier ?? null);
-const ownerSubscriptionActive = computed(() => storeContext.currentStore?.ownerSubscriptionActive ?? false);
-const planKnown = computed(() => ownerPlanTier.value !== null);
-const isPlanLocked = computed(
-    () =>
-        !ownerSubscriptionActive.value ||
-        (planKnown.value && !hasPlanFeature(ownerPlanTier.value, 'purchaseOrders'))
-);
 
 const routeStoreId = computed(() => route.params.storeId as string | undefined);
 const receiptId = computed(() => route.params.receiptId as string | undefined);
@@ -189,10 +172,6 @@ const formatTime = (value: string) => {
 };
 
 const loadReceipt = async () => {
-    if (isPlanLocked.value) {
-        receipt.value = null;
-        return;
-    }
     if (!routeStoreId.value || !receiptId.value) {
         receipt.value = null;
         return;
@@ -252,7 +231,6 @@ onMounted(async () => {
     if (routeStoreId.value) {
         storeContext.setCurrentStore(routeStoreId.value);
     }
-    if (isPlanLocked.value) return;
     await loadReceipt();
 });
 
@@ -268,7 +246,6 @@ watch(
 watch(
     () => receiptId.value,
     async () => {
-        if (isPlanLocked.value) return;
         await loadReceipt();
     }
 );
