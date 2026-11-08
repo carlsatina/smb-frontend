@@ -114,7 +114,34 @@
                             <mdicon name="information-outline" size="18" />
                             <p v-html="formatInline(block.text)"></p>
                         </div>
+
+                        <div v-else-if="block.type === 'contact'" class="hc-contact">
+                            <div v-for="channel in contactChannels" :key="channel.key" class="hc-contact-row">
+                                <span class="hc-contact-icon"><mdicon :name="channel.icon" size="20" /></span>
+                                <div class="hc-contact-body">
+                                    <span class="hc-contact-label">{{ channel.label }}</span>
+                                    <a v-if="channel.href" :href="channel.href" :target="channel.external ? '_blank' : undefined" rel="noopener" class="hc-contact-value">
+                                        <template v-if="channel.key === 'email'">{{ emailParts[0] }}@<wbr />{{ emailParts[1] }}</template>
+                                        <template v-else>{{ channel.value }}</template>
+                                    </a>
+                                    <span v-else class="hc-contact-soon">Coming soon</span>
+                                </div>
+                            </div>
+                            <p class="hc-contact-note">{{ supportContact.responseNote }}</p>
+                        </div>
                     </template>
+
+                    <!-- Every article ends with a way to reach a person. -->
+                    <aside v-if="activeArticle.id !== 'contact-support'" class="hc-still">
+                        <div>
+                            <strong>Still need help?</strong>
+                            <span>Email us at <a :href="`mailto:${supportContact.email}`">{{ emailParts[0] }}@<wbr />{{ emailParts[1] }}</a>.</span>
+                        </div>
+                        <RouterLink :to="{ name: 'help', params: { articleId: 'contact-support' } }" class="hc-still-link">
+                            All contact options
+                            <mdicon name="arrow-right" size="14" />
+                        </RouterLink>
+                    </aside>
 
                     <footer class="hc-pager">
                         <RouterLink
@@ -154,6 +181,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { helpArticles, helpSections, type HelpSection } from '@/content/helpArticles';
 import { useStoreContextStore } from '@/stores/storeContext';
+import { phoneHref, supportContact } from '@/config/support';
 
 const route = useRoute();
 const router = useRouter();
@@ -168,6 +196,36 @@ const activeArticle = computed(
 const activeSection = computed(
     () => helpSections.find((section) => section.articles.some((a) => a.id === activeArticle.value.id)) ?? helpSections[0],
 );
+
+// Lets long addresses wrap after "@" on narrow screens instead of mid-word.
+const emailParts = supportContact.email.split('@');
+
+const contactChannels = computed(() => [
+    {
+        key: 'email',
+        icon: 'email-outline',
+        label: 'Email',
+        value: supportContact.email,
+        href: supportContact.email ? `mailto:${supportContact.email}` : '',
+        external: false,
+    },
+    {
+        key: 'messenger',
+        icon: 'facebook-messenger',
+        label: 'Messenger',
+        value: 'Message us on Messenger',
+        href: supportContact.messengerUrl,
+        external: true,
+    },
+    {
+        key: 'phone',
+        icon: 'phone-outline',
+        label: 'Phone',
+        value: supportContact.phone,
+        href: supportContact.phone ? phoneHref(supportContact.phone) : '',
+        external: false,
+    },
+]);
 
 const activeIndex = computed(() => helpArticles.findIndex((a) => a.id === activeArticle.value.id));
 const prevArticle = computed(() => helpArticles[activeIndex.value - 1] ?? null);
@@ -433,6 +491,12 @@ onUnmounted(() => document.removeEventListener('keydown', handleKeydown));
 .hc-list {
     margin: 0 0 1rem;
     padding-left: 1.25rem;
+    /* The app's global styles reset list markers. */
+    list-style: disc;
+}
+
+.hc-list li::marker {
+    color: var(--hc-accent);
 }
 
 .hc-list li + li {
@@ -580,6 +644,115 @@ onUnmounted(() => document.removeEventListener('keydown', handleKeydown));
 .hc-callout :deep(svg) {
     flex-shrink: 0;
     margin-top: 2px;
+}
+
+/* Contact options */
+.hc-contact {
+    margin: 0 0 1.25rem;
+    border: 1px solid var(--hc-border);
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.hc-contact-row {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    padding: 0.8rem 1rem;
+}
+
+.hc-contact-row + .hc-contact-row {
+    border-top: 1px solid var(--hc-border);
+}
+
+.hc-contact-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(13, 148, 136, 0.1);
+    color: var(--hc-accent-dark);
+    flex-shrink: 0;
+}
+
+.hc-contact-body {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.hc-contact-label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--hc-muted);
+}
+
+.hc-contact-value {
+    font-weight: 600;
+    color: var(--hc-accent-dark);
+    text-decoration: none;
+}
+
+.hc-contact-value:hover {
+    text-decoration: underline;
+}
+
+.hc-contact-soon {
+    color: #94a3b8;
+    font-style: italic;
+}
+
+.hc-contact-note {
+    margin: 0;
+    padding: 0.6rem 1rem;
+    background: #f8fafc;
+    border-top: 1px solid var(--hc-border);
+    font-size: 0.8rem;
+    color: var(--hc-muted);
+}
+
+/* "Still need help?" strip */
+.hc-still {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-top: 1.75rem;
+    padding: 0.85rem 1rem;
+    border-radius: 10px;
+    background: #f0fdfa;
+    border: 1px solid #ccfbf1;
+    font-size: 0.86rem;
+}
+
+.hc-still div {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    min-width: 0;
+}
+
+.hc-still strong {
+    color: var(--hc-text);
+}
+
+.hc-still a {
+    color: var(--hc-accent-dark);
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+.hc-still-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    text-decoration: none;
+    white-space: nowrap;
 }
 
 /* Prev / next */

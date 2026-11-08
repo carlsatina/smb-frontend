@@ -6,7 +6,7 @@
             The account has an unpaid bill, so sales and changes are paused. You can still view and export your data.
             <template v-if="canSeeBilling">
                 Settle {{ overdueText || 'the outstanding bill' }} by contacting
-                <a href="mailto:support@arshii.app">support@arshii.app</a> to restore full access.
+                <a :href="`mailto:${supportContact.email}`">{{ supportContact.email }}</a> to restore full access.
             </template>
             <template v-else>Ask the store owner to settle the bill.</template>
         </p>
@@ -16,7 +16,7 @@
         <p class="billing-banner__text">
             <strong>Your bill is overdue.</strong>
             {{ overdueText }} is unpaid. Please settle it to avoid your stores becoming read-only.
-            Questions? <a href="mailto:support@arshii.app">support@arshii.app</a>
+            Questions? <a :href="`mailto:${supportContact.email}`">{{ supportContact.email }}</a>
         </p>
     </div>
 </template>
@@ -24,6 +24,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useStoreContextStore } from '@/stores/storeContext';
+import { supportContact } from '@/config/support';
 
 const storeContext = useStoreContextStore();
 

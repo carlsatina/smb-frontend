@@ -458,8 +458,12 @@ const currentStoreLabel = computed(() => {
 
 const canAdjust = computed(() => canAccess(storeContext.currentStore, 'inventoryAdjustments'));
 
+// Transfers write stock into the destination, so only offer stores where the
+// user can manage stock (the API enforces the same rule).
 const otherStores = computed(() =>
-    storeContext.stores.filter((s) => s.id !== storeContext.currentStoreId)
+    storeContext.stores.filter(
+        (s) => s.id !== storeContext.currentStoreId && canAccess(s, 'inventoryAdjustments')
+    )
 );
 
 // ── Transfer modal ──────────────────────────────────────────

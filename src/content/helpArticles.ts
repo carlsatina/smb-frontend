@@ -11,7 +11,9 @@ export type HelpBlock =
     | { type: 'image'; src: string; caption?: string }
     | { type: 'tip'; text: string }
     | { type: 'note'; text: string }
-    | { type: 'list'; items: string[] };
+    | { type: 'list'; items: string[] }
+    // Renders the contact options from src/config/support.ts.
+    | { type: 'contact' };
 
 export interface HelpArticle {
     id: string;
@@ -75,6 +77,22 @@ export const helpSections: HelpSection[] = [
                         { name: 'Allow negative stock', text: 'When off, a sale or adjustment that would take stock below zero is blocked. Turn it on if you sometimes sell before recording deliveries.' },
                     ] },
                     { type: 'note', text: 'Each store is billed monthly. See **Billing** for pricing.' },
+                ],
+            },
+            {
+                id: 'cashier-quick-start',
+                title: 'Quick start for cashiers',
+                summary: 'Everything a cashier needs on day one.',
+                blocks: [
+                    { type: 'p', text: 'New on the team? These are the things you will do every shift. Your owner decides what you can see, so some pages mentioned in other articles may not appear for you.' },
+                    { type: 'steps', items: [
+                        { text: '**Time in** when your shift starts: click **Time In** in the top bar, next to your name. It shows the shift you\'re rostered for today.', image: img('time-clock'), caption: 'The time clock in the top bar.' },
+                        { text: '**Ring up sales** on the **POS** page. Click products to add them, pick Dine-in or Takeout and the payment method, then click **Finalize sale**. See **Make a sale at the POS**.' },
+                        { text: '**Record expenses** you paid from the till (ice, delivery fees…) on the **Expenses** page so the owner\'s cash count adds up.' },
+                        { text: '**Check your schedule** under **Schedule**. You see everyone\'s shifts but only your own pay.' },
+                        { text: '**Time out** before you leave: click the timer in the top bar and confirm. A missed time out shows a **!** on the button, and that day pays nothing until a manager corrects it.' },
+                    ] },
+                    { type: 'tip', text: 'Made a mistake on a sale? Don\'t ring it up again. Ask a manager to edit or void it in **Sales history**.' },
                 ],
             },
         ],
@@ -163,6 +181,29 @@ export const helpSections: HelpSection[] = [
                     { type: 'tip', text: 'Ingredient not listed? Click **Create new ingredient** below the recipe lines to add it without leaving the form.' },
                 ],
             },
+            {
+                id: 'import-products',
+                title: 'Import products from a spreadsheet',
+                summary: 'Add or update many products at once with CSV.',
+                blocks: [
+                    { type: 'p', text: 'Owners and admins with **Manage products & stock** can add or update the whole catalog from a CSV file instead of one product at a time. Ingredients work the same way from the Ingredients page.' },
+                    { type: 'steps', items: [
+                        { text: 'On the **Products** page, open **Import / Export** and choose **Download template** (or **Export CSV** to start from your current catalog).' },
+                        { text: 'Fill in one product per row in Excel or Google Sheets, then save it as CSV.' },
+                        { text: 'Choose **Import / Export → Import CSV**, pick the file, check the preview, and confirm.' },
+                    ] },
+                    { type: 'fields', title: 'Columns', items: [
+                        { name: 'Name, Price', text: 'Required. A row whose name matches an existing product (ignoring capitals) **updates** that product; any other name **creates** a new one.' },
+                        { name: 'Type', text: '**READY_MADE** (default) or **RECIPE**.' },
+                        { name: 'Cost, Unit, Category, Subcategory', text: 'Optional. Unit defaults to pcs. Subcategories must already exist under the category in **Settings → Catalog defaults**.' },
+                        { name: 'SKU, Barcode', text: 'Optional item codes.' },
+                        { name: 'Active', text: 'true or false. Recipe products need a recipe before they can be active.' },
+                        { name: 'Low Stock Threshold', text: 'Optional per-product override.' },
+                        { name: 'Recipe', text: 'For RECIPE products: ingredients and amounts per unit sold, written as **Ingredient name:qty**, separated by **|**. For example: **Espresso beans:18 | Fresh milk:180**. Add the ingredients first; unknown names are rejected.' },
+                    ] },
+                    { type: 'note', text: 'After the import you\'ll see how many rows were added, updated and failed, with the reason for each failed row. Fix those rows and import the file again; rows that already worked will just update.' },
+                ],
+            },
         ],
     },
     {
@@ -170,6 +211,24 @@ export const helpSections: HelpSection[] = [
         title: 'Inventory',
         icon: 'warehouse',
         articles: [
+            {
+                id: 'inventory-overview',
+                title: 'Check stock levels & history',
+                summary: 'What you have, what\'s low, and every change.',
+                blocks: [
+                    { type: 'p', text: 'The **Inventory** page lists the current stock of every ready-made product and ingredient. Recipe products don\'t appear because their stock is their ingredients.' },
+                    { type: 'image', src: img('inventory-overview'), caption: 'Inventory → Stock overview.' },
+                    { type: 'fields', items: [
+                        { name: 'Tracked items / Low stock / Out of stock', text: 'The counters at the top double as filters. Click one to show only those items.' },
+                        { name: 'Status', text: '**Healthy**, **Low** (at or below its low stock threshold) or **Out of stock** (zero or less).' },
+                        { name: 'All / Products / Ingredients', text: 'Narrow the list by item type, or search by name, SKU or category.' },
+                    ] },
+                    { type: 'heading', text: 'Movement history' },
+                    { type: 'p', text: 'Click **History** to see every stock change: sales, adjustments, purchase receipts, voids, waste and transfers. Each row shows when, who, the quantity change and where it came from (for example a receipt number). Filter by movement type or date and use **Export CSV** to download it.' },
+                    { type: 'image', src: img('movements'), caption: 'Inventory → History shows every change in stock.' },
+                    { type: 'tip', text: 'Stock looks wrong? Search the item in **History** to see exactly which sale, receipt or adjustment changed it.' },
+                ],
+            },
             {
                 id: 'adjust-stock',
                 title: 'Record opening stock & adjustments',
@@ -189,6 +248,88 @@ export const helpSections: HelpSection[] = [
                         { name: 'Note (optional)', text: 'Why you made the change. It appears in the movement history and audit log.' },
                     ] },
                     { type: 'note', text: 'If **Allow negative stock** is off in the store settings, an adjustment that would drop stock below zero is blocked.' },
+                ],
+            },
+            {
+                id: 'transfer-stock',
+                title: 'Transfer stock between stores',
+                summary: 'Move items to another store or warehouse.',
+                blocks: [
+                    { type: 'p', text: 'If you manage more than one store (for example a warehouse that supplies your branches), you can move stock from one to another. The **Transfer** button appears on the Inventory page when you belong to another store.' },
+                    { type: 'steps', items: [
+                        { text: 'Open **Inventory** in the store the stock is leaving, and click **Transfer**.' },
+                        { text: 'Choose the **Destination store**. Change the **Transfer date** only if you\'re recording a transfer that already happened.', image: img('transfer-stock'), caption: 'The Transfer stock window.' },
+                        { text: 'Add the items and quantities you\'re sending, add an optional note, and confirm.' },
+                    ] },
+                    { type: 'p', text: 'Stock goes down in this store and up in the destination at the same time. Both stores record it in their movement history as **Transfer out** and **Transfer in**.' },
+                    { type: 'note', text: 'Items are matched by name in the destination store. If the destination doesn\'t have the item yet, it\'s created there automatically. Recipe products can\'t be transferred. Move their ingredients instead.' },
+                ],
+            },
+        ],
+    },
+    {
+        id: 'purchasing',
+        title: 'Purchasing & expenses',
+        icon: 'truck-delivery-outline',
+        articles: [
+            {
+                id: 'purchase-orders',
+                title: 'Order stock with a purchase order',
+                summary: 'Plan what you\'re buying from a supplier.',
+                blocks: [
+                    { type: 'p', text: 'A purchase order (PO) lists what you\'re buying from a supplier. Creating one doesn\'t change stock. Stock only goes up when you **receive** the delivery (next article).' },
+                    { type: 'steps', items: [
+                        { text: 'Open **Purchases** and click **New purchase order**.' },
+                        { text: 'Pick the **Supplier** (or click **New** to add one) and the **Expected delivery date**.' },
+                        { text: 'Click **+ Add item** for each product or ingredient, and enter the quantity and cost per unit. Costs fill in from your records, so check they\'re still right.', image: img('purchase-order-form'), caption: 'A new purchase order.' },
+                        { text: 'Click **Create purchase order**. Use **Mark sent** once you\'ve sent it to the supplier.' },
+                    ] },
+                    { type: 'fields', title: 'Order status', items: [
+                        { name: 'Draft', text: 'Created, not yet sent. Supplier and expected date can still change.' },
+                        { name: 'Sent', text: 'Sent to the supplier and waiting for delivery.' },
+                        { name: 'Partially received', text: 'Some items arrived; the rest are still expected.' },
+                        { name: 'Received', text: 'Everything arrived.' },
+                        { name: 'Cancelled', text: 'Won\'t be delivered; it can no longer be received.' },
+                    ] },
+                    { type: 'tip', text: 'If an ingredient has a purchase unit (e.g. bought by the Gallon), enter the quantity in that unit. The order shows the equivalent in the recipe unit (e.g. litres).' },
+                ],
+            },
+            {
+                id: 'receive-delivery',
+                title: 'Receive a delivery',
+                summary: 'Add delivered stock and record the invoice.',
+                blocks: [
+                    { type: 'steps', items: [
+                        { text: 'Open the purchase order under **Purchases** and click **Receive items**.' },
+                        { text: 'Enter the supplier\'s **Invoice number** and the **Received date**.' },
+                        { text: 'The remaining quantities are filled in for you. Change any line that arrived short, or set it to 0 if it didn\'t come.', image: img('po-receive'), caption: 'Recording a delivery.' },
+                        { text: 'Click **Record receipt**.' },
+                    ] },
+                    { type: 'p', text: 'The received quantities are added to stock right away and appear in Inventory history as purchases. If only part of the order arrived, it becomes **Partially received**, and you can receive the rest later the same way.' },
+                    { type: 'p', text: 'All recorded deliveries are listed under **Purchases → Receipts**. Purchase spend by supplier appears in **Reports → Inventory**.' },
+                ],
+            },
+            {
+                id: 'suppliers',
+                title: 'Manage suppliers',
+                summary: 'Keep supplier contacts in one place.',
+                blocks: [
+                    { type: 'p', text: 'Open **Suppliers** to add, edit or remove suppliers. Each has a name and optional email and phone number. You can also add a supplier on the spot while creating a purchase order.' },
+                    { type: 'p', text: 'Open a supplier to see its purchase orders and how much you\'ve spent with them.' },
+                ],
+            },
+            {
+                id: 'expenses',
+                title: 'Record expenses',
+                summary: 'Rent, utilities, supplies and other costs.',
+                blocks: [
+                    { type: 'p', text: 'Expenses are costs that aren\'t stock purchases, such as rent, electricity, wages or ice bought from the till. They\'re subtracted from profit in **Reports** (**Net after expenses**).' },
+                    { type: 'steps', items: [
+                        { text: 'Open **Expenses** and click **Add expense**.' },
+                        { text: 'Choose the date and category, enter the amount and an optional note, and click **Add expense**.', image: img('expenses'), caption: 'The Expenses page for one month.' },
+                    ] },
+                    { type: 'p', text: 'Use the arrows to move between months and the category filter to see one kind of cost. The total at the top is for the month shown.' },
+                    { type: 'note', text: 'Categories come from **Settings → Catalog defaults → Expense categories**. If the list is empty, ask the owner to add some.' },
                 ],
             },
         ],
@@ -219,6 +360,139 @@ export const helpSections: HelpSection[] = [
                     ] },
                     { type: 'tip', text: 'Use the **Cards** and **Table List** views to switch layouts. The table view is faster for very large catalogs. In the cards view you can drag cards to reorder them.' },
                     { type: 'p', text: 'Past sales are under **Sales history**, where users with the right permission can edit or void them.' },
+                ],
+            },
+            {
+                id: 'sales-history',
+                title: 'Find, edit or void a sale',
+                summary: 'Look up past sales and fix mistakes.',
+                blocks: [
+                    { type: 'p', text: 'Open **Sales history** (or click **Sales history** on the POS) to see finalized sales. Pick a date range at the top and filter by cashier, payment method, channel or item.' },
+                    { type: 'image', src: img('sales-history'), caption: 'Sales history with filters and actions.' },
+                    { type: 'fields', title: 'Actions on a sale', items: [
+                        { name: 'Print', text: 'Prints the receipt again.' },
+                        { name: 'Edit', text: 'Change items, quantities, payment method, order type or discount. Stock is adjusted only for the difference, and the original is kept in the Audit Log. Needs the **Edit sales** permission.' },
+                        { name: 'Void', text: 'Cancels the sale: the stock it used goes back to inventory, and it\'s excluded from net sales. It stays in the list marked **Voided** so there\'s a record. Needs the **Void sales** permission.' },
+                        { name: 'Delete (bin icon, owners only)', text: 'Removes a sale entirely, e.g. a test or duplicate ticket. It disappears from history, reports and daily totals, its stock is returned, and a copy is kept in the Audit Log. This can\'t be undone in the app.' },
+                    ] },
+                    { type: 'image', src: img('edit-sale'), caption: 'Editing a sale. The total shows the difference from the original.' },
+                    { type: 'tip', text: 'Prefer **Void** over **Delete** for real sales that were cancelled. Voids stay visible, which keeps your cash count and audit trail honest.' },
+                    { type: 'note', text: 'Cashiers only see their most recent sales, up to the **Cashier sales history limit** in Settings.' },
+                ],
+            },
+            {
+                id: 'daily-sales',
+                title: 'Daily Sales & cash remittance',
+                summary: 'Count the cash and catch shortages each day.',
+                blocks: [
+                    { type: 'p', text: '**Daily Sales** is an optional page for reconciling the cash drawer each day. If you don\'t see it, it isn\'t switched on for your account; see **Contact support** to have it enabled. Open it from **Daily Sales** and use the **Sales & Cash Remittance** tab.' },
+                    { type: 'steps', items: [
+                        { text: 'Click **Add Entry** for the day.' },
+                        { text: 'For each cashier, enter the cash on hand (click **Denoms** to count it by bill and coin) and their GCash total.' },
+                        { text: 'Enter the senior/PWD discounts and expenses paid from the till, then the **Actual COH** you physically counted, and click **Save**.' },
+                    ] },
+                    { type: 'fields', title: 'What the columns mean', items: [
+                        { name: 'Total COH / Total GCash', text: 'Cash and GCash added up across cashiers.' },
+                        { name: 'Total Sales', text: 'Total COH + Total GCash + Senior discounts + Expense.' },
+                        { name: 'POS', text: 'What the POS recorded as sold that day.' },
+                        { name: 'Kulang Remit', text: 'Total COH − Actual COH. Cash that should be there but isn\'t.' },
+                        { name: 'Short if (-)', text: 'Total Sales − POS. Negative means less money than the POS says was sold.' },
+                        { name: 'Sales Needed', text: 'How far you are from the month\'s goal so far: the daily goal minus actual sales, added up from the 1st. Owners set it with the **Goal** button at the top of the page.' },
+                    ] },
+                ],
+            },
+        ],
+    },
+    {
+        id: 'insights',
+        title: 'Reports & insights',
+        icon: 'chart-line',
+        articles: [
+            {
+                id: 'reports',
+                title: 'Understand your reports',
+                summary: 'What each number on the Reports page means.',
+                blocks: [
+                    { type: 'p', text: 'Open **Reports** and choose a range: **Today**, **Last 7 days**, **Last 30 days**, **This month** or a custom range. Each figure is compared with the previous period of the same length. Days follow your store\'s timezone.' },
+                    { type: 'image', src: img('reports-overview'), caption: 'Reports → Overview.' },
+                    { type: 'fields', title: 'Headline numbers', items: [
+                        { name: 'Net sales', text: 'What customers paid for finalized sales: after discounts, including tax. Voided sales are not counted.' },
+                        { name: 'Orders / Avg order', text: 'Number of finalized sales, and net sales divided by that number.' },
+                        { name: 'Gross profit', text: 'Sales minus the cost of what was sold. Costs come from product costs, or ingredient costs for recipes. "8/10 costed" means 2 items sold have no cost yet, so profit is overstated until you add them.' },
+                        { name: 'Expenses', text: 'The total from the Expenses page for the range.' },
+                        { name: 'Net after expenses', text: 'Gross profit minus expenses. Roughly what the business earned.' },
+                    ] },
+                    { type: 'fields', title: 'Tabs', items: [
+                        { name: 'Overview', text: 'Sales by day (or by hour for a single day), payment mix, sales channels with their markup, daypart mix (breakfast, lunch, afternoon, dinner, late), best sellers, and the breakdown from gross sales to net.' },
+                        { name: 'Products', text: 'Units sold per product and item margins (revenue, cost, profit, margin %).' },
+                        { name: 'Inventory', text: 'Low stock watch, ingredients used by recipe sales, and purchasing spend by supplier.' },
+                        { name: 'Team', text: 'Orders and takings per cashier, split by payment method.' },
+                    ] },
+                    { type: 'tip', text: '**Gross sales** in the breakdown is before discounts. The gap between gross and net is your discounts (and tax).' },
+                ],
+            },
+            {
+                id: 'ai-insights',
+                title: 'AI Insights',
+                summary: 'Daily summaries, questions and reorder suggestions.',
+                blocks: [
+                    { type: 'p', text: 'AI Insights uses your store\'s AI provider (set up in **Settings → AI integration**) to explain your numbers in plain language.' },
+                    { type: 'fields', items: [
+                        { name: 'AI daily summary', text: 'Click **Generate summary** for a short recap of your last complete day.' },
+                        { name: 'Ask your data', text: 'Ask questions about sales, products, margins, payments or stock, e.g. "How many iced lattes did I sell last month?"' },
+                        { name: 'Reorder suggestions', text: 'Click **Generate plan** to see what\'s running low and how much to order, based on the last 30 days of usage: stock on hand, usage per day, days left and a suggested order.' },
+                    ] },
+                    { type: 'note', text: 'If it says **AI isn\'t set up yet**, the owner needs to add a provider and API key first. AI usage is billed by your AI provider, not by SMB-PoS.' },
+                ],
+            },
+            {
+                id: 'audit-log',
+                title: 'Audit Log',
+                summary: 'Who changed what, and when.',
+                blocks: [
+                    { type: 'p', text: 'Open **Audit Log** (under **More**) to see important changes: stock adjustments, purchase receipts, order status changes, supplier edits, sale edits and deletions, permission changes, and anything changed by an AI app.' },
+                    { type: 'image', src: img('audit-log'), caption: 'The Audit Log. Click an event to see its details.' },
+                    { type: 'p', text: 'Filter by type or date range, search by person or item, and click an event to see exactly what changed. Use **Export** to download the list.' },
+                ],
+            },
+        ],
+    },
+    {
+        id: 'team',
+        title: 'Staff schedule & pay',
+        icon: 'calendar-account',
+        articles: [
+            {
+                id: 'schedule',
+                title: 'Plan the weekly schedule',
+                summary: 'Shifts, rest days, publishing and payout.',
+                blocks: [
+                    { type: 'p', text: 'The **Schedule** page replaces a payroll spreadsheet. Weeks run Sunday to Saturday. Staff see everyone\'s shifts, so they can arrange swaps, but only their own pay.' },
+                    { type: 'steps', items: [
+                        { text: 'First, set each person\'s pay under the **Rates** tab: daily rate, hours per day, overtime multiplier and unpaid break minutes. A week can\'t be published until everyone on it has a rate.' },
+                        { text: 'On the **Week** tab, add staff to the week, then click a day to give them a shift or **RD** (rest day). Save shifts you use often as **Shift presets** so it\'s one click. **Copy last week** starts from the previous roster.', image: img('schedule-week'), caption: 'The weekly shift grid with payout.' },
+                        { text: 'Click **Save draft** while you work. Staff can\'t see the week until you click **Publish**.' },
+                    ] },
+                    { type: 'fields', title: 'Payout columns', items: [
+                        { name: 'Days', text: 'Days worked that week.' },
+                        { name: 'OT', text: 'Overtime hours. You enter these; the time clock suggests a figure.' },
+                        { name: 'less CA', text: 'Cash advance deducted this week. Record advances and choose how much to deduct per week; the oldest advance is paid off first.' },
+                        { name: 'Payout', text: 'Days × daily rate + OT hours × OT rate − cash advance. The OT rate is daily rate ÷ hours per day × OT multiplier.' },
+                    ] },
+                    { type: 'p', text: '**Month totals** adds up the published weeks of a month for payroll. Draft weeks aren\'t counted until you publish them.' },
+                    { type: 'note', text: 'Rates are saved with a start date, so a raise only affects weeks from then on and never changes weeks you already published.' },
+                ],
+            },
+            {
+                id: 'time-clock',
+                title: 'Time clock & attendance',
+                summary: 'Clock in and out, and correct missed punches.',
+                blocks: [
+                    { type: 'p', text: 'Staff clock in and out with the **Time In** button in the top bar, on any page. The button shows today\'s rostered shift; timing in on a rest day is allowed but flagged as unscheduled. Owners don\'t clock in.' },
+                    { type: 'image', src: img('time-clock'), caption: 'The time clock in the top bar.' },
+                    { type: 'p', text: 'Managers check punches under **Schedule → Attendance**: each day shows the rostered shift next to the actual time in and out, with lateness and the difference in hours. Click a day to correct a punch or add a missing one.' },
+                    { type: 'image', src: img('attendance'), caption: 'Schedule → Attendance.' },
+                    { type: 'note', text: 'A day with a time in but no time out pays nothing until it\'s corrected, and the staff member sees a **!** on their clock button. Lateness is counted to the minute; there\'s no grace period.' },
                 ],
             },
         ],
@@ -371,6 +645,64 @@ export const helpSections: HelpSection[] = [
                 blocks: [
                     { type: 'p', text: 'In **Settings → Danger zone**, the owner can archive a store. Archiving hides it from all members and stops new activity. The data is kept, but you can\'t undo this yourself. To confirm, you\'ll be asked to type the store\'s name.' },
                     { type: 'note', text: 'Only the store owner can archive a store.' },
+                ],
+            },
+        ],
+    },
+    {
+        id: 'troubleshooting',
+        title: 'Troubleshooting & support',
+        icon: 'lifebuoy',
+        articles: [
+            {
+                id: 'contact-support',
+                title: 'Contact support',
+                summary: 'Get help from the SMB-PoS team.',
+                blocks: [
+                    { type: 'p', text: 'Can\'t find the answer in this guide? Get in touch and we\'ll help.' },
+                    { type: 'contact' },
+                    { type: 'heading', text: 'Help us help you faster' },
+                    { type: 'list', items: [
+                        'Your **store name** and the **email you log in with**.',
+                        'Which page you were on and what you were trying to do.',
+                        'The exact error message, or a screenshot of it.',
+                        'For a sale, the **receipt number** (e.g. #1048).',
+                    ] },
+                    { type: 'note', text: 'We will never ask for your password. Don\'t send it, or your MCP tokens or AI API keys, to anyone, including us.' },
+                ],
+            },
+            {
+                id: 'faq',
+                title: 'Common problems',
+                summary: 'Quick fixes for the questions we hear most.',
+                blocks: [
+                    { type: 'heading', text: 'A product doesn\'t show in the POS' },
+                    { type: 'list', items: [
+                        'The product is turned off: open it and switch on **Active**.',
+                        'It\'s a recipe product with no recipe lines. Recipe products can\'t be active until they have at least one ingredient.',
+                        'You\'re on a sales channel (e.g. Grab) and the product has **Sell on Grab** unticked.',
+                        'A category or subcategory filter is selected in the POS. Click **All**.',
+                    ] },
+                    { type: 'heading', text: '"Stock would go negative for this sale"' },
+                    { type: 'p', text: 'The store doesn\'t allow negative stock, and there isn\'t enough of the product or one of its ingredients. Record the delivery or a **stock adjustment** first, or ask the owner to turn on **Allow negative stock** in Settings.' },
+                    { type: 'heading', text: 'The store says it\'s read-only' },
+                    { type: 'p', text: 'The account has an unpaid bill, so nothing can be changed until it\'s paid. You can still view and export everything. The owner sees a banner with the details; access comes back automatically once payment is recorded.' },
+                    { type: 'heading', text: 'I can\'t see a page or a button' },
+                    { type: 'p', text: 'Pages and actions depend on your role and permissions in that store. Ask the owner to check **Settings → Roles & permissions** or the **Permissions** button next to your name in **Team**. A **View-only access** label means you can look but not change. Warehouse stores have no POS or sales history.' },
+                    { type: 'heading', text: '"Your access to this store has been suspended"' },
+                    { type: 'p', text: 'An owner or admin has suspended your membership. Ask them to reinstate you in **Settings → Team**.' },
+                    { type: 'heading', text: 'The invite link doesn\'t work' },
+                    { type: 'p', text: 'Invites expire after the number of days chosen when they were created (7 by default), and each can be used once. Ask the owner to create a new one. Sign up or log in with the **same email** the invite was sent to.' },
+                    { type: 'heading', text: 'I didn\'t get the verification or password reset email' },
+                    { type: 'p', text: 'Check your spam or promotions folder, and that you typed the email correctly. Use **Resend verification email** on the Stores page; reset links expire after 1 hour, so request a new one if it\'s old.' },
+                    { type: 'heading', text: 'Report numbers look wrong' },
+                    { type: 'list', items: [
+                        'Check the date range at the top. Days follow the store\'s timezone, not your phone\'s.',
+                        'Voided sales aren\'t counted in net sales; deleted sales are removed completely.',
+                        'Gross profit needs costs. Look for "costed" under Gross profit and add missing product or ingredient costs.',
+                    ] },
+                    { type: 'heading', text: 'An AI app stopped connecting' },
+                    { type: 'p', text: 'MCP tokens stop working when they expire, are revoked, or when you change or reset your password. Create a new token in **Settings → MCP server**.' },
                 ],
             },
         ],
