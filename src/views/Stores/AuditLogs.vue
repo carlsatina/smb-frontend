@@ -529,6 +529,13 @@ const formatActionLabel = (action: string) => {
         ROLE_PERMISSIONS_UPDATED: 'Role Permissions Updated',
         MEMBER_PERMISSIONS_UPDATED: 'Member Permissions Updated',
         MEMBER_PERMISSIONS_CLEARED: 'Member Permissions Cleared',
+        MCP_TOKEN_CREATED: 'MCP Token Created',
+        MCP_TOKEN_REVOKED: 'MCP Token Revoked',
+        MCP_INGREDIENT_CREATED: 'Ingredient Added (AI)',
+        MCP_INGREDIENT_UPDATED: 'Ingredient Updated (AI)',
+        MCP_PRODUCT_CREATED: 'Product Added (AI)',
+        MCP_PRODUCT_UPDATED: 'Product Updated (AI)',
+        MCP_RECIPE_UPDATED: 'Recipe Updated (AI)',
     };
     return labels[action] || action.replace(/_/g, ' ');
 };
@@ -544,6 +551,13 @@ const getActionIcon = (action: string) => {
         ROLE_PERMISSIONS_UPDATED: 'shield-account-outline',
         MEMBER_PERMISSIONS_UPDATED: 'shield-account-outline',
         MEMBER_PERMISSIONS_CLEARED: 'shield-off-outline',
+        MCP_TOKEN_CREATED: 'key-plus',
+        MCP_TOKEN_REVOKED: 'key-remove',
+        MCP_INGREDIENT_CREATED: 'robot-outline',
+        MCP_INGREDIENT_UPDATED: 'robot-outline',
+        MCP_PRODUCT_CREATED: 'robot-outline',
+        MCP_PRODUCT_UPDATED: 'robot-outline',
+        MCP_RECIPE_UPDATED: 'robot-outline',
     };
     return icons[action] || 'circle-outline';
 };
@@ -559,6 +573,13 @@ const getActionClass = (action: string) => {
         ROLE_PERMISSIONS_UPDATED: 'supplier',
         MEMBER_PERMISSIONS_UPDATED: 'supplier',
         MEMBER_PERMISSIONS_CLEARED: 'supplier',
+        MCP_TOKEN_CREATED: 'supplier',
+        MCP_TOKEN_REVOKED: 'deleted',
+        MCP_INGREDIENT_CREATED: 'status',
+        MCP_INGREDIENT_UPDATED: 'status',
+        MCP_PRODUCT_CREATED: 'status',
+        MCP_PRODUCT_UPDATED: 'status',
+        MCP_RECIPE_UPDATED: 'status',
     };
     return classes[action] || '';
 };
@@ -569,6 +590,7 @@ const getAuditItemName = (log: AuditLogRecord) => {
     if (!log.meta || typeof log.meta !== 'object') return '';
     const meta = log.meta as Record<string, unknown>;
     if (typeof meta.itemName === 'string') return meta.itemName;
+    if (log.action.startsWith('MCP_') && typeof meta.name === 'string') return meta.name;
     return '';
 };
 
@@ -586,6 +608,24 @@ const getAuditReceiptItems = (log: AuditLogRecord) => {
 const formatAuditSummary = (log: AuditLogRecord) => {
     if (!log.meta || typeof log.meta !== 'object') return '';
     const meta = log.meta as Record<string, unknown>;
+
+    // Changes made by an AI app through the MCP server: "Price 120 → 135 · via Claude"
+    if (log.action.startsWith('MCP_')) {
+        const via = typeof meta.tokenName === 'string' ? `via ${meta.tokenName}` : '';
+        if (log.action === 'MCP_TOKEN_CREATED' || log.action === 'MCP_TOKEN_REVOKED') {
+            const access = meta.access === 'READ_WRITE' ? 'Read & write' : 'Read-only';
+            return [meta.name, access].filter(Boolean).join(' · ');
+        }
+        const changes = meta.changes && typeof meta.changes === 'object' ? (meta.changes as Record<string, unknown>) : {};
+        const previous = meta.previous && typeof meta.previous === 'object' ? (meta.previous as Record<string, unknown>) : {};
+        const show = (value: unknown) => (value === null || value === undefined ? '—' : typeof value === 'object' ? '…' : String(value));
+        const fields = Object.keys(changes)
+            .filter((key) => key !== 'lines')
+            .slice(0, 3)
+            .map((key) => (key in previous ? `${key} ${show(previous[key])} → ${show(changes[key])}` : key));
+        if (Array.isArray(changes.lines)) fields.push(`${changes.lines.length} recipe line${changes.lines.length === 1 ? '' : 's'}`);
+        return [...fields, via].filter(Boolean).join(' · ');
+    }
 
     if (log.action === 'INVENTORY_ADJUSTMENT') {
         const itemName = typeof meta.itemName === 'string' ? meta.itemName : '';

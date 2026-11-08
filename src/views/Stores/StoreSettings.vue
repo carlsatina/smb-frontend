@@ -52,6 +52,10 @@
                             <mdicon name="robot-outline" size="16" />
                             AI integration
                         </button>
+                        <button v-if="isOwner" class="st-sidebar-item" :class="{ 'is-active': activeSection === 'mcp' }" @click="activeSection = 'mcp'">
+                            <mdicon name="connection" size="16" />
+                            MCP server
+                        </button>
                     </div>
 
                     <div class="st-sidebar-group">
@@ -545,6 +549,18 @@
                             </form>
                         </section>
 
+                        <!-- ── MCP server (owner only) ── -->
+                        <section v-if="activeSection === 'mcp' && isOwner && currentStore" class="st-section">
+                            <div class="st-section-header">
+                                <h2 class="st-section-title">MCP server</h2>
+                                <p class="st-section-sub">
+                                    Let AI apps like Claude and Cursor work with your stores' catalogs. Each app connects with a token you
+                                    create here, covering the stores you choose, and you can revoke it anytime.
+                                </p>
+                            </div>
+                            <McpAccessPanel :store-id="currentStore.id" />
+                        </section>
+
                         <!-- ── Danger zone ── -->
                         <section v-if="activeSection === 'danger'" class="st-section">
                             <div class="st-section-header">
@@ -665,6 +681,7 @@ import SkeletonLoader from '@/components/SkeletonLoader.vue';
 import RolePermissionsPanel from '@/components/RolePermissionsPanel.vue';
 import SalesChannelsPanel from '@/components/SalesChannelsPanel.vue';
 import MemberPermissionsModal from '@/components/MemberPermissionsModal.vue';
+import McpAccessPanel from '@/components/McpAccessPanel.vue';
 
 const router = useRouter();
 const route = useRoute();
@@ -718,7 +735,7 @@ const allPaymentMethods = [
     { value: 'OTHER', label: 'Other' },
 ];
 
-const activeSection = ref<'profile' | 'payment' | 'channels' | 'catalog' | 'team' | 'permissions' | 'ai' | 'danger'>('profile');
+const activeSection = ref<'profile' | 'payment' | 'channels' | 'catalog' | 'team' | 'permissions' | 'ai' | 'mcp' | 'danger'>('profile');
 
 const isSaving = ref(false);
 const isCatalogSaving = ref(false);
@@ -789,6 +806,7 @@ const currentStore = computed(() => {
 
 const canEdit = computed(() => hasPermission(currentStore.value, 'store.manage'));
 const canArchive = computed(() => currentStore.value?.role === 'OWNER');
+const isOwner = canArchive;
 
 const timezoneOptions = computed(() => {
     if (storeForm.timezone && !baseTimezoneOptions.includes(storeForm.timezone)) {
@@ -1515,7 +1533,7 @@ onMounted(async () => {
 
     // Support deep-linking via ?section=team etc.
     const qs = route.query.section as string | undefined;
-    if (qs && ['profile', 'payment', 'channels', 'catalog', 'team', 'permissions', 'ai', 'danger'].includes(qs)) {
+    if (qs && ['profile', 'payment', 'channels', 'catalog', 'team', 'permissions', 'ai', 'mcp', 'danger'].includes(qs)) {
         activeSection.value = qs as typeof activeSection.value;
     }
 
