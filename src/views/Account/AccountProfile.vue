@@ -51,7 +51,7 @@
             <section class="apf-panel">
                 <div class="apf-panel-head">
                     <h2 class="apf-panel-title">Change password</h2>
-                    <p class="apf-panel-desc">Changing your password signs out your other devices.</p>
+                    <p class="apf-panel-desc">Changing your password signs out your other devices and disconnects AI apps (MCP tokens).</p>
                 </div>
 
                 <form class="apf-form" @submit.prevent="savePassword">

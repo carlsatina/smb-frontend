@@ -8,6 +8,7 @@ export type McpToken = {
     access: McpTokenAccess;
     tokenPrefix: string;
     lastUsedAt: string | null;
+    expiresAt: string | null;
     createdAt: string;
     stores: Array<{ id: string; name: string }>;
 };
@@ -16,7 +17,15 @@ export type McpToken = {
 export const listMcpTokens = () => apiClient.request<{ tokens: McpToken[] }>('/api/v1/mcp-tokens');
 
 /** `secret` is only ever returned here, once. */
-export const createMcpToken = (payload: { name: string; access: McpTokenAccess; storeIds: string[] }) =>
+export const createMcpToken = (payload: {
+    name: string;
+    access: McpTokenAccess;
+    storeIds: string[];
+    /** null = never expires. */
+    expiresInDays: 30 | 90 | 365 | null;
+    /** The owner's current password, required to mint a token. */
+    password: string;
+}) =>
     apiClient.request<{ token: McpToken; secret: string }>('/api/v1/mcp-tokens', {
         method: 'POST',
         body: payload,

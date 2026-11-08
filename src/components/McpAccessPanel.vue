@@ -79,7 +79,7 @@
                 </div>
                 <pre><code>{{ currentClient.snippet }}</code></pre>
             </div>
-            <p v-if="!newSecret" class="mcp-setup-hint">Replace <code>YOUR_TOKEN</code> with a token you created below.</p>
+            <p v-if="!newSecret && currentClient.key !== 'claude-code'" class="mcp-setup-hint">Replace <code>YOUR_TOKEN</code> with a token you created below.</p>
         </div>
 
         <!-- Create -->
@@ -132,12 +132,37 @@
                 </span>
             </div>
             <p v-else class="mcp-stores-hint">This token will cover <strong>{{ ownedStores[0]?.name }}</strong>.</p>
+            <div class="mcp-create-grid mcp-create-grid--even">
+                <label class="st-field">
+                    Expires
+                    <select v-model="form.expiresInDays">
+                        <option :value="30">In 30 days</option>
+                        <option :value="90">In 90 days</option>
+                        <option :value="365">In 1 year</option>
+                        <option :value="null">Never</option>
+                    </select>
+                </label>
+                <label class="st-field">
+                    Your password
+                    <input
+                        v-model="form.password"
+                        type="password"
+                        autocomplete="current-password"
+                        placeholder="Confirm it's you"
+                        required
+                    />
+                </label>
+            </div>
+            <p v-if="form.expiresInDays === null" class="mcp-warn">
+                <mdicon name="alert-outline" size="15" />
+                A token that never expires keeps working until you revoke it. Prefer an expiry date.
+            </p>
             <p v-if="form.access === 'READ_WRITE'" class="mcp-warn">
                 <mdicon name="alert-outline" size="15" />
                 Changes made by the AI go live in the POS immediately (for example a new price). Each one is recorded in the Audit Log.
             </p>
             <div class="mcp-create-actions">
-                <button type="submit" class="st-btn-primary" :disabled="isCreating || !form.name || form.storeIds.length === 0">
+                <button type="submit" class="st-btn-primary" :disabled="isCreating || !form.name || !form.password || form.storeIds.length === 0">
                     {{ isCreating ? 'Creating…' : 'Create token' }}
                 </button>
             </div>
@@ -165,6 +190,7 @@
                     <div class="mcp-token-meta">
                         <code>{{ token.tokenPrefix }}…</code>
                         · Created {{ formatDate(token.createdAt) }}
+                        · <span :class="{ 'mcp-expiring': isExpiringSoon(token) }">{{ token.expiresAt ? `Expires ${formatDate(token.expiresAt)}` : 'Never expires' }}</span>
                         · {{ token.lastUsedAt ? `Last used ${formatDate(token.lastUsedAt)}` : 'Never used' }}
                     </div>
                 </div>
@@ -216,7 +242,16 @@ const isCreating = ref(false);
 const revokingId = ref<string | null>(null);
 const pendingRevoke = ref<McpToken | null>(null);
 const newSecret = ref<string | null>(null);
-const form = reactive({ name: '', access: 'READ_ONLY' as McpTokenAccess, storeIds: [props.storeId] as string[] });
+const form = reactive({
+    name: '',
+    access: 'READ_ONLY' as McpTokenAccess,
+    storeIds: [props.storeId] as string[],
+    expiresInDays: 90 as 30 | 90 | 365 | null,
+    password: '',
+});
+
+const isExpiringSoon = (token: McpToken) =>
+    Boolean(token.expiresAt && new Date(token.expiresAt).getTime() - Date.now() < 7 * 24 * 60 * 60 * 1000);
 const copiedKey = ref<string | null>(null);
 let copiedTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -255,8 +290,12 @@ const clients = computed(() => {
             label: 'Claude Code',
             file: 'Terminal',
             icon: 'console',
-            hint: 'Run this in your terminal.',
-            snippet: `claude mcp add --transport http smb-pos ${serverUrl} --header "Authorization: Bearer ${token}"`,
+            hint: 'Run these in your terminal. The first line asks for the token without showing it, so it never lands in your shell history.',
+            snippet: [
+                'read -rs SMBPOS_MCP_TOKEN   # paste your token, then press Enter',
+                `claude mcp add --transport http smb-pos ${serverUrl} --header "Authorization: Bearer $SMBPOS_MCP_TOKEN"`,
+                'unset SMBPOS_MCP_TOKEN',
+            ].join('\n'),
         },
         {
             key: 'cursor' as const,
@@ -321,15 +360,23 @@ const create = async () => {
     if (!form.name) return;
     isCreating.value = true;
     try {
-        const { token, secret } = await createMcpToken({ name: form.name, access: form.access, storeIds: form.storeIds });
+        const { token, secret } = await createMcpToken({
+            name: form.name,
+            access: form.access,
+            storeIds: form.storeIds,
+            expiresInDays: form.expiresInDays,
+            password: form.password,
+        });
         tokens.value = [token, ...tokens.value];
         newSecret.value = secret;
         form.name = '';
         form.access = 'READ_ONLY';
         form.storeIds = [props.storeId];
+        form.expiresInDays = 90;
     } catch (error) {
         showToast(errorMessage(error, 'Could not create the token.'), 'error');
     } finally {
+        form.password = '';
         isCreating.value = false;
     }
 };
@@ -688,6 +735,16 @@ onMounted(load);
 .mcp-store-chip--none {
     background: #fef2f2;
     color: #b91c1c;
+}
+
+.mcp-create-grid--even {
+    grid-template-columns: 1fr 1fr;
+    margin-top: 1rem;
+}
+
+.mcp-expiring {
+    color: #b45309;
+    font-weight: 600;
 }
 
 .mcp-warn {

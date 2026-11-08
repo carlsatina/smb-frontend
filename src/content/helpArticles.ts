@@ -353,7 +353,7 @@ export const helpSections: HelpSection[] = [
                         { text: 'Open **Settings → MCP server**. Only store owners see this section.' },
                         { text: 'Under **Create a token**, give the token a name you\'ll recognize (e.g. "Claude on my laptop") and choose **Read-only** or **Read & write**.' },
                         { text: 'If you own more than one store, tick the stores this token may use. The store you\'re in is ticked already. One connection covers all the stores you tick, so you can ask things like "Copy the Spanish Latte recipe to my Makati store."' },
-                        { text: 'Click **Create token** and **copy it right away**. It is shown only once.' },
+                        { text: 'Choose when the token expires (90 days by default), enter your password to confirm it\'s you, then click **Create token** and **copy it right away**. It is shown only once.' },
                         { text: 'Pick your app under **Connect an AI app**, copy the setup (your token is already filled in), and add it to the app as described.' },
                     ] },
                     { type: 'fields', title: 'Access levels', items: [
@@ -361,7 +361,7 @@ export const helpSections: HelpSection[] = [
                         { name: 'Read & write', text: 'The AI can also add and edit ingredients, products and recipes. Changes go live in the POS immediately and are recorded in the **Audit Log** with the token\'s name and the old and new values. Store settings stay read-only either way.' },
                     ] },
                     { type: 'tip', text: 'Create a separate token for each app or device. If a laptop is lost, revoke just that token and the others keep working.' },
-                    { type: 'note', text: 'A token stops working when you click **Revoke**. If you stop owning one of its stores, or a store is archived, that store drops off the token and the others keep working. While an account is read-only for non-payment, AI apps can still read but not make changes. ChatGPT and claude.ai web connectors are not supported yet.' },
+                    { type: 'note', text: 'A token stops working when it expires, when you click **Revoke**, or when you change or reset your password (reconnect your AI apps with a new token afterwards). If you stop owning one of its stores, or a store is archived, that store drops off the token and the others keep working. While an account is read-only for non-payment, AI apps can still read but not make changes. ChatGPT and claude.ai web connectors are not supported yet.' },
                 ],
             },
             {
@@ -385,7 +385,7 @@ export const helpSections: HelpSection[] = [
                 title: 'Your profile & password',
                 summary: 'Change your name or password.',
                 blocks: [
-                    { type: 'p', text: 'Click your name in the top-right corner and choose **My Profile**. You can change your display name and password there. Changing your password signs you out on your other devices. Your email can\'t be changed.' },
+                    { type: 'p', text: 'Click your name in the top-right corner and choose **My Profile**. You can change your display name and password there. Changing your password signs you out on your other devices and disconnects any AI apps (MCP tokens). Your email can\'t be changed.' },
                 ],
             },
             {
