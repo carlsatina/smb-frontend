@@ -371,8 +371,8 @@ export const helpSections: HelpSection[] = [
                     { type: 'image', src: img('sales-history'), caption: 'Sales history with filters and actions.' },
                     { type: 'fields', title: 'Actions on a sale', items: [
                         { name: 'Print', text: 'Prints the receipt again.' },
-                        { name: 'Edit', text: 'Change items, quantities, payment method, order type or discount. Stock is adjusted only for the difference, and the original is kept in the Audit Log. Needs the **Edit sales** permission.' },
-                        { name: 'Void', text: 'Cancels the sale: the stock it used goes back to inventory, and it\'s excluded from net sales. It stays in the list marked **Voided** so there\'s a record. Needs the **Void sales** permission.' },
+                        { name: 'Edit', text: 'Change items, quantities, payment method, order type or discount. Stock is adjusted only for the difference, and the original is kept in the Audit Log. Owners and admins can do this by default; others need the **Edit & import sales** permission.' },
+                        { name: 'Void', text: 'Cancels the sale: the stock it used goes back to inventory, and it\'s excluded from net sales. It stays in the list marked **Voided** so there\'s a record. Owners and admins can do this by default; others need the **Void sales** permission.' },
                         { name: 'Delete (bin icon, owners only)', text: 'Removes a sale entirely, e.g. a test or duplicate ticket. It disappears from history, reports and daily totals, its stock is returned, and a copy is kept in the Audit Log. This can\'t be undone in the app.' },
                     ] },
                     { type: 'image', src: img('edit-sale'), caption: 'Editing a sale. The total shows the difference from the original.' },
