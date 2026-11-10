@@ -667,14 +667,22 @@
                             </label>
                             <span :class="{ 'text-muted': !discountEnabled }">-{{ formatMoney(cartDiscount) }}</span>
                         </div>
-                        <div class="summary-row net">
-                            <span>Net</span>
-                            <span>{{ formatMoney(cartNet) }}</span>
-                        </div>
-                        <div class="summary-row">
-                            <span>Tax ({{ defaultTaxRate }}%)</span>
-                            <span>{{ formatMoney(cartTax) }}</span>
-                        </div>
+                        <template v-if="discountEnabled">
+                            <div v-if="defaultTaxRate > 0" class="summary-row">
+                                <span>Less VAT ({{ defaultTaxRate }}%)</span>
+                                <span>-{{ formatMoney(cartVatExemption) }}</span>
+                            </div>
+                        </template>
+                        <template v-else>
+                            <div class="summary-row net">
+                                <span>Net</span>
+                                <span>{{ formatMoney(cartNet) }}</span>
+                            </div>
+                            <div class="summary-row">
+                                <span>Tax ({{ defaultTaxRate }}%)</span>
+                                <span>{{ formatMoney(cartTax) }}</span>
+                            </div>
+                        </template>
                         <div class="summary-row total">
                             <span>Total</span>
                             <span>{{ formatMoney(cartTotal) }}</span>
@@ -1547,16 +1555,55 @@ const cartSubtotal = computed(() => {
 const defaultTaxRate = computed(() => storeContext.currentStore?.defaultTaxRate ?? 0);
 const defaultDiscount = computed(() => storeContext.currentStore?.defaultDiscount ?? 0);
 
+const roundCents = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
+
+// Senior/PWD discount: prices are VAT-inclusive, so remove VAT first and take the
+// discount off the VAT-exclusive price, e.g. 90 / 1.12 = 80.36, less 20% = 64.29.
+// Computed per line so the receipt matches what gets saved.
+const seniorLineBreakdown = (item: CartItem) => {
+    const gross = lineTotal(item);
+    const vatExclusive = roundCents(gross / (1 + defaultTaxRate.value / 100));
+    const discount = roundCents((vatExclusive * defaultDiscount.value) / 100);
+    return { gross, vatExemption: roundCents(gross - vatExclusive), discount };
+};
+
+// The discounted ticket total is rounded to the nearest whole peso (64.29 -> 64);
+// the centavo difference is folded into the discount of the largest line.
+const seniorBreakdowns = computed(() => {
+    if (!discountEnabled.value) return [];
+    const lines = cartItems.value.map(seniorLineBreakdown);
+    if (!lines.length) return lines;
+    const exactTotal = roundCents(
+        lines.reduce((sum, line) => sum + line.gross - line.vatExemption - line.discount, 0)
+    );
+    const adjustment = roundCents(exactTotal - Math.round(exactTotal));
+    if (adjustment !== 0) {
+        const largest = lines.reduce((best, line) => (line.gross > best.gross ? line : best), lines[0]);
+        largest.discount = roundCents(
+            Math.min(Math.max(largest.discount + adjustment, 0), largest.gross - largest.vatExemption)
+        );
+    }
+    return lines;
+});
+
+const cartVatExemption = computed(() =>
+    roundCents(seniorBreakdowns.value.reduce((sum, line) => sum + line.vatExemption, 0))
+);
+
 const cartDiscount = computed(() => {
     if (!discountEnabled.value) return 0;
-    return (cartSubtotal.value * defaultDiscount.value) / 100;
+    return roundCents(seniorBreakdowns.value.reduce((sum, line) => sum + line.discount, 0));
 });
 
 const cartTotal = computed(() => {
-    return cartSubtotal.value - cartDiscount.value;
+    if (discountEnabled.value) {
+        return roundCents(cartSubtotal.value - cartVatExemption.value - cartDiscount.value);
+    }
+    return cartSubtotal.value;
 });
 
 const cartTax = computed(() => {
+    if (discountEnabled.value) return 0;
     return cartTotal.value > 0 ? (cartTotal.value * defaultTaxRate.value) / 100 : 0;
 });
 
@@ -1765,8 +1812,7 @@ const finalizeTicket = async () => {
     isSubmitting.value = true;
     try {
         const taxRate = defaultTaxRate.value;
-        const totalDiscount = cartDiscount.value;
-        const subtotal = cartSubtotal.value;
+        const seniorDiscount = discountEnabled.value;
 
         const customDateIso =
             isOwner.value && useCustomDate.value && customSaleDate.value
@@ -1778,16 +1824,25 @@ const finalizeTicket = async () => {
                 : undefined;
 
         const payload = {
-            items: cartItems.value.map((item) => {
+            items: cartItems.value.map((item, index) => {
                 const itemTotal = lineTotal(item);
-                const itemDiscountShare = subtotal > 0 ? (itemTotal / subtotal) * totalDiscount : 0;
-                const taxableAmount = itemTotal - itemDiscountShare;
-                const itemTax = taxableAmount > 0 ? (taxableAmount * taxRate) / 100 : 0;
+                if (seniorDiscount) {
+                    // VAT-exempt: the removed VAT is recorded as part of the discount, no tax.
+                    const line = seniorBreakdowns.value[index];
+                    return {
+                        productId: item.productId,
+                        qty: item.qty,
+                        unitPrice: item.unitPrice,
+                        discount: roundCents(line.vatExemption + line.discount),
+                        tax: 0,
+                    };
+                }
+                const itemTax = itemTotal > 0 ? (itemTotal * taxRate) / 100 : 0;
                 return {
                     productId: item.productId,
                     qty: item.qty,
                     unitPrice: item.unitPrice,
-                    discount: itemDiscountShare,
+                    discount: 0,
                     tax: itemTax,
                 };
             }),

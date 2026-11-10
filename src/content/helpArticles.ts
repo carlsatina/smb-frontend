@@ -352,7 +352,7 @@ export const helpSections: HelpSection[] = [
                         { text: 'Select the **Payment method**, then click **Finalize sale**.' },
                     ] },
                     { type: 'fields', items: [
-                        { name: 'Discount', text: 'Tick to apply the Senior/PWD discount percentage set in the store settings.' },
+                        { name: 'Discount', text: 'Tick to apply the Senior/PWD discount. The VAT is removed first, then the store\'s discount percentage is taken off the VAT-exclusive price (e.g. ₱90 ÷ 1.12 = ₱80.36, less 20% = ₱64.29, rounded to ₱64). The total is rounded to the nearest peso and the ticket is recorded with no tax.' },
                         { name: 'Tax', text: 'Calculated from the store\'s tax rate.' },
                         { name: 'Walk-in / channel', text: 'Channel tickets use the channel prices. Reports show channel sales and markup separately.' },
                         { name: 'Dine-in / Takeout', text: 'Takeout also deducts each product\'s takeout packaging.' },
