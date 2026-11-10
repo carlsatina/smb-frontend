@@ -22,9 +22,12 @@
         <div class="sales-shell">
 
             <!-- HEADER -->
+            <button type="button" class="back-link" @click="goToPos">
+                <mdicon name="arrow-left" size="15" />
+                POS
+            </button>
             <header class="sales-header">
                 <div class="sales-title">
-                    <span class="sales-eyebrow">Sales</span>
                     <h1>Sales history</h1>
                     <p>Track finalized tickets, receipts, and cashier performance for {{ currentStoreLabel }}.</p>
                 </div>
@@ -63,9 +66,9 @@
             <div class="sales-main">
 
                     <!-- TOOLBAR -->
-                    <div class="sales-toolbar">
-                        <div class="toolbar-left">
-                            <div class="filter-pills">
+                    <div class="filter-bar">
+                        <div class="filter-bar__top">
+                            <div class="filter-pills" role="tablist" aria-label="Sale status">
                                 <button class="pill" :class="{ active: statusFilter === 'ALL' }" @click="statusFilter = 'ALL'">All</button>
                                 <button class="pill" :class="{ active: statusFilter === 'FINALIZED' }" @click="statusFilter = 'FINALIZED'">Finalized</button>
                                 <button class="pill" :class="{ active: statusFilter === 'VOIDED' }" @click="statusFilter = 'VOIDED'">
@@ -73,77 +76,108 @@
                                     Voided
                                 </button>
                             </div>
-                            <input
-                                v-model="searchQuery"
-                                type="text"
-                                class="search-input"
-                                placeholder="Search receipt or cashier on this page..."
-                            />
+                            <div class="search-box">
+                                <mdicon name="magnify" size="17" class="search-box__icon" />
+                                <input
+                                    v-model="searchQuery"
+                                    type="search"
+                                    class="search-input"
+                                    placeholder="Search receipt, cashier, or item"
+                                    aria-label="Search sales on this page by receipt, cashier, or item"
+                                />
+                                <button
+                                    v-if="searchQuery"
+                                    type="button"
+                                    class="search-box__clear"
+                                    aria-label="Clear search"
+                                    @click="searchQuery = ''"
+                                >
+                                    <mdicon name="close" size="15" />
+                                </button>
+                            </div>
+                            <div class="toolbar-actions">
+                                <button class="toolbar-button" :disabled="isExporting" title="Export CSV" aria-label="Export CSV" @click="handleExport">
+                                    <mdicon name="tray-arrow-down" size="16" />
+                                    <span class="toolbar-button__text">{{ isExporting ? 'Exporting…' : 'Export' }}</span>
+                                </button>
+                                <button v-if="canEdit" class="toolbar-button" :disabled="isImporting" title="Import CSV" aria-label="Import CSV" @click="triggerImport">
+                                    <mdicon name="tray-arrow-up" size="16" />
+                                    <span class="toolbar-button__text">{{ isImporting ? 'Importing…' : 'Import' }}</span>
+                                </button>
+                                <input
+                                    ref="importFileInput"
+                                    type="file"
+                                    accept=".csv,text/csv"
+                                    style="display:none"
+                                    @change="handleImportFileSelected"
+                                />
+                            </div>
                         </div>
-                        <div class="toolbar-right">
-                            <button class="ghost-button" :disabled="isExporting" @click="handleExport">
-                                {{ isExporting ? 'Exporting…' : 'Export CSV' }}
-                            </button>
-                            <button v-if="canEdit" class="ghost-button" :disabled="isImporting" @click="triggerImport">
-                                {{ isImporting ? 'Importing…' : 'Import CSV' }}
-                            </button>
-                            <input
-                                ref="importFileInput"
-                                type="file"
-                                accept=".csv,text/csv"
-                                style="display:none"
-                                @change="handleImportFileSelected"
-                            />
-                            <button class="ghost-button" @click="goToPos">Back to POS</button>
-                        </div>
-                    </div>
 
-                    <div class="advanced-filters">
-                        <label class="filter-field">
-                            <span>Cashier</span>
-                            <select v-model="cashierFilter" :disabled="isFilterOptionsLoading">
-                                <option value="">All cashiers</option>
-                                <option v-for="member in cashierOptions" :key="member.userId" :value="member.userId">
-                                    {{ member.fullName || member.email }}
-                                </option>
-                            </select>
-                        </label>
-                        <label class="filter-field">
-                            <span>Payment method</span>
-                            <select v-model="paymentMethodFilter" :disabled="isFilterOptionsLoading">
-                                <option value="">All methods</option>
-                                <option v-for="method in paymentMethodOptions" :key="method.value" :value="method.value">
-                                    {{ method.label }}
-                                </option>
-                            </select>
-                        </label>
-                        <label v-if="channelOptions.length" class="filter-field">
-                            <span>Channel</span>
-                            <select v-model="channelFilter" :disabled="isFilterOptionsLoading">
-                                <option value="">All channels</option>
-                                <option value="WALK_IN">Walk-in</option>
-                                <option v-for="channel in channelOptions" :key="channel.key" :value="channel.key">
-                                    {{ channel.name }}
-                                </option>
-                            </select>
-                        </label>
-                        <label class="filter-field">
-                            <span>Item</span>
-                            <select v-model="productFilter" :disabled="isFilterOptionsLoading">
-                                <option value="">All items</option>
-                                <option v-for="product in productOptions" :key="product.id" :value="product.id">
-                                    {{ product.name }}
-                                </option>
-                            </select>
-                        </label>
-                        <button
-                            class="clear-filters-button"
-                            type="button"
-                            :disabled="!hasAdvancedFilters || isFilterOptionsLoading"
-                            @click="clearAdvancedFilters"
-                        >
-                            Clear filters
-                        </button>
+                        <div class="filter-bar__chips">
+                            <span class="filter-bar__label">
+                                <mdicon name="filter-variant" size="15" />
+                                Filters
+                            </span>
+                            <label class="filter-chip" :class="{ 'filter-chip--active': cashierFilter }">
+                                <mdicon name="account-outline" size="15" class="filter-chip__icon" />
+                                <select v-model="cashierFilter" :disabled="isFilterOptionsLoading" aria-label="Cashier">
+                                    <option value="">All cashiers</option>
+                                    <option v-for="member in cashierOptions" :key="member.userId" :value="member.userId">
+                                        {{ member.fullName || member.email }}
+                                    </option>
+                                </select>
+                            </label>
+                            <label class="filter-chip" :class="{ 'filter-chip--active': paymentMethodFilter }">
+                                <mdicon name="credit-card-outline" size="15" class="filter-chip__icon" />
+                                <select v-model="paymentMethodFilter" :disabled="isFilterOptionsLoading" aria-label="Payment method">
+                                    <option value="">All payment methods</option>
+                                    <option v-for="method in paymentMethodOptions" :key="method.value" :value="method.value">
+                                        {{ method.label }}
+                                    </option>
+                                </select>
+                            </label>
+                            <label v-if="channelOptions.length" class="filter-chip" :class="{ 'filter-chip--active': channelFilter }">
+                                <mdicon name="storefront-outline" size="15" class="filter-chip__icon" />
+                                <select v-model="channelFilter" :disabled="isFilterOptionsLoading" aria-label="Channel">
+                                    <option value="">All channels</option>
+                                    <option value="WALK_IN">Walk-in</option>
+                                    <option v-for="channel in channelOptions" :key="channel.key" :value="channel.key">
+                                        {{ channel.name }}
+                                    </option>
+                                </select>
+                            </label>
+                            <label class="filter-chip" :class="{ 'filter-chip--active': productFilter }">
+                                <mdicon name="package-variant-closed" size="15" class="filter-chip__icon" />
+                                <select v-model="productFilter" :disabled="isFilterOptionsLoading" aria-label="Item">
+                                    <option value="">All items</option>
+                                    <option v-for="product in productOptions" :key="product.id" :value="product.id">
+                                        {{ product.name }}
+                                    </option>
+                                </select>
+                            </label>
+                            <button
+                                v-if="hasActiveFilters"
+                                class="clear-filters-button"
+                                type="button"
+                                :disabled="isFilterOptionsLoading"
+                                @click="clearAllFilters"
+                            >
+                                Clear all
+                            </button>
+                            <div class="daily-nav">
+                                <button class="daily-nav__arrow" type="button" title="Previous" aria-label="Previous period" @click="goToPrevious">
+                                    <mdicon name="chevron-left" size="16" />
+                                </button>
+                                <button class="daily-nav__date" type="button" @click="showDateModal = true">
+                                    <mdicon name="calendar-outline" size="15" />
+                                    <span>{{ dateRangeLabel }}</span>
+                                </button>
+                                <button class="daily-nav__arrow" type="button" :disabled="!canGoNext" title="Next" aria-label="Next period" @click="goToNext">
+                                    <mdicon name="chevron-right" size="16" />
+                                </button>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- IMPORT PROGRESS -->
@@ -169,22 +203,6 @@
 
                     <!-- TABLE PANEL -->
                     <section class="sales-panel">
-                        <!-- DATE NAVIGATOR -->
-                        <div class="daily-nav-wrapper">
-                            <div class="daily-nav">
-                                <button class="daily-nav__arrow" type="button" @click="goToPrevious" title="Previous">
-                                    <mdicon name="chevron-left" size="18" />
-                                </button>
-                                <button class="daily-nav__date" type="button" @click="showDateModal = true">
-                                    <mdicon name="calendar-outline" size="16" />
-                                    <span>{{ dateRangeLabel }}</span>
-                                </button>
-                                <button class="daily-nav__arrow" type="button" :disabled="!canGoNext" @click="goToNext" title="Next">
-                                    <mdicon name="chevron-right" size="18" />
-                                </button>
-                            </div>
-                        </div>
-
                         <Teleport to="body">
                             <Transition name="modal">
                                 <div v-if="showDateModal" class="date-modal-overlay" @click.self="showDateModal = false">
@@ -240,7 +258,7 @@
                                         <th>Receipt</th>
                                         <th>Cashier</th>
                                         <th>Payment</th>
-                                        <th>Items</th>
+                                        <th class="items-col">Items</th>
                                         <th class="align-right">Total</th>
                                         <th>Status</th>
                                         <th class="align-right">Actions</th>
@@ -269,13 +287,12 @@
                                             {{ formatPaymentMethod(sale.paymentMethod) }}
                                             <span v-if="sale.channel" class="channel-tag">{{ channelName(sale.channel) }}</span>
                                         </td>
-                                        <td>
+                                        <td class="items-col">
                                             <div class="item-list">
-                                                <div v-for="item in sale.items.slice(0, 2)" :key="item.id" class="item-line">
+                                                <div v-for="item in sale.items" :key="item.id" class="item-line">
                                                     <span class="item-qty">{{ item.qty }}×</span>
                                                     <span class="item-name">{{ item.name }}</span>
                                                 </div>
-                                                <div v-if="sale.items.length > 2" class="item-more">+{{ sale.items.length - 2 }} more</div>
                                             </div>
                                         </td>
                                         <td class="sale-total">{{ formatMoney(sale.total) }}</td>
@@ -693,6 +710,13 @@ const clearAdvancedFilters = () => {
     channelFilter.value = '';
 };
 
+const hasActiveFilters = computed(() => hasAdvancedFilters.value || Boolean(searchQuery.value.trim()));
+
+const clearAllFilters = () => {
+    clearAdvancedFilters();
+    searchQuery.value = '';
+};
+
 const resetAdvancedFilters = () => {
     isResettingFilters.value = true;
     clearAdvancedFilters();
@@ -855,7 +879,8 @@ const filteredSales = computed(() => {
         if (query) {
             const receipt = sale.receiptNumber ? String(sale.receiptNumber) : '';
             const cashier = sale.cashier?.fullName || sale.cashier?.email || '';
-            if (!receipt.includes(query) && !cashier.toLowerCase().includes(query)) return false;
+            const matchesItem = sale.items.some((item) => item.name?.toLowerCase().includes(query));
+            if (!receipt.includes(query) && !cashier.toLowerCase().includes(query) && !matchesItem) return false;
         }
         return true;
     });
@@ -1131,18 +1156,24 @@ watch(
     justify-content: space-between;
 }
 
-.sales-eyebrow {
-    display: inline-block;
-    font-size: 0.65rem;
-    font-weight: 750;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--c-accent);
-    background: rgba(13, 148, 136, 0.08);
-    padding: 0.2rem 0.6rem;
-    border-radius: 999px;
-    margin-bottom: 0.25rem;
+.back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    border: none;
+    background: none;
+    padding: 0;
+    margin-bottom: -0.4rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    font-family: inherit;
+    color: var(--c-muted);
+    cursor: pointer;
+    transition: color 0.15s;
+    align-self: flex-start;
 }
+
+.back-link:hover { color: var(--c-accent-dark); }
 
 .sales-title h1 {
     font-size: 1.35rem;
@@ -1244,55 +1275,68 @@ watch(
 }
 
 /* ============================================================
-   TOOLBAR
+   TOOLBAR (status · search · actions, then filter chips)
 ============================================================ */
-.sales-toolbar {
+.filter-bar {
+    background: var(--c-surface);
+    border: 1px solid var(--c-border);
+    border-radius: 14px;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.filter-bar__top {
     display: flex;
+    align-items: center;
     gap: 0.75rem;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
+    padding: 0.75rem;
 }
 
-.toolbar-left {
+.filter-bar__chips {
     display: flex;
-    gap: 0.65rem;
-    align-items: center;
     flex-wrap: wrap;
-    flex: 1;
-}
-
-.toolbar-right {
-    display: flex;
-    gap: 0.65rem;
     align-items: center;
-    flex-shrink: 0;
+    gap: 0.5rem;
+    padding: 0.65rem 0.75rem;
+    border-top: 1px solid var(--c-border);
+    background: #fbfcfd;
+    border-radius: 0 0 14px 14px;
 }
 
-/* ============================================================
-   FILTER PILLS
-============================================================ */
+.filter-bar__label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    margin-right: 0.25rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--c-muted);
+}
+
+/* Status segmented control */
 .filter-pills {
     display: inline-flex;
+    flex-shrink: 0;
     background: #f1f5f9;
-    border-radius: 8px;
-    padding: 0.2rem;
-    gap: 0.15rem;
-    border: 1px solid var(--c-border);
+    border-radius: 9px;
+    padding: 3px;
+    gap: 2px;
 }
 
 .pill {
     position: relative;
     border: none;
     background: transparent;
-    padding: 0.35rem 0.8rem;
-    border-radius: 6px;
-    font-size: 0.78rem;
+    height: 32px;
+    padding: 0 0.85rem;
+    border-radius: 7px;
+    font-size: 0.8rem;
     font-weight: 600;
     font-family: 'Inter', -apple-system, sans-serif;
     color: var(--c-muted);
     cursor: pointer;
-    transition: all 0.15s;
+    transition: color 0.15s, background 0.15s, box-shadow 0.15s;
     display: inline-flex;
     align-items: center;
     gap: 0.35rem;
@@ -1303,7 +1347,7 @@ watch(
 .pill.active {
     background: var(--c-surface);
     color: var(--c-accent-dark);
-    box-shadow: 0 1px 4px rgba(15, 23, 42, 0.1);
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
 }
 
 .pill-alert-dot {
@@ -1314,98 +1358,165 @@ watch(
     flex-shrink: 0;
 }
 
-/* ============================================================
-   SEARCH
-============================================================ */
+/* Search */
+.search-box {
+    position: relative;
+    display: flex;
+    align-items: center;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.search-box__icon {
+    position: absolute;
+    left: 0.75rem;
+    color: #94a3b8;
+    pointer-events: none;
+    display: inline-flex;
+}
+
+.search-box__clear {
+    position: absolute;
+    right: 0.35rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--c-muted);
+    cursor: pointer;
+}
+
+.search-box__clear:hover { background: #e2e8f0; color: var(--c-text); }
+
 .search-input {
-    border-radius: 8px;
-    border: 1.5px solid var(--c-border);
-    padding: 0.6rem 0.9rem;
-    min-width: 220px;
+    width: 100%;
+    height: 38px;
+    border-radius: 9px;
+    border: 1px solid transparent;
+    padding: 0 2.2rem 0 2.3rem;
     font-size: 0.875rem;
     font-family: 'Inter', -apple-system, sans-serif;
     color: var(--c-text);
-    background: var(--c-surface);
-    transition: border-color 0.15s, box-shadow 0.15s;
+    background: #f1f5f9;
+    transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
 }
 
 .search-input::placeholder { color: #94a3b8; }
+.search-input::-webkit-search-cancel-button { -webkit-appearance: none; }
+
+.search-input:hover { background: #eef2f6; }
 
 .search-input:focus {
     outline: none;
+    background: var(--c-surface);
     border-color: var(--c-accent);
     box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.12);
 }
 
-/* ============================================================
-   ADVANCED FILTERS
-============================================================ */
-.advanced-filters {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 0.75rem;
-    align-items: end;
-}
-
-.filter-field {
+/* Export / Import */
+.toolbar-actions {
     display: flex;
-    flex-direction: column;
+    gap: 0.4rem;
+    flex-shrink: 0;
+    padding-left: 0.75rem;
+    border-left: 1px solid var(--c-border);
+}
+
+.toolbar-button {
+    display: inline-flex;
+    align-items: center;
     gap: 0.35rem;
-}
-
-.filter-field span {
-    font-size: 0.72rem;
-    font-weight: 700;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    color: var(--c-muted);
-}
-
-.filter-field select {
-    border-radius: 10px;
-    border: 1.5px solid var(--c-border);
-    padding: 0.7rem 0.85rem;
-    font-size: 0.875rem;
-    font-family: 'Inter', -apple-system, sans-serif;
+    height: 38px;
+    padding: 0 0.8rem;
+    border: none;
+    border-radius: 9px;
+    background: transparent;
     color: var(--c-text);
-    background: var(--c-surface);
-    transition: border-color 0.15s, box-shadow 0.15s;
+    font-size: 0.82rem;
+    font-weight: 600;
+    font-family: 'Inter', -apple-system, sans-serif;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s, color 0.15s;
 }
 
-.filter-field select:focus {
+.toolbar-button:hover:not(:disabled) { background: rgba(13, 148, 136, 0.08); color: var(--c-accent-dark); }
+.toolbar-button:disabled { opacity: 0.55; cursor: not-allowed; }
+
+/* Filter chips */
+.filter-chip {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    max-width: 240px;
+    margin: 0;
+}
+
+.filter-chip__icon {
+    position: absolute;
+    display: inline-flex;
+    color: var(--c-muted);
+    pointer-events: none;
+}
+
+.filter-chip__icon { left: 0.65rem; }
+
+.filter-chip select {
+    appearance: none;
+    -webkit-appearance: none;
+    height: 32px;
+    max-width: 100%;
+    padding: 0 2.2rem 0 2rem;
+    border: 1px solid var(--c-border);
+    border-radius: 999px;
+    background: var(--c-surface);
+    color: var(--c-text);
+    font-size: 0.8rem;
+    font-weight: 500;
+    font-family: 'Inter', -apple-system, sans-serif;
+    text-overflow: ellipsis;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+}
+
+.filter-chip select:hover:not(:disabled) { border-color: #cbd5e1; }
+
+.filter-chip select:focus-visible {
     outline: none;
     border-color: var(--c-accent);
     box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.12);
 }
 
-.filter-field select:disabled {
-    background: #f8fafc;
-    color: #94a3b8;
-    cursor: not-allowed;
+.filter-chip select:disabled { color: #94a3b8; cursor: not-allowed; }
+
+.filter-chip--active select {
+    border-color: rgba(13, 148, 136, 0.45);
+    background: rgba(13, 148, 136, 0.08);
+    color: var(--c-accent-dark);
+    font-weight: 600;
 }
 
+.filter-chip--active .filter-chip__icon { color: var(--c-accent-dark); }
+
 .clear-filters-button {
-    border: 1px solid var(--c-border);
-    border-radius: 10px;
-    padding: 0.7rem 1rem;
-    background: #f8fafc;
-    color: var(--c-text);
-    font-size: 0.875rem;
+    height: 32px;
+    padding: 0 0.6rem;
+    border: none;
+    background: transparent;
+    color: var(--c-accent-dark);
+    font-size: 0.8rem;
     font-weight: 600;
     font-family: 'Inter', -apple-system, sans-serif;
     cursor: pointer;
-    transition: all 0.15s;
+    border-radius: 7px;
 }
 
-.clear-filters-button:hover:not(:disabled) {
-    border-color: var(--c-accent);
-    color: var(--c-accent-dark);
-}
-
-.clear-filters-button:disabled {
-    opacity: 0.55;
-    cursor: not-allowed;
-}
+.clear-filters-button:hover:not(:disabled) { background: rgba(13, 148, 136, 0.08); }
+.clear-filters-button:disabled { opacity: 0.55; cursor: not-allowed; }
 
 /* ============================================================
    MAIN PANEL
@@ -1432,29 +1543,27 @@ watch(
 /* ============================================================
    DATE NAVIGATOR
 ============================================================ */
-.daily-nav-wrapper {
-    display: flex;
-    justify-content: center;
-}
-
 .daily-nav {
     display: inline-flex;
     align-items: center;
-    gap: 0.2rem;
-    padding: 0.2rem;
-    background: #f1f5f9;
-    border-radius: 10px;
+    flex-shrink: 0;
+    margin-left: auto;
+    height: 32px;
+    gap: 1px;
+    padding: 2px;
+    background: var(--c-surface);
     border: 1px solid var(--c-border);
+    border-radius: 999px;
 }
 
 .daily-nav__arrow {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
+    width: 26px;
+    height: 26px;
     border: none;
-    border-radius: 7px;
+    border-radius: 999px;
     background: transparent;
     color: var(--c-muted);
     cursor: pointer;
@@ -1471,21 +1580,23 @@ watch(
 .daily-nav__date {
     display: inline-flex;
     align-items: center;
-    gap: 0.4rem;
-    padding: 0.4rem 0.85rem;
+    justify-content: center;
+    gap: 0.35rem;
+    height: 26px;
+    padding: 0 0.55rem;
+    white-space: nowrap;
     border: none;
-    border-radius: 7px;
-    background: var(--c-surface);
+    border-radius: 999px;
+    background: transparent;
     color: var(--c-text);
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     font-weight: 600;
     font-family: 'Inter', -apple-system, sans-serif;
     cursor: pointer;
-    transition: all 0.15s;
-    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.07);
+    transition: background 0.15s, color 0.15s;
 }
 
-.daily-nav__date:hover { box-shadow: 0 2px 6px rgba(15, 23, 42, 0.1); }
+.daily-nav__date:hover { background: rgba(13, 148, 136, 0.08); color: var(--c-accent-dark); }
 
 /* ============================================================
    TABLE
@@ -1551,9 +1662,14 @@ watch(
     gap: 0.2rem;
 }
 
+.items-col {
+    width: 34%;
+    min-width: 260px;
+}
+
 .item-line {
     display: flex;
-    align-items: center;
+    align-items: baseline;
     gap: 0.3rem;
     font-size: 0.78rem;
 }
@@ -1567,15 +1683,8 @@ watch(
 
 .item-name {
     color: var(--c-text);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 120px;
-}
-
-.item-more {
-    font-size: 0.72rem;
-    color: var(--c-muted);
+    line-height: 1.35;
+    overflow-wrap: anywhere;
 }
 
 .sale-total {
@@ -1766,42 +1875,25 @@ watch(
 .page-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 
 /* ============================================================
-   BUTTONS
-============================================================ */
-.ghost-button {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.3rem;
-    padding: 0.45rem 0.9rem;
-    border-radius: 7px;
-    border: 1.5px solid var(--c-border);
-    background: transparent;
-    color: var(--c-text);
-    font-size: 0.82rem;
-    font-weight: 600;
-    font-family: 'Inter', -apple-system, sans-serif;
-    cursor: pointer;
-    transition: all 0.15s;
-    white-space: nowrap;
-}
-
-.ghost-button:hover { border-color: var(--c-accent); color: var(--c-accent-dark); background: rgba(13, 148, 136, 0.05); }
-
-/* ============================================================
    RESPONSIVE
 ============================================================ */
 @media (max-width: 768px) {
-    .sales-toolbar { flex-direction: column; align-items: flex-start; }
-    .toolbar-right { width: 100%; justify-content: flex-end; }
-    .search-input { min-width: 0; width: 100%; }
-    .advanced-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .filter-bar__top { flex-wrap: wrap; }
+    .search-box { order: 4; flex-basis: 100%; }
+    .toolbar-actions { margin-left: auto; padding-left: 0; border-left: none; }
 }
 
 @media (max-width: 640px) {
     .sales-page { padding: 1.25rem 1rem 2.5rem; }
     .sales-title h1 { font-size: 1.5rem; }
-    .filter-pills { flex-wrap: wrap; }
-    .advanced-filters { grid-template-columns: 1fr; }
+    .filter-bar__label { display: none; }
+    .toolbar-actions { gap: 0.15rem; }
+    .toolbar-button { padding: 0 0.6rem; }
+    .toolbar-button__text { display: none; }
+    .daily-nav { flex-basis: 100%; }
+    .daily-nav__date { flex: 1; }
+    .filter-chip { flex: 1 1 calc(50% - 0.25rem); max-width: none; }
+    .filter-chip select { width: 100%; }
 }
 
 /* ============================================================
