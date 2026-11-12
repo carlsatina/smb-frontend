@@ -2,16 +2,37 @@
     <Teleport to="body">
         <Transition name="ds-fade">
             <div v-if="show" class="ds-overlay" @click.self="requestClose" @keydown.esc="requestClose">
-                <div class="ds" role="dialog" aria-modal="true" aria-labelledby="dsa-title">
+                <div class="ds" role="dialog" aria-modal="true" aria-labelledby="dsf-title">
                     <header class="ds-header">
                         <mdicon name="delete-alert-outline" size="22" class="ds-icon" />
-                        <h3 id="dsa-title">Delete all sales{{ storeName ? ` in ${storeName}` : '' }}?</h3>
+                        <h3 id="dsf-title">Delete {{ countLabel }}?</h3>
                     </header>
                     <div class="ds-body">
+                        <div class="ds-scope">
+                            <p class="ds-scope__lead">Only the sales matching your current filters will be deleted:</p>
+                            <dl class="ds-scope__list">
+                                <div>
+                                    <dt>Period</dt>
+                                    <dd>{{ periodLabel }}</dd>
+                                </div>
+                                <div v-for="filter in filterLabels" :key="filter.name">
+                                    <dt>{{ filter.name }}</dt>
+                                    <dd>{{ filter.value }}</dd>
+                                </div>
+                                <div>
+                                    <dt>Sales</dt>
+                                    <dd>{{ count }}</dd>
+                                </div>
+                            </dl>
+                            <p class="ds-scope__note">
+                                Sales outside this period or these filters are not touched. To delete other sales, change the
+                                filters first.
+                            </p>
+                        </div>
                         <ul class="ds-effects">
-                            <li>Every sale is removed from sales history, reports and daily totals, not just the ones shown on screen.</li>
+                            <li>They're removed from sales history, reports and daily totals.</li>
                             <li>Stock used by finalized sales goes back to inventory. Voided sales already returned theirs.</li>
-                            <li>The deletion is recorded in the audit log.</li>
+                            <li>The deletion and these filters are recorded in the audit log.</li>
                         </ul>
                         <label class="ds-field">
                             <span>Reason <em>optional</em></span>
@@ -24,7 +45,7 @@
                             ></textarea>
                         </label>
                         <label class="ds-field">
-                            <span>Type <code>{{ DELETE_ALL_SALES_PHRASE }}</code> to confirm</span>
+                            <span>Type <code>{{ DELETE_SALES_PHRASE }}</code> to confirm</span>
                             <input
                                 ref="confirmInput"
                                 v-model="confirmText"
@@ -32,7 +53,7 @@
                                 autocomplete="off"
                                 autocapitalize="characters"
                                 spellcheck="false"
-                                :placeholder="DELETE_ALL_SALES_PHRASE"
+                                :placeholder="DELETE_SALES_PHRASE"
                                 :disabled="isDeleting"
                                 @keydown.enter.prevent="confirmDelete"
                             />
@@ -42,7 +63,7 @@
                     <footer class="ds-footer">
                         <button type="button" class="ds-btn ds-btn--ghost" :disabled="isDeleting" @click="requestClose">Cancel</button>
                         <button type="button" class="ds-btn ds-btn--danger" :disabled="!canConfirm" @click="confirmDelete">
-                            {{ isDeleting ? 'Deleting…' : 'Delete all sales' }}
+                            {{ isDeleting ? 'Deleting…' : `Delete ${countLabel}` }}
                         </button>
                     </footer>
                 </div>
@@ -53,11 +74,19 @@
 
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue';
-import { deleteAllSales, DELETE_ALL_SALES_PHRASE } from '@/api/sales';
+import { deleteFilteredSales, DELETE_SALES_PHRASE, type SaleListFilters } from '@/api/sales';
 import { useToast } from '@/composables/useToast';
 import { useStoreContextStore } from '@/stores/storeContext';
 
-const props = defineProps<{ show: boolean; storeName?: string }>();
+const props = defineProps<{
+    show: boolean;
+    // Snapshot of the list filters when the dialog opened.
+    filters: SaleListFilters;
+    // How many sales those filters matched; the server refuses if this changed.
+    count: number;
+    periodLabel: string;
+    filterLabels: { name: string; value: string }[];
+}>();
 const emit = defineEmits<{
     (e: 'close'): void;
     (e: 'deleted', deletedCount: number): void;
@@ -70,7 +99,10 @@ const confirmText = ref('');
 const isDeleting = ref(false);
 const confirmInput = ref<HTMLInputElement | null>(null);
 
-const canConfirm = computed(() => !isDeleting.value && confirmText.value.trim() === DELETE_ALL_SALES_PHRASE);
+const countLabel = computed(() => `${props.count} sale${props.count === 1 ? '' : 's'}`);
+const canConfirm = computed(
+    () => !isDeleting.value && props.count > 0 && confirmText.value.trim() === DELETE_SALES_PHRASE
+);
 
 watch(
     () => props.show,
@@ -92,13 +124,12 @@ const confirmDelete = async () => {
     if (!storeId || !canConfirm.value) return;
     isDeleting.value = true;
     try {
-        const result = await deleteAllSales(storeId, reason.value.trim() || null);
-        showToast(
-            result.deletedCount === 0
-                ? 'There were no sales to delete.'
-                : `Deleted ${result.deletedCount} sale${result.deletedCount === 1 ? '' : 's'}.`,
-            'success'
-        );
+        const result = await deleteFilteredSales(storeId, props.filters, {
+            expectedCount: props.count,
+            filterSummary: [props.periodLabel, ...props.filterLabels.map((f) => `${f.name}: ${f.value}`)].join(' · '),
+            reason: reason.value.trim() || null,
+        });
+        showToast(`Deleted ${result.deletedCount} sale${result.deletedCount === 1 ? '' : 's'} (${props.periodLabel}).`, 'success');
         emit('deleted', result.deletedCount);
     } catch (error: any) {
         showToast(error?.body?.error?.message || 'Unable to delete sales.', 'error');
@@ -109,6 +140,50 @@ const confirmDelete = async () => {
 </script>
 
 <style scoped>
+.ds-scope {
+    border: 1px solid #fecaca;
+    background: #fef2f2;
+    border-radius: 10px;
+    padding: 0.7rem 0.85rem;
+    display: grid;
+    gap: 0.5rem;
+}
+
+.ds-scope__lead,
+.ds-scope__note {
+    margin: 0;
+    font-size: 0.82rem;
+    color: #7f1d1d;
+}
+
+.ds-scope__lead {
+    font-weight: 600;
+}
+
+.ds-scope__list {
+    margin: 0;
+    display: grid;
+    gap: 0.25rem;
+}
+
+.ds-scope__list > div {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    font-size: 0.85rem;
+}
+
+.ds-scope__list dt {
+    color: #991b1b;
+}
+
+.ds-scope__list dd {
+    margin: 0;
+    font-weight: 700;
+    color: #0f172a;
+    text-align: right;
+}
+
 .ds-overlay {
     position: fixed;
     inset: 0;

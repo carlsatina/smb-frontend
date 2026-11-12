@@ -151,14 +151,35 @@ export const deleteSale = async (storeId: string, saleId: string, reason?: strin
     );
 };
 
-// Owner-only: soft-deletes every sale in the store. The API requires the
-// typed confirmation phrase.
-export const DELETE_ALL_SALES_PHRASE = 'DELETE ALL';
+// Owner-only: soft-deletes the sales matching the list filters. The API
+// requires the typed phrase and refuses if the match differs from
+// expectedCount (the number the owner was shown).
+export const DELETE_SALES_PHRASE = 'DELETE';
 
-export const deleteAllSales = async (storeId: string, reason?: string | null) => {
+export type SaleListFilters = {
+    status?: string;
+    from?: string;
+    to?: string;
+    cashierId?: string;
+    paymentMethod?: string;
+    productId?: string;
+    channel?: string;
+};
+
+export const deleteFilteredSales = async (
+    storeId: string,
+    filters: SaleListFilters,
+    options: { expectedCount: number; filterSummary?: string | null; reason?: string | null }
+) => {
     return apiClient.request<{ deletedCount: number; stockReturned: boolean }>(`/api/v1/stores/${storeId}/sales`, {
         method: 'DELETE',
-        body: { confirm: DELETE_ALL_SALES_PHRASE, reason: reason ?? null },
+        body: {
+            ...filters,
+            confirm: DELETE_SALES_PHRASE,
+            expectedCount: options.expectedCount,
+            filterSummary: options.filterSummary ?? null,
+            reason: options.reason ?? null,
+        },
     });
 };
 

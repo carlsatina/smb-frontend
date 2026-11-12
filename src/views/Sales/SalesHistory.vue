@@ -12,11 +12,14 @@
             @update:show="showImportPreview = $event"
         />
         <DeleteSaleModal :sale="deletingSale" @close="deletingSale = null" @deleted="handleSaleDeleted" />
-        <DeleteAllSalesModal
-            :show="showDeleteAll"
-            :store-name="currentStoreLabel"
-            @close="showDeleteAll = false"
-            @deleted="handleAllSalesDeleted"
+        <DeleteFilteredSalesModal
+            :show="showBulkDelete"
+            :filters="bulkDeleteFilters"
+            :count="total"
+            :period-label="exactPeriodLabel"
+            :filter-labels="activeFilterLabels"
+            @close="showBulkDelete = false"
+            @deleted="handleBulkDeleted"
         />
         <EditSaleModal
             :sale-id="editingSaleId"
@@ -113,12 +116,13 @@
                                 <button
                                     v-if="isOwner"
                                     class="toolbar-button toolbar-button--danger"
-                                    title="Delete all sales"
-                                    aria-label="Delete all sales"
-                                    @click="showDeleteAll = true"
+                                    :disabled="!canBulkDelete"
+                                    :title="bulkDeleteTitle"
+                                    :aria-label="bulkDeleteTitle"
+                                    @click="openBulkDelete"
                                 >
                                     <mdicon name="delete-sweep-outline" size="16" />
-                                    <span class="toolbar-button__text">Delete all</span>
+                                    <span class="toolbar-button__text">Delete filtered</span>
                                 </button>
                                 <input
                                     ref="importFileInput"
@@ -400,9 +404,9 @@ import SkeletonLoader from '@/components/SkeletonLoader.vue';
 import CsvImportPreviewModal from '@/components/CsvImportPreviewModal.vue';
 import EditSaleModal from '@/components/EditSaleModal.vue';
 import DeleteSaleModal from '@/components/DeleteSaleModal.vue';
-import DeleteAllSalesModal from '@/components/DeleteAllSalesModal.vue';
+import DeleteFilteredSalesModal from '@/components/DeleteFilteredSalesModal.vue';
 import { listProducts, ProductResponse } from '@/api/products';
-import { exportSales, getSale, importSales, listSales, SaleDetail, SalesImportResult, SaleSummary, voidSale } from '@/api/sales';
+import { exportSales, getSale, importSales, listSales, SaleDetail, SaleListFilters, SalesImportResult, SaleSummary, voidSale } from '@/api/sales';
 import { listStoreMembers, StoreMember } from '@/api/storeMembers';
 import { useToast } from '@/composables/useToast';
 import { useStoreContextStore } from '@/stores/storeContext';
@@ -454,7 +458,10 @@ const editingSaleId = ref<string | null>(null);
 // Deleting sales is owner-only (server enforces the same).
 const deletingSale = ref<SaleSummary | null>(null);
 const isOwner = computed(() => storeContext.currentStore?.role === 'OWNER');
-const showDeleteAll = ref(false);
+const showBulkDelete = ref(false);
+// Filters snapshotted when the dialog opens, so the delete matches the list
+// the owner was looking at.
+const bulkDeleteFilters = ref<SaleListFilters>({});
 
 const searchQuery = ref('');
 const showDateModal = ref(false);
@@ -689,6 +696,20 @@ const loadFilterOptions = async () => {
     }
 };
 
+// The server-side filters behind the list (everything except the on-page search).
+const currentListFilters = (): SaleListFilters => {
+    const timeZone = storeContext.currentStore?.timezone || 'Asia/Manila';
+    return {
+        status: statusFilter.value === 'ALL' ? undefined : statusFilter.value,
+        from: zonedDayStartIso(fromDate.value, timeZone),
+        to: zonedDayEndIso(toDate.value, timeZone),
+        cashierId: cashierFilter.value || undefined,
+        paymentMethod: paymentMethodFilter.value || undefined,
+        productId: productFilter.value || undefined,
+        channel: channelFilter.value || undefined,
+    };
+};
+
 const loadSales = async () => {
     const storeId = storeContext.currentStoreId;
     if (!storeId) {
@@ -700,17 +721,8 @@ const loadSales = async () => {
 
     isLoading.value = true;
     try {
-        const timeZone = storeContext.currentStore?.timezone || 'Asia/Manila';
-        const fromValue = zonedDayStartIso(fromDate.value, timeZone);
-        const toValue = zonedDayEndIso(toDate.value, timeZone);
         const data = await listSales(storeId, {
-            status: statusFilter.value === 'ALL' ? undefined : statusFilter.value,
-            from: fromValue,
-            to: toValue,
-            cashierId: cashierFilter.value || undefined,
-            paymentMethod: paymentMethodFilter.value || undefined,
-            productId: productFilter.value || undefined,
-            channel: channelFilter.value || undefined,
+            ...currentListFilters(),
             page: page.value,
             pageSize: pageSize.value,
         });
@@ -886,8 +898,68 @@ const handleSaleDeleted = async () => {
     await loadSales();
 };
 
-const handleAllSalesDeleted = async () => {
-    showDeleteAll.value = false;
+// Search only narrows the rows already loaded, so it can't define what a
+// bulk delete removes; the owner has to clear it first.
+const isSearching = computed(() => Boolean(searchQuery.value.trim()));
+const canBulkDelete = computed(() => !isLoading.value && !isSearching.value && total.value > 0);
+const bulkDeleteTitle = computed(() => {
+    if (isSearching.value) return 'Clear the search to delete by filters';
+    if (total.value === 0) return 'No sales match these filters';
+    return `Delete the ${total.value} sale${total.value === 1 ? '' : 's'} matching these filters`;
+});
+
+const formatDay = (value: string, withYear: boolean) => {
+    const [year, month, day] = value.split('-').map(Number);
+    return new Date(year, month - 1, day).toLocaleDateString(undefined, {
+        month: 'short',
+        day: 'numeric',
+        ...(withYear ? { year: 'numeric' } : {}),
+    });
+};
+
+// Always spelled out ("Nov 1 – Nov 12, 2026"), never "Today", so the owner
+// knows exactly which days a bulk delete covers.
+const exactPeriodLabel = computed(() => {
+    const from = fromDate.value;
+    const to = toDate.value;
+    if (from === to) return formatDay(from, true);
+    const sameYear = from.slice(0, 4) === to.slice(0, 4);
+    return `${formatDay(from, !sameYear)} – ${formatDay(to, true)}`;
+});
+
+const activeFilterLabels = computed(() => {
+    const labels: { name: string; value: string }[] = [];
+    if (statusFilter.value === 'FINALIZED') labels.push({ name: 'Status', value: 'Finalized only' });
+    if (statusFilter.value === 'VOIDED') labels.push({ name: 'Status', value: 'Voided only' });
+    if (cashierFilter.value) {
+        const member = cashierOptions.value.find((m) => m.userId === cashierFilter.value);
+        labels.push({ name: 'Cashier', value: member?.fullName || member?.email || 'Selected cashier' });
+    }
+    if (paymentMethodFilter.value) {
+        const method = paymentMethodOptions.value.find((m) => m.value === paymentMethodFilter.value);
+        labels.push({ name: 'Payment', value: method?.label || paymentMethodFilter.value });
+    }
+    if (channelFilter.value) {
+        labels.push({
+            name: 'Channel',
+            value: channelFilter.value === 'WALK_IN' ? 'Walk-in' : channelName(channelFilter.value),
+        });
+    }
+    if (productFilter.value) {
+        const product = productOptions.value.find((p) => p.id === productFilter.value);
+        labels.push({ name: 'Item', value: product?.name || 'Selected item' });
+    }
+    return labels;
+});
+
+const openBulkDelete = () => {
+    if (!canBulkDelete.value) return;
+    bulkDeleteFilters.value = currentListFilters();
+    showBulkDelete.value = true;
+};
+
+const handleBulkDeleted = async () => {
+    showBulkDelete.value = false;
     page.value = 1;
     await loadSales();
 };
