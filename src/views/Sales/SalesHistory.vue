@@ -12,6 +12,12 @@
             @update:show="showImportPreview = $event"
         />
         <DeleteSaleModal :sale="deletingSale" @close="deletingSale = null" @deleted="handleSaleDeleted" />
+        <DeleteAllSalesModal
+            :show="showDeleteAll"
+            :store-name="currentStoreLabel"
+            @close="showDeleteAll = false"
+            @deleted="handleAllSalesDeleted"
+        />
         <EditSaleModal
             :sale-id="editingSaleId"
             :products="productOptions"
@@ -103,6 +109,16 @@
                                 <button v-if="canEdit" class="toolbar-button" :disabled="isImporting" title="Import CSV" aria-label="Import CSV" @click="triggerImport">
                                     <mdicon name="tray-arrow-up" size="16" />
                                     <span class="toolbar-button__text">{{ isImporting ? 'Importing…' : 'Import' }}</span>
+                                </button>
+                                <button
+                                    v-if="isOwner"
+                                    class="toolbar-button toolbar-button--danger"
+                                    title="Delete all sales"
+                                    aria-label="Delete all sales"
+                                    @click="showDeleteAll = true"
+                                >
+                                    <mdicon name="delete-sweep-outline" size="16" />
+                                    <span class="toolbar-button__text">Delete all</span>
                                 </button>
                                 <input
                                     ref="importFileInput"
@@ -384,6 +400,7 @@ import SkeletonLoader from '@/components/SkeletonLoader.vue';
 import CsvImportPreviewModal from '@/components/CsvImportPreviewModal.vue';
 import EditSaleModal from '@/components/EditSaleModal.vue';
 import DeleteSaleModal from '@/components/DeleteSaleModal.vue';
+import DeleteAllSalesModal from '@/components/DeleteAllSalesModal.vue';
 import { listProducts, ProductResponse } from '@/api/products';
 import { exportSales, getSale, importSales, listSales, SaleDetail, SalesImportResult, SaleSummary, voidSale } from '@/api/sales';
 import { listStoreMembers, StoreMember } from '@/api/storeMembers';
@@ -437,6 +454,7 @@ const editingSaleId = ref<string | null>(null);
 // Deleting sales is owner-only (server enforces the same).
 const deletingSale = ref<SaleSummary | null>(null);
 const isOwner = computed(() => storeContext.currentStore?.role === 'OWNER');
+const showDeleteAll = ref(false);
 
 const searchQuery = ref('');
 const showDateModal = ref(false);
@@ -865,6 +883,12 @@ const handleSaleDeleted = async () => {
     deletingSale.value = null;
     // Step back a page if this removed the last row on it.
     if (sales.value.length === 1 && page.value > 1) page.value -= 1;
+    await loadSales();
+};
+
+const handleAllSalesDeleted = async () => {
+    showDeleteAll.value = false;
+    page.value = 1;
     await loadSales();
 };
 
@@ -1446,6 +1470,8 @@ watch(
 
 .toolbar-button:hover:not(:disabled) { background: rgba(13, 148, 136, 0.08); color: var(--c-accent-dark); }
 .toolbar-button:disabled { opacity: 0.55; cursor: not-allowed; }
+.toolbar-button--danger { color: #dc2626; }
+.toolbar-button--danger:hover:not(:disabled) { background: #fef2f2; color: #b91c1c; }
 
 /* Filter chips */
 .filter-chip {

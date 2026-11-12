@@ -151,6 +151,17 @@ export const deleteSale = async (storeId: string, saleId: string, reason?: strin
     );
 };
 
+// Owner-only: soft-deletes every sale in the store. The API requires the
+// typed confirmation phrase.
+export const DELETE_ALL_SALES_PHRASE = 'DELETE ALL';
+
+export const deleteAllSales = async (storeId: string, reason?: string | null) => {
+    return apiClient.request<{ deletedCount: number; stockReturned: boolean }>(`/api/v1/stores/${storeId}/sales`, {
+        method: 'DELETE',
+        body: { confirm: DELETE_ALL_SALES_PHRASE, reason: reason ?? null },
+    });
+};
+
 export const voidSale = async (storeId: string, saleId: string) => {
     return apiClient.request<{ sale: SaleDetail }>(`/api/v1/stores/${storeId}/sales/${saleId}/void`, {
         method: 'POST',
