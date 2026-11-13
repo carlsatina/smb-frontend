@@ -118,7 +118,7 @@ export const helpSections: HelpSection[] = [
                     { type: 'fields', items: [
                         { name: 'Name', text: 'What the ingredient is called, e.g. "Fresh milk" or "16oz cup".' },
                         { name: 'Unit', text: 'The unit you measure it in for recipes (g, ml, pc…). The list comes from **Settings → Catalog defaults**.' },
-                        { name: 'Category', text: '**Raw material** for things that go into the product. **Packaging** for cups, lids, bags and straws; only packaging can be used as takeout packaging on a product. **Supply** for things the store uses but that aren\'t part of a product, like gloves, alcohol and trash bags. Supplies are never deducted by sales and can\'t be added to a recipe or as packaging. Track them with purchase orders and stock adjustments.' },
+                        { name: 'Category', text: '**Raw material** for things that go into the product. **Packaging** for cups, lids, bags and straws; only packaging can be used as takeout packaging on a product. **Supply** for things the store uses but that aren\'t part of a product, like gloves, alcohol and trash bags. Supplies are never deducted by sales and can\'t be added to a recipe or as packaging. Record their use on the **Supplies** page (see **Count and record supplies**).' },
                         { name: 'Cost per unit', text: 'What one unit costs you. Recipe costs and margins are calculated from this.' },
                         { name: 'Purchase unit (optional)', text: 'The unit you buy it in, e.g. "Gallon" or "Box".' },
                         { name: 'Units per purchase unit', text: 'How many recipe units are in one purchase unit, e.g. 3.785 L per Gallon. Purchase orders can then be entered in gallons while stock is tracked in litres.' },
@@ -224,7 +224,7 @@ export const helpSections: HelpSection[] = [
                         { name: 'All / Products / Ingredients', text: 'Narrow the list by item type, or search by name, SKU or category.' },
                     ] },
                     { type: 'heading', text: 'Movement history' },
-                    { type: 'p', text: 'Click **History** to see every stock change: sales, adjustments, purchase receipts, voids, waste and transfers. Each row shows when, who, the quantity change and where it came from (for example a receipt number). Filter by movement type or date and use **Export CSV** to download it.' },
+                    { type: 'p', text: 'Click **History** to see every stock change: sales, adjustments, purchase receipts, voids, waste, supply usage and transfers. Each row shows when, who, the quantity change and where it came from (for example a receipt number). Filter by movement type or date and use **Export CSV** to download it.' },
                     { type: 'image', src: img('movements'), caption: 'Inventory → History shows every change in stock.' },
                     { type: 'tip', text: 'Stock looks wrong? Search the item in **History** to see exactly which sale, receipt or adjustment changed it.' },
                 ],
@@ -248,6 +248,26 @@ export const helpSections: HelpSection[] = [
                         { name: 'Note (optional)', text: 'Why you made the change. It appears in the movement history and audit log.' },
                     ] },
                     { type: 'note', text: 'If **Allow negative stock** is off in the store settings, an adjustment that would drop stock below zero is blocked.' },
+                ],
+            },
+            {
+                id: 'supplies-count',
+                title: 'Count and record supplies',
+                summary: 'Track gloves, alcohol, trash bags and other store supplies.',
+                blocks: [
+                    { type: 'p', text: 'Supplies are items the store uses up but doesn\'t sell, so sales never deduct them. Add them on **Items & Supplies** with the **Supply** category, buy them with purchase orders, and record what gets used on the **Supplies** page.' },
+                    { type: 'steps', items: [
+                        { text: 'Open **Inventory** and click **Supplies** (or **Count supplies** on the Items & Supplies page).' },
+                        { text: '**Count** (best done weekly): enter what\'s on the shelf for each supply. The difference from expected stock is recorded as usage. Leave an item blank to skip it.' },
+                        { text: '**Record usage**: enter how much was just used, for example when a new box of gloves is opened.' },
+                        { text: 'Add an optional note and save. The cost of what was used is shown before you save.' },
+                    ] },
+                    { type: 'fields', items: [
+                        { name: 'Expected', text: 'Current stock: everything received, minus usage recorded so far.' },
+                        { name: 'Used since last count', text: 'Expected minus counted. If you count more than expected, the stock is corrected up instead.' },
+                    ] },
+                    { type: 'tip', text: 'Usage appears in **History** as **Supply usage**, with who recorded it and the cost at the time.' },
+                    { type: 'note', text: 'If **Allow negative stock** is off, usage that would drop a supply below zero is blocked. Record the delivery first.' },
                 ],
             },
             {

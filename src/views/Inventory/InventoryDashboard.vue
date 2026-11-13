@@ -56,6 +56,10 @@
                         <mdicon name="swap-horizontal" size="16" />
                         Transfer
                     </button>
+                    <button v-if="canAdjust" class="ghost-button" :disabled="!storeContext.currentStoreId" @click="goToSupplies">
+                        <mdicon name="clipboard-check-outline" size="16" />
+                        Supplies
+                    </button>
                     <button class="primary-button" :disabled="!storeContext.currentStoreId || !canAdjust" @click="goToAdjustments">
                         <mdicon name="plus" size="16" />
                         Stock adjustment
@@ -634,6 +638,11 @@ const goToAdjustments = () => {
 const goToMovements = () => {
     if (!storeContext.currentStoreId) return;
     router.push(`/stores/${storeContext.currentStoreId}/inventory/movements`);
+};
+
+const goToSupplies = () => {
+    if (!storeContext.currentStoreId) return;
+    router.push(`/stores/${storeContext.currentStoreId}/inventory/supplies`);
 };
 
 onMounted(async () => {

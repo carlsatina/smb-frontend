@@ -116,6 +116,39 @@ export const listMovements = (
     );
 };
 
+export type SupplyUsagePayload = {
+    items: Array<{ itemId: string; qty: number }>;
+    note?: string | null;
+};
+
+export type SupplyCountPayload = {
+    counts: Array<{ itemId: string; countedQty: number }>;
+    note?: string | null;
+};
+
+export type SupplyCountResult = {
+    counted: number;
+    usedItems: number;
+    surplusItems: number;
+    unchangedItems: number;
+    usageCost: number;
+    movements: MovementRecord[];
+};
+
+export const recordSupplyUsage = (storeId: string, payload: SupplyUsagePayload) => {
+    return apiClient.request<{ movements: MovementRecord[] }>(`/api/v1/stores/${storeId}/inventory/supplies/usage`, {
+        method: 'POST',
+        body: payload,
+    });
+};
+
+export const recordSupplyCount = (storeId: string, payload: SupplyCountPayload) => {
+    return apiClient.request<SupplyCountResult>(`/api/v1/stores/${storeId}/inventory/supplies/count`, {
+        method: 'POST',
+        body: payload,
+    });
+};
+
 export const createStockAdjustment = (storeId: string, payload: StockAdjustmentPayload) => {
     return apiClient.request<{ movement: MovementRecord }>(
         `/api/v1/stores/${storeId}/inventory/adjustments`,

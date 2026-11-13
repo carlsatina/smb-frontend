@@ -55,6 +55,14 @@
                             @change="handleImportFileSelected"
                         />
                     </template>
+                    <router-link
+                        v-if="canWrite && storeContext.currentStoreId && supplyCount > 0"
+                        class="ghost-button"
+                        :to="`/stores/${storeContext.currentStoreId}/inventory/supplies`"
+                    >
+                        <mdicon name="clipboard-check-outline" size="16" />
+                        Count supplies
+                    </router-link>
                     <button
                         v-if="canWrite"
                         class="primary-button"
@@ -1144,6 +1152,23 @@ watch(
 /* ============================================================
    BUTTONS
 ============================================================ */
+.ghost-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.45rem 0.9rem;
+    border-radius: 7px;
+    border: 1px solid var(--c-border);
+    background: var(--c-surface);
+    color: var(--c-text);
+    font-size: 0.82rem;
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: border-color 0.15s, color 0.15s;
+}
+.ghost-button:hover { border-color: var(--c-accent); color: var(--c-accent-dark); }
+
 .primary-button {
     display: inline-flex;
     align-items: center;

@@ -521,6 +521,8 @@ const formatRelativeTime = (value: string) => {
 const formatActionLabel = (action: string) => {
     const labels: Record<string, string> = {
         INVENTORY_ADJUSTMENT: 'Inventory Adjustment',
+        SUPPLY_USAGE: 'Supply Usage',
+        SUPPLY_COUNT: 'Supply Count',
         PURCHASE_RECEIPT: 'Purchase Receipt',
         PURCHASE_ORDER_STATUS: 'PO Status Change',
         SUPPLIER_UPDATED: 'Supplier Updated',
@@ -547,6 +549,8 @@ const formatActionLabel = (action: string) => {
 const getActionIcon = (action: string) => {
     const icons: Record<string, string> = {
         INVENTORY_ADJUSTMENT: 'swap-vertical',
+        SUPPLY_USAGE: 'minus-circle-outline',
+        SUPPLY_COUNT: 'clipboard-check-outline',
         PURCHASE_RECEIPT: 'package-variant-closed',
         PURCHASE_ORDER_STATUS: 'clipboard-check-outline',
         SUPPLIER_UPDATED: 'account-edit-outline',
@@ -573,6 +577,8 @@ const getActionIcon = (action: string) => {
 const getActionClass = (action: string) => {
     const classes: Record<string, string> = {
         INVENTORY_ADJUSTMENT: 'adjustment',
+        SUPPLY_USAGE: 'adjustment',
+        SUPPLY_COUNT: 'adjustment',
         PURCHASE_RECEIPT: 'receipt',
         PURCHASE_ORDER_STATUS: 'status',
         SUPPLIER_UPDATED: 'supplier',
@@ -644,6 +650,22 @@ const formatAuditSummary = (log: AuditLogRecord) => {
             parts.push(meta.from === meta.to ? meta.from : `${meta.from} – ${meta.to}`);
         }
         return parts.join(' · ');
+    }
+
+    if (log.action === 'SUPPLY_USAGE' || log.action === 'SUPPLY_COUNT') {
+        const items = Array.isArray(meta.items) ? meta.items : [];
+        const summarize = (item: any) => {
+            const qty = log.action === 'SUPPLY_USAGE' ? Number(item.qty) : -Number(item.diff);
+            if (!Number.isFinite(qty) || qty === 0) return null;
+            const label = qty > 0 ? `${formatQty(qty)} used` : `+${formatQty(-qty)}`;
+            return `${item.itemName} ${label}`;
+        };
+        const changed = items.map(summarize).filter((text: string | null): text is string => Boolean(text));
+        if (changed.length === 0) {
+            return log.action === 'SUPPLY_COUNT' ? `${items.length} counted, no change` : '';
+        }
+        const suffix = changed.length > 3 ? ` +${changed.length - 3} more` : '';
+        return changed.slice(0, 3).join(', ') + suffix;
     }
 
     if (log.action === 'INVENTORY_ADJUSTMENT') {

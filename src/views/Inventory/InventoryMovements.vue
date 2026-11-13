@@ -53,6 +53,7 @@
                         <option value="VOID">Voids</option>
                         <option value="REFUND">Refunds</option>
                         <option value="WASTE">Waste</option>
+                        <option value="USAGE">Supply usage</option>
                         <option value="TRANSFER_IN">Transfers in</option>
                         <option value="TRANSFER_OUT">Transfers out</option>
                     </select>
@@ -561,6 +562,7 @@ const MOVEMENT_LABELS: Record<string, string> = {
     VOID: 'Void',
     REFUND: 'Refund',
     WASTE: 'Waste',
+    USAGE: 'Supply usage',
     TRANSFER_IN: 'Transfer in',
     TRANSFER_OUT: 'Transfer out',
 };
@@ -574,6 +576,7 @@ const MOVEMENT_PILL_CLASSES: Record<string, string> = {
     VOID: 'movement-pill--void',
     REFUND: 'movement-pill--void',
     WASTE: 'movement-pill--waste',
+    USAGE: 'movement-pill--waste',
     TRANSFER_IN: 'movement-pill--transfer',
     TRANSFER_OUT: 'movement-pill--transfer',
 };

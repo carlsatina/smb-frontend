@@ -10,6 +10,7 @@ import InventoryDashboard from '@/views/Inventory/InventoryDashboard.vue'
 import StockAdjustments from '@/views/Inventory/StockAdjustments.vue'
 import InventoryMovements from '@/views/Inventory/InventoryMovements.vue'
 import IngredientsList from '@/views/Inventory/IngredientsList.vue'
+import SuppliesView from '@/views/Inventory/SuppliesView.vue'
 import SalesPos from '@/views/Sales/SalesPos.vue'
 import SalesHistory from '@/views/Sales/SalesHistory.vue'
 import PurchaseOrdersList from '@/views/PurchaseOrders/PurchaseOrdersList.vue'
@@ -102,6 +103,12 @@ const routes: Array<RouteRecordRaw> = [
     path: '/stores/:storeId/inventory/adjustments',
     name: 'inventory-adjustments',
     component: StockAdjustments,
+    meta: { requiresAuth: true, feature: 'inventoryAdjustments' }
+  },
+  {
+    path: '/stores/:storeId/inventory/supplies',
+    name: 'inventory-supplies',
+    component: SuppliesView,
     meta: { requiresAuth: true, feature: 'inventoryAdjustments' }
   },
   {
