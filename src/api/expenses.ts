@@ -69,6 +69,23 @@ export const deleteExpense = (storeId: string, expenseId: string) => {
     });
 };
 
+export const exportExpenses = (storeId: string, filters: ExpenseListFilters = {}) => {
+    return apiClient.download(`/api/v1/stores/${storeId}/expenses/export${buildQuery(filters)}`);
+};
+
+export type ExpenseImportResult = {
+    imported: number;
+    skipped: number;
+    failed: number;
+    errors: Array<{ row: number; message: string }>;
+};
+
+export const importExpenses = (storeId: string, file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return apiClient.upload<ExpenseImportResult>(`/api/v1/stores/${storeId}/expenses/import`, formData);
+};
+
 export type ExpenseSummary = {
     range: { from: string; to: string };
     total: number;

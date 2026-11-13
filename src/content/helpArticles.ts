@@ -330,6 +330,7 @@ export const helpSections: HelpSection[] = [
                     ] },
                     { type: 'p', text: 'Use the arrows to move between months and the category filter to see one kind of cost. The total at the top is for the month shown.' },
                     { type: 'note', text: 'Categories come from **Settings → Catalog defaults → Expense categories**. If the list is empty, ask the owner to add some.' },
+                    { type: 'p', text: '**Import / Export** downloads the month and category you\'re viewing as a CSV file. Owners and admins can also import a CSV with **Date**, **Category** and **Amount** columns (and an optional **Note**); use **Download template** for the layout. Rows that match an expense already recorded (same date, category, amount and note) are skipped, so re-importing an export won\'t double count. Rent and salaries are only included for people who can see payroll.' },
                 ],
             },
         ],

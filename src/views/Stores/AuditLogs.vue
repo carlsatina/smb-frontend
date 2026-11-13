@@ -530,6 +530,7 @@ const formatActionLabel = (action: string) => {
         ROLE_PERMISSIONS_UPDATED: 'Role Permissions Updated',
         MEMBER_PERMISSIONS_UPDATED: 'Member Permissions Updated',
         MEMBER_PERMISSIONS_CLEARED: 'Member Permissions Cleared',
+        EXPENSES_IMPORTED: 'Expenses Imported',
         MCP_TOKEN_CREATED: 'MCP Token Created',
         MCP_TOKEN_REVOKED: 'MCP Token Revoked',
         MCP_INGREDIENT_CREATED: 'Ingredient Added (AI)',
@@ -555,6 +556,7 @@ const getActionIcon = (action: string) => {
         ROLE_PERMISSIONS_UPDATED: 'shield-account-outline',
         MEMBER_PERMISSIONS_UPDATED: 'shield-account-outline',
         MEMBER_PERMISSIONS_CLEARED: 'shield-off-outline',
+        EXPENSES_IMPORTED: 'file-upload-outline',
         MCP_TOKEN_CREATED: 'key-plus',
         MCP_TOKEN_REVOKED: 'key-remove',
         MCP_INGREDIENT_CREATED: 'robot-outline',
@@ -632,6 +634,16 @@ const formatAuditSummary = (log: AuditLogRecord) => {
             .map((key) => (key in previous ? `${key} ${show(previous[key])} → ${show(changes[key])}` : key));
         if (Array.isArray(changes.lines)) fields.push(`${changes.lines.length} recipe line${changes.lines.length === 1 ? '' : 's'}`);
         return [...fields, via].filter(Boolean).join(' · ');
+    }
+
+    if (log.action === 'EXPENSES_IMPORTED') {
+        const parts = [`${Number(meta.imported) || 0} added`];
+        if (Number(meta.skipped) > 0) parts.push(`${meta.skipped} skipped`);
+        if (Number(meta.failed) > 0) parts.push(`${meta.failed} failed`);
+        if (typeof meta.from === 'string' && typeof meta.to === 'string') {
+            parts.push(meta.from === meta.to ? meta.from : `${meta.from} – ${meta.to}`);
+        }
+        return parts.join(' · ');
     }
 
     if (log.action === 'INVENTORY_ADJUSTMENT') {

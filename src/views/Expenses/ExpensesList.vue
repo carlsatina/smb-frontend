@@ -10,6 +10,23 @@
                     <p>Itemized business expenses for {{ currentStoreLabel }}.</p>
                 </div>
                 <div class="header-actions">
+                    <template v-if="storeId">
+                        <CsvActionsMenu
+                            :can-import="canImport"
+                            :is-importing="isImporting"
+                            :is-exporting="isExporting"
+                            @export="handleExport"
+                            @import="triggerImport"
+                            @template="downloadTemplate"
+                        />
+                        <input
+                            ref="importFileInput"
+                            type="file"
+                            accept=".csv,text/csv"
+                            style="display:none"
+                            @change="handleImportFileSelected"
+                        />
+                    </template>
                     <button v-if="canWrite" class="primary-button" :disabled="!storeId" @click="openCreate">
                         <mdicon name="plus" size="16" />
                         Add expense
@@ -23,6 +40,28 @@
             </div>
 
             <template v-else>
+                <!-- IMPORT PROGRESS -->
+                <div v-if="isImporting" class="import-progress">
+                    <div class="import-progress__label">Importing… {{ Math.round(importProgress) }}%</div>
+                    <div class="import-progress__track">
+                        <div class="import-progress__fill" :style="{ width: importProgress + '%' }"></div>
+                    </div>
+                </div>
+
+                <!-- IMPORT RESULT -->
+                <div v-if="importResult" class="import-result" :class="importResult.failed > 0 ? 'import-result--warn' : 'import-result--ok'">
+                    <div class="import-result__summary">
+                        <span>
+                            Import complete: <strong>{{ importResult.imported }}</strong> added<template v-if="importResult.skipped > 0">,
+                            <strong>{{ importResult.skipped }}</strong> skipped (already recorded)</template>{{ importResult.failed > 0 ? `, ${importResult.failed} failed` : '' }}.
+                        </span>
+                        <button class="import-result__close" aria-label="Dismiss" @click="importResult = null">✕</button>
+                    </div>
+                    <ul v-if="importResult.errors.length > 0" class="import-result__errors">
+                        <li v-for="err in importResult.errors" :key="err.row">Row {{ err.row }}: {{ err.message }}</li>
+                    </ul>
+                </div>
+
                 <!-- STAT STRIP -->
                 <SkeletonLoader v-if="isLoading" variant="kpi" :count="3" />
                 <div v-else class="stat-strip">
@@ -167,6 +206,15 @@
             </transition>
         </teleport>
 
+        <CsvImportPreviewModal
+            :show="showImportPreview"
+            :file="pendingImportFile"
+            title="Import Expenses"
+            :confirming="isImporting"
+            @confirm="confirmImport"
+            @cancel="cancelImport"
+            @update:show="showImportPreview = $event"
+        />
         <ConfirmModal
             :show="deleteModal.show"
             title="Delete expense"
@@ -182,7 +230,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, reactive, ref } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, reactive, ref } from 'vue';
 import PullToRefresh from '@/components/PullToRefresh.vue';
 import { useStoreContextStore } from '@/stores/storeContext';
 import { useToast } from '@/composables/useToast';
@@ -191,10 +239,15 @@ import {
     type Expense,
     createExpense,
     deleteExpense,
+    exportExpenses,
+    importExpenses,
+    type ExpenseImportResult,
     listExpenses,
     updateExpense,
 } from '@/api/expenses';
 import ConfirmModal from '@/components/ConfirmModal.vue';
+import CsvActionsMenu from '@/components/CsvActionsMenu.vue';
+import CsvImportPreviewModal from '@/components/CsvImportPreviewModal.vue';
 import SkeletonLoader from '@/components/SkeletonLoader.vue';
 
 const storeContext = useStoreContextStore();
@@ -247,10 +300,10 @@ const topCategory = computed(() => {
         totals.set(e.category, (totals.get(e.category) ?? 0) + Number(e.amount || 0));
     });
     let best: { category: string; total: number } | null = null;
-    totals.forEach((total, category) => {
+    for (const [category, total] of totals) {
         if (!best || total > best.total) best = { category, total };
-    });
-    return best;
+    }
+    return best as { category: string; total: number } | null;
 });
 
 const formatMoney = (v: number) =>
@@ -427,10 +480,174 @@ const onDeleteConfirm = async () => {
     }
 };
 
+// ── Import / export ──
+// Export follows the month and category on screen. Bulk import is for owners
+// and admins (the API enforces the same rule).
+const canImport = computed(
+    () => canWrite.value && ['OWNER', 'ADMIN'].includes(storeContext.currentStore?.role ?? '')
+);
+
+const isExporting = ref(false);
+const importFileInput = ref<HTMLInputElement | null>(null);
+const pendingImportFile = ref<File | null>(null);
+const showImportPreview = ref(false);
+const importResult = ref<ExpenseImportResult | null>(null);
+const isImporting = ref(false);
+const importProgress = ref(0);
+let progressTimer: ReturnType<typeof setInterval> | null = null;
+
+const saveBlob = (blob: Blob, filename: string) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+};
+
+const handleExport = async () => {
+    if (!storeId.value) return;
+    isExporting.value = true;
+    try {
+        const { blob, filename } = await exportExpenses(storeId.value, {
+            from: monthRange.value.from,
+            to: monthRange.value.to,
+            category: selectedCategory.value || undefined,
+        });
+        saveBlob(blob, filename);
+    } catch {
+        showToast('Unable to export expenses.', 'error');
+    } finally {
+        isExporting.value = false;
+    }
+};
+
+const downloadTemplate = () => {
+    // Date, Category and Amount are required; Note is optional. Source and
+    // Added By columns from an export are ignored on import.
+    const category = categoryOptions.value[0] ?? 'Supplies';
+    const csv = `Date,Category,Amount,Note\n${todayStr()},${category},250.00,Ice for the week\n`;
+    saveBlob(new Blob([csv], { type: 'text/csv;charset=utf-8;' }), 'expenses-template.csv');
+};
+
+const triggerImport = () => {
+    importResult.value = null;
+    importFileInput.value?.click();
+};
+
+const handleImportFileSelected = (event: Event) => {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file || !storeId.value) return;
+    importResult.value = null;
+    pendingImportFile.value = file;
+    showImportPreview.value = true;
+};
+
+const cancelImport = () => {
+    showImportPreview.value = false;
+    pendingImportFile.value = null;
+};
+
+const startImportProgress = () => {
+    importProgress.value = 0;
+    isImporting.value = true;
+    progressTimer = setInterval(() => {
+        if (importProgress.value < 85) {
+            const remaining = 85 - importProgress.value;
+            importProgress.value = Math.min(85, importProgress.value + Math.max(0.8, remaining * 0.06));
+        }
+    }, 120);
+};
+
+const finishImportProgress = () =>
+    new Promise<void>((resolve) => {
+        if (progressTimer) { clearInterval(progressTimer); progressTimer = null; }
+        importProgress.value = 100;
+        setTimeout(() => {
+            isImporting.value = false;
+            importProgress.value = 0;
+            resolve();
+        }, 500);
+    });
+
+const confirmImport = async () => {
+    const file = pendingImportFile.value;
+    if (!file || !storeId.value) return;
+    showImportPreview.value = false;
+    startImportProgress();
+    try {
+        const result = await importExpenses(storeId.value, file);
+        await finishImportProgress();
+        importResult.value = result;
+        if (result.imported > 0) await loadExpenses();
+    } catch (e: any) {
+        await finishImportProgress();
+        importResult.value = {
+            imported: 0,
+            skipped: 0,
+            failed: 1,
+            errors: [{ row: 0, message: e?.body?.error?.message || 'Upload failed. Check the file and try again.' }],
+        };
+    } finally {
+        pendingImportFile.value = null;
+    }
+};
+
+onUnmounted(() => {
+    if (progressTimer) clearInterval(progressTimer);
+});
+
 onMounted(loadExpenses);
 </script>
 
 <style scoped>
+/* ============================================================
+   IMPORT PROGRESS & RESULT
+============================================================ */
+.import-progress {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    padding: 0.75rem 1rem;
+    background: rgba(13, 148, 136, 0.06);
+    border: 1px solid rgba(13, 148, 136, 0.22);
+    border-radius: 10px;
+}
+
+.import-progress__label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #0f766e;
+}
+
+.import-progress__track {
+    height: 6px;
+    background: rgba(13, 148, 136, 0.15);
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.import-progress__fill {
+    height: 100%;
+    background: #0d9488;
+    border-radius: 999px;
+    transition: width 0.15s ease;
+}
+
+.import-result {
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+    font-size: 0.875rem;
+}
+.import-result--ok { background: #f0fdf4; border: 1px solid #86efac; color: #15803d; }
+.import-result--warn { background: #fffbeb; border: 1px solid #fcd34d; color: #92400e; }
+.import-result__summary { display: flex; justify-content: space-between; align-items: center; }
+.import-result__close { background: none; border: none; cursor: pointer; font-size: 1rem; opacity: 0.6; }
+.import-result__close:hover { opacity: 1; }
+.import-result__errors { margin: 0.5rem 0 0; padding-left: 1.25rem; display: flex; flex-direction: column; gap: 0.2rem; }
+
 /* ============================================================
    TOKENS
 ============================================================ */
@@ -991,6 +1208,8 @@ onMounted(loadExpenses);
 
     .header-actions { width: 100%; }
     .header-actions .primary-button { flex: 1; justify-content: center; }
+    /* The menu sits at the left edge here, so open its panel rightwards. */
+    .header-actions :deep(.csv-menu__panel) { left: 0; right: auto; }
 
     .stat { padding: 0.75rem 0.7rem; }
     .stat-value { font-size: 1rem; }
