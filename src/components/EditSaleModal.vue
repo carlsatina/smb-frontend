@@ -138,7 +138,7 @@
                                 <span>Discount</span><span>−{{ formatMoney(discountAmount) }}</span>
                             </div>
                             <div v-if="taxRate > 0" class="edit-sale__summary-row">
-                                <span>Tax ({{ formatRate(taxRate) }}%)</span><span>{{ formatMoney(taxAmount) }}</span>
+                                <span>VAT ({{ formatRate(taxRate) }}%, included)</span><span>{{ formatMoney(taxAmount) }}</span>
                             </div>
                             <div class="edit-sale__summary-row edit-sale__summary-row--total">
                                 <span>Total</span><span>{{ formatMoney(total) }}</span>
@@ -234,8 +234,11 @@ const discountAmount = computed(() => {
 const discountInvalid = computed(
     () => num(discountValue.value) < 0 || discountAmount.value > subtotal.value || (discountMode.value === 'percent' && num(discountValue.value) > 100)
 );
-const taxAmount = computed(() => roundMoney(((subtotal.value - discountAmount.value) * taxRate.value) / 100));
-const total = computed(() => roundMoney(subtotal.value - discountAmount.value + taxAmount.value));
+// Prices are VAT-inclusive: the VAT is the portion already inside the amount, not added on top.
+const includedVat = (amount: number) =>
+    amount > 0 && taxRate.value > 0 ? roundMoney((amount * taxRate.value) / (100 + taxRate.value)) : 0;
+const taxAmount = computed(() => includedVat(subtotal.value - discountAmount.value));
+const total = computed(() => roundMoney(subtotal.value - discountAmount.value));
 const totalChanged = computed(() => original.value !== null && Math.abs(total.value - original.value.total) >= 0.005);
 
 const storeDiscountPercent = computed(() => storeContext.currentStore?.defaultDiscount ?? 0);
@@ -321,9 +324,18 @@ const load = async (saleId: string) => {
         orderType.value = sale.orderType === 'TAKEOUT' ? 'TAKEOUT' : 'DINE_IN';
         discountMode.value = 'amount';
         discountValue.value = sale.discount;
-        // Preserve the tax treatment the sale was rung up with.
+        // Preserve the tax treatment the sale was rung up with: VAT-exempt (senior/PWD) sales stay at 0.
+        // Taxed sales use the store's VAT rate; if none is set, recover it from the VAT inside the total.
         const taxableBase = sale.subtotal - sale.discount;
-        taxRate.value = taxableBase > 0 && sale.tax > 0 ? (sale.tax / taxableBase) * 100 : 0;
+        const storeRate = storeContext.currentStore?.defaultTaxRate ?? 0;
+        taxRate.value =
+            sale.tax <= 0 || taxableBase <= 0
+                ? 0
+                : storeRate > 0
+                  ? storeRate
+                  : taxableBase > sale.tax
+                    ? (sale.tax / (taxableBase - sale.tax)) * 100
+                    : 0;
         initialSnapshot.value = snapshot();
     } catch (error: any) {
         loadError.value = error?.body?.error?.message || 'Unable to load sale.';
@@ -393,7 +405,7 @@ const save = async () => {
             const lineTotal = lineSubtotal(line);
             const discountShare = sub > 0 ? roundMoney((lineTotal / sub) * discount) : 0;
             const lineDiscount = Math.min(discountShare, lineTotal);
-            const lineTax = roundMoney(((lineTotal - lineDiscount) * taxRate.value) / 100);
+            const lineTax = includedVat(lineTotal - lineDiscount);
             return {
                 productId: line.productId,
                 qty: num(line.qty),

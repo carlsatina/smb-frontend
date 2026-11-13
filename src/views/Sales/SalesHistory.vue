@@ -782,7 +782,7 @@ const buildReceiptMarkup = (sale: SaleDetail) => {
             : '';
     const taxRow =
         sale.tax > 0
-            ? `<div class="summary-row"><span>Tax</span><span>${formatMoney(sale.tax)}</span></div>`
+            ? `<div class="summary-row"><span>VAT (included)</span><span>${formatMoney(sale.tax)}</span></div>`
             : '';
 
     return `<!doctype html>

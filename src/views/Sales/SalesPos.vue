@@ -679,7 +679,7 @@
                                 <span>{{ formatMoney(cartNet) }}</span>
                             </div>
                             <div class="summary-row">
-                                <span>Tax ({{ defaultTaxRate }}%)</span>
+                                <span>VAT ({{ defaultTaxRate }}%, included)</span>
                                 <span>{{ formatMoney(cartTax) }}</span>
                             </div>
                         </template>
@@ -1602,9 +1602,16 @@ const cartTotal = computed(() => {
     return cartSubtotal.value;
 });
 
+// Prices are VAT-inclusive, so the VAT is the portion already inside the amount:
+// 112 at 12% holds 12 VAT (112 × 12 / 112), not 13.44 on top.
+const includedVat = (amount: number) =>
+    amount > 0 && defaultTaxRate.value > 0
+        ? roundCents((amount * defaultTaxRate.value) / (100 + defaultTaxRate.value))
+        : 0;
+
 const cartTax = computed(() => {
     if (discountEnabled.value) return 0;
-    return cartTotal.value > 0 ? (cartTotal.value * defaultTaxRate.value) / 100 : 0;
+    return includedVat(cartTotal.value);
 });
 
 const cartNet = computed(() => {
@@ -1811,7 +1818,6 @@ const finalizeTicket = async () => {
     if (!storeId || cartItems.value.length === 0) return;
     isSubmitting.value = true;
     try {
-        const taxRate = defaultTaxRate.value;
         const seniorDiscount = discountEnabled.value;
 
         const customDateIso =
@@ -1837,7 +1843,7 @@ const finalizeTicket = async () => {
                         tax: 0,
                     };
                 }
-                const itemTax = itemTotal > 0 ? (itemTotal * taxRate) / 100 : 0;
+                const itemTax = includedVat(itemTotal);
                 return {
                     productId: item.productId,
                     qty: item.qty,
