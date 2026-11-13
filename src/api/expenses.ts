@@ -90,7 +90,12 @@ export type ExpenseSummary = {
     range: { from: string; to: string };
     total: number;
     byCategory: Array<{ category: string; total: number }>;
+    /** What net profit subtracts: all expenses, or (on a usage basis) expenses with "Supplies" swapped for supplies used. */
+    profitDeduction: number;
+    supplies: { basis: SupplyCostBasis; purchased: number; used: number };
 };
+
+export type SupplyCostBasis = 'PURCHASE' | 'USAGE';
 
 export const getExpenseSummary = (storeId: string, from?: string, to?: string) => {
     const params = new URLSearchParams();

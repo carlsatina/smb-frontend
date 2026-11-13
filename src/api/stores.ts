@@ -18,6 +18,7 @@ export const listStores = () => {
             subcategoryOptions: Record<string, string[]>;
             salesChannels: SalesChannel[];
             expenseCategoryOptions: string[];
+            supplyCostBasis: 'PURCHASE' | 'USAGE';
             defaultTaxRate: number;
             defaultDiscount: number;
             cashierSalesHistoryLimit: number | null;
@@ -67,6 +68,7 @@ export const updateStore = (
         defaultDiscount?: number;
         cashierSalesHistoryLimit?: number | null;
         paymentMethods?: string[];
+        supplyCostBasis?: 'PURCHASE' | 'USAGE';
     }
 ) => {
     return apiClient.request<{ store: { id: string; name: string } }>(`/api/v1/stores/${storeId}`, {

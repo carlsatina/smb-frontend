@@ -523,6 +523,7 @@ const formatActionLabel = (action: string) => {
         INVENTORY_ADJUSTMENT: 'Inventory Adjustment',
         SUPPLY_USAGE: 'Supply Usage',
         SUPPLY_COUNT: 'Supply Count',
+        SUPPLY_COST_BASIS_UPDATED: 'Supply Costing Changed',
         PURCHASE_RECEIPT: 'Purchase Receipt',
         PURCHASE_ORDER_STATUS: 'PO Status Change',
         SUPPLIER_UPDATED: 'Supplier Updated',
@@ -551,6 +552,7 @@ const getActionIcon = (action: string) => {
         INVENTORY_ADJUSTMENT: 'swap-vertical',
         SUPPLY_USAGE: 'minus-circle-outline',
         SUPPLY_COUNT: 'clipboard-check-outline',
+        SUPPLY_COST_BASIS_UPDATED: 'cash-sync',
         PURCHASE_RECEIPT: 'package-variant-closed',
         PURCHASE_ORDER_STATUS: 'clipboard-check-outline',
         SUPPLIER_UPDATED: 'account-edit-outline',
@@ -579,6 +581,7 @@ const getActionClass = (action: string) => {
         INVENTORY_ADJUSTMENT: 'adjustment',
         SUPPLY_USAGE: 'adjustment',
         SUPPLY_COUNT: 'adjustment',
+        SUPPLY_COST_BASIS_UPDATED: 'supplier',
         PURCHASE_RECEIPT: 'receipt',
         PURCHASE_ORDER_STATUS: 'status',
         SUPPLIER_UPDATED: 'supplier',
@@ -650,6 +653,11 @@ const formatAuditSummary = (log: AuditLogRecord) => {
             parts.push(meta.from === meta.to ? meta.from : `${meta.from} – ${meta.to}`);
         }
         return parts.join(' · ');
+    }
+
+    if (log.action === 'SUPPLY_COST_BASIS_UPDATED') {
+        const label = (basis: unknown) => (basis === 'USAGE' ? 'when used' : basis === 'PURCHASE' ? 'when bought' : '—');
+        return `Supply costs in profit: ${label(meta.from)} → ${label(meta.to)}`;
     }
 
     if (log.action === 'SUPPLY_USAGE' || log.action === 'SUPPLY_COUNT') {

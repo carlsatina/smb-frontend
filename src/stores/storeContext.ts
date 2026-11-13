@@ -17,6 +17,7 @@ export type StoreSummary = {
     subcategoryOptions: Record<string, string[]>;
     salesChannels: SalesChannel[];
     expenseCategoryOptions: string[];
+    supplyCostBasis: 'PURCHASE' | 'USAGE';
     defaultTaxRate: number;
     defaultDiscount: number;
     cashierSalesHistoryLimit: number | null;

@@ -88,6 +88,7 @@ export type ProductsSoldResponse = {
 export type LowStockItem = {
     itemType: 'PRODUCT' | 'INGREDIENT';
     itemId: string;
+    subType?: string;
     name: string;
     unit: string;
     currentQty: number;
@@ -100,6 +101,27 @@ export type IngredientUsageRecord = {
     name: string;
     unit?: string;
     qtyUsed: number;
+};
+
+export type SupplyUsageRecord = {
+    ingredientId: string;
+    name: string;
+    unit: string;
+    active: boolean;
+    qtyUsed: number;
+    cost: number;
+    currentQty: number;
+    avgDailyUse: number;
+    daysLeft: number | null;
+    lowStockThreshold: number | null;
+    isLow: boolean;
+};
+
+export type SupplyUsageSummary = {
+    totalCost: number;
+    netSales: number;
+    costPerThousandSales: number | null;
+    lastCountAt: string | null;
 };
 
 export type PurchaseSpendRecord = {
@@ -262,6 +284,20 @@ export const getIngredientUsage = (
     const query = search.toString();
     return apiClient.request<{ ingredients: IngredientUsageRecord[] }>(
         `/api/v1/stores/${storeId}/reports/ingredient-usage${query ? `?${query}` : ''}`
+    );
+};
+
+export const getSupplyUsage = (storeId: string, params?: { from?: string; to?: string }) => {
+    const search = new URLSearchParams();
+    if (params?.from) {
+        search.set('from', params.from);
+    }
+    if (params?.to) {
+        search.set('to', params.to);
+    }
+    const query = search.toString();
+    return apiClient.request<{ summary: SupplyUsageSummary; supplies: SupplyUsageRecord[]; rateWindowDays: number }>(
+        `/api/v1/stores/${storeId}/reports/supply-usage${query ? `?${query}` : ''}`
     );
 };
 

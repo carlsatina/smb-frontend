@@ -118,6 +118,21 @@
                                         <input v-model.number="storeForm.defaultDiscount" type="number" min="0" max="100" step="0.01" placeholder="0" :disabled="!canEdit" />
                                     </label>
                                     <label class="st-field">
+                                        Supply costs in profit
+                                        <select v-model="storeForm.supplyCostBasis" :disabled="!canEdit">
+                                            <option value="PURCHASE">When bought (Supplies expenses)</option>
+                                            <option value="USAGE">When used (supply counts)</option>
+                                        </select>
+                                        <span class="st-field-hint">
+                                            <template v-if="storeForm.supplyCostBasis === 'USAGE'">
+                                                Net profit uses the cost of supplies used instead of expenses in the "Supplies" category, so a bulk buy doesn't hit one month. Count supplies weekly.
+                                            </template>
+                                            <template v-else>
+                                                Net profit subtracts expenses logged in the "Supplies" category when you buy them.
+                                            </template>
+                                        </span>
+                                    </label>
+                                    <label class="st-field">
                                         Cashier sales history limit
                                         <input v-model.number="storeForm.cashierSalesHistoryLimit" type="number" min="1" step="1" placeholder="No limit" :disabled="!canEdit" />
                                         <span class="st-field-hint">Max recent sales shown to cashier role. Leave blank for no limit.</span>
@@ -695,6 +710,7 @@ const storeForm = reactive({
     timezone: 'Asia/Manila',
     currency: 'PHP',
     allowNegativeStock: false,
+    supplyCostBasis: 'PURCHASE' as 'PURCHASE' | 'USAGE',
     lowStockThreshold: 0,
     defaultTaxRate: 0,
     defaultDiscount: 0,
@@ -846,6 +862,7 @@ const resetForm = () => {
     storeForm.timezone = currentStore.value.timezone;
     storeForm.currency = currentStore.value.currency;
     storeForm.allowNegativeStock = currentStore.value.allowNegativeStock;
+    storeForm.supplyCostBasis = currentStore.value.supplyCostBasis ?? 'PURCHASE';
     storeForm.lowStockThreshold = currentStore.value.lowStockThreshold ?? 0;
     storeForm.defaultTaxRate = currentStore.value.defaultTaxRate ?? 0;
     storeForm.defaultDiscount = currentStore.value.defaultDiscount ?? 0;

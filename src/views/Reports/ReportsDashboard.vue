@@ -678,7 +678,7 @@
                                         </td>
                                         <td>
                                             <span :class="['item-type-chip', item.itemType === 'INGREDIENT' ? 'item-type-chip--ingredient' : 'item-type-chip--product']">
-                                                {{ item.itemType === 'INGREDIENT' ? 'Ingredient' : 'Product' }}
+                                                {{ item.itemType === 'PRODUCT' ? 'Product' : item.subType === 'SUPPLY' ? 'Supply' : 'Ingredient' }}
                                             </span>
                                         </td>
                                         <td>
@@ -703,6 +703,78 @@
                                 </tbody>
                             </table>
                         </div>
+                    </section>
+
+                    <section class="report-card report-card--wide">
+                        <div class="card-header">
+                            <div>
+                                <h2>Supply usage</h2>
+                                <p>Gloves, alcohol, trash bags and other store supplies used in this range</p>
+                            </div>
+                            <div class="card-meta">
+                                <span v-if="supplyRunningOut.length" class="pill pill--warn">{{ supplyRunningOut.length }} running out</span>
+                            </div>
+                        </div>
+
+                        <SkeletonLoader v-if="isLoading" :rows="4" label="Loading supply usage…" />
+                        <div v-else-if="supplyUsage.length === 0" class="panel-state panel-state--small">
+                            No supplies yet. Add items with the Supply category on Items &amp; Supplies, then count them on Inventory → Supplies.
+                        </div>
+                        <template v-else>
+                            <div class="supplier-metrics">
+                                <div class="metric-card">
+                                    <span class="metric-label">Supplies used</span>
+                                    <strong>{{ formatMoney(supplyUsageSummary.totalCost) }}</strong>
+                                    <span class="metric-sub">At cost, in this range</span>
+                                </div>
+                                <div class="metric-card">
+                                    <span class="metric-label">Per {{ formatMoney(1000).replace(/[.,]00$/, '') }} of sales</span>
+                                    <strong>{{ supplyUsageSummary.costPerThousandSales === null ? '—' : formatMoney(supplyUsageSummary.costPerThousandSales) }}</strong>
+                                    <span class="metric-sub">Watch for jumps between periods</span>
+                                </div>
+                                <div class="metric-card">
+                                    <span class="metric-label">Last count</span>
+                                    <strong>{{ supplyUsageSummary.lastCountAt ? formatShortDate(supplyUsageSummary.lastCountAt) : 'Never' }}</strong>
+                                    <span class="metric-sub" :class="{ 'metric-sub--warn': supplyCountOverdue }">
+                                        {{ supplyCountOverdue ? 'Over a week ago, count soon' : 'Count weekly for accurate usage' }}
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="table-wrap">
+                                <table class="report-table table-compact table-compact--bordered">
+                                    <thead>
+                                        <tr>
+                                            <th>Supply</th>
+                                            <th>Days left</th>
+                                            <th>In stock</th>
+                                            <th>Used</th>
+                                            <th>Cost</th>
+                                            <th>Avg / day</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr v-for="item in supplyUsage" :key="item.ingredientId">
+                                            <td><div class="item-name">{{ item.name }}</div></td>
+                                            <td>
+                                                <span v-if="supplyDaysClass(item)" class="stock-chip" :class="`stock-chip--${supplyDaysClass(item)}`">
+                                                    {{ supplyDaysLabel(item) }}
+                                                </span>
+                                                <span v-else>{{ supplyDaysLabel(item) }}</span>
+                                            </td>
+                                            <td>{{ formatQty(item.currentQty) }} {{ item.unit }}</td>
+                                            <td>{{ item.qtyUsed ? `${formatQty(item.qtyUsed)} ${item.unit}` : '—' }}</td>
+                                            <td>{{ item.cost ? formatMoney(item.cost) : '—' }}</td>
+                                            <td>{{ item.avgDailyUse ? `${formatQty(item.avgDailyUse)} ${item.unit}` : '—' }}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <p class="card-footnote">
+                                Avg / day and days left use the last {{ supplyRateWindowDays }} days of recorded usage.
+                                <template v-if="expenseSummary.supplies.basis === 'USAGE'">Net profit counts supplies as they're used.</template>
+                                <template v-else>Net profit counts supplies when bought (Supplies expenses). Switch in Settings → Store profile.</template>
+                            </p>
+                        </template>
                     </section>
 
                     <section class="report-card">
@@ -861,6 +933,7 @@ import { useRoute, useRouter } from 'vue-router';
 import {
     getEmployeeSales,
     getIngredientUsage,
+    getSupplyUsage,
     getLowStock,
     getPaymentMethodBreakdown,
     getSalesByChannel,
@@ -875,6 +948,8 @@ import {
     getTopProducts,
     EmployeeSalesRecord,
     IngredientUsageRecord,
+    SupplyUsageRecord,
+    SupplyUsageSummary,
     LowStockItem,
     PaymentMethodRecord,
     PurchaseSpendRecord,
@@ -886,7 +961,7 @@ import {
     SalesSummaryTotals,
     TopProductRecord,
 } from '@/api/reports';
-import { getExpenseSummary } from '@/api/expenses';
+import { getExpenseSummary, ExpenseSummary } from '@/api/expenses';
 import { suppressLoading, resumeLoading } from '@/composables/useLoading';
 import PullToRefresh from '@/components/PullToRefresh.vue';
 import HeroSparkline from './HeroSparkline.vue';
@@ -952,6 +1027,9 @@ const productsSold = ref<ProductsSoldRecord[]>([]);
 const productsSoldSummary = ref({ totalQty: 0, productCount: 0, shown: 0, limited: false });
 const lowStockItems = ref<LowStockItem[]>([]);
 const ingredientUsage = ref<IngredientUsageRecord[]>([]);
+const supplyUsage = ref<SupplyUsageRecord[]>([]);
+const supplyUsageSummary = ref<SupplyUsageSummary>({ totalCost: 0, netSales: 0, costPerThousandSales: null, lastCountAt: null });
+const supplyRateWindowDays = ref(28);
 const purchaseSpend = ref<PurchaseSpendRecord[]>([]);
 const productMargins = ref<ProductMarginRecord[]>([]);
 const paymentMethods = ref<PaymentMethodRecord[]>([]);
@@ -1070,12 +1148,16 @@ const profitSummary = ref({
     totalItems: 0,
 });
 
-const expenseSummary = ref<{ total: number; byCategory: Array<{ category: string; total: number }> }>({
+const expenseSummary = ref<Pick<ExpenseSummary, 'total' | 'byCategory' | 'profitDeduction' | 'supplies'>>({
     total: 0,
     byCategory: [],
+    profitDeduction: 0,
+    supplies: { basis: 'PURCHASE', purchased: 0, used: 0 },
 });
+const prevProfitDeduction = ref<number | null>(null);
 
-const netAfterExpenses = computed(() => profitSummary.value.totalProfit - expenseSummary.value.total);
+// On a usage basis the server swaps logged "Supplies" expenses for the cost of supplies used.
+const netAfterExpenses = computed(() => profitSummary.value.totalProfit - expenseSummary.value.profitDeduction);
 
 // The same-length window immediately before the selected range, used for
 // period-over-period comparison in the hero.
@@ -1099,12 +1181,14 @@ const loadReports = async () => {
         productsSoldSummary.value = { totalQty: 0, productCount: 0, shown: 0, limited: false };
         lowStockItems.value = [];
         ingredientUsage.value = [];
+        supplyUsage.value = [];
         purchaseSpend.value = [];
         hourlySales.value = [];
         productMargins.value = [];
         marginSummary.value = { costedItems: 0, totalItems: 0 };
         profitSummary.value = { totalRevenue: 0, totalCost: 0, totalProfit: 0, marginPct: 0, itemsWithCost: 0, totalItems: 0 };
-        expenseSummary.value = { total: 0, byCategory: [] };
+        expenseSummary.value = { total: 0, byCategory: [], profitDeduction: 0, supplies: { basis: 'PURCHASE', purchased: 0, used: 0 } };
+        prevProfitDeduction.value = null;
         purchaseSpendSummary.value = { totalSpend: 0, totalReceipts: 0, avgReceipt: 0 };
         paymentMethods.value = [];
         salesChannels.value = [];
@@ -1141,11 +1225,13 @@ const loadReports = async () => {
             getSalesSummary(storeId, { from: prev.from, to: prev.to }),
             getProfitSummary(storeId, { from: prev.from, to: prev.to }),
             getExpenseSummary(storeId, prev.from, prev.to),
+            getSupplyUsage(storeId, { from: filters.from, to: filters.to }),
         ] as const;
         resumeLoading();
         const [
             summary, sales, hourly, top, soldPerProduct, profit, lowStock, usage, spend,
             margins, paymentBreakdown, channelBreakdown, empSales, expense, prevSummary, prevProfit, prevExpense,
+            supplies,
         ] = await Promise.allSettled(reportRequests);
         if (summary.status === 'fulfilled') salesSummary.value = summary.value.totals;
         if (sales.status === 'fulfilled') salesDays.value = sales.value.days;
@@ -1158,6 +1244,11 @@ const loadReports = async () => {
         if (profit.status === 'fulfilled') profitSummary.value = profit.value.summary;
         if (lowStock.status === 'fulfilled') lowStockItems.value = lowStock.value.items;
         if (usage.status === 'fulfilled') ingredientUsage.value = usage.value.ingredients;
+        if (supplies.status === 'fulfilled') {
+            supplyUsage.value = supplies.value.supplies;
+            supplyUsageSummary.value = supplies.value.summary;
+            supplyRateWindowDays.value = supplies.value.rateWindowDays;
+        }
         if (spend.status === 'fulfilled') {
             purchaseSpend.value = spend.value.suppliers;
             purchaseSpendSummary.value = spend.value.summary;
@@ -1169,10 +1260,19 @@ const loadReports = async () => {
         if (paymentBreakdown.status === 'fulfilled') paymentMethods.value = paymentBreakdown.value.methods;
         if (channelBreakdown.status === 'fulfilled') salesChannels.value = channelBreakdown.value.channels;
         if (empSales.status === 'fulfilled') employeeSales.value = empSales.value.employees;
-        if (expense.status === 'fulfilled') expenseSummary.value = { total: expense.value.total, byCategory: expense.value.byCategory };
+        if (expense.status === 'fulfilled') {
+            expenseSummary.value = {
+                total: expense.value.total,
+                byCategory: expense.value.byCategory,
+                profitDeduction: expense.value.profitDeduction ?? expense.value.total,
+                supplies: expense.value.supplies ?? { basis: 'PURCHASE', purchased: 0, used: 0 },
+            };
+        }
         prevSalesSummary.value = prevSummary.status === 'fulfilled' ? prevSummary.value.totals : null;
         prevProfitTotal.value = prevProfit.status === 'fulfilled' ? prevProfit.value.summary.totalProfit : null;
         prevExpenseTotal.value = prevExpense.status === 'fulfilled' ? prevExpense.value.total : null;
+        prevProfitDeduction.value =
+            prevExpense.status === 'fulfilled' ? prevExpense.value.profitDeduction ?? prevExpense.value.total : null;
         if (summary.status === 'rejected') {
             errorMessage.value = (summary.reason as any)?.body?.error?.message || 'Unable to load reports.';
         }
@@ -1259,15 +1359,20 @@ const heroKpis = computed<HeroKpi[]>(() => {
         label: 'Expenses',
         value: formatMoney(expenseSummary.value.total),
         delta: computeDelta(expenseSummary.value.total, prevExpenseTotal.value, true),
+        sub: expenseSummary.value.supplies.basis === 'USAGE' && expenseSummary.value.supplies.purchased > 0
+            ? `${formatMoney(expenseSummary.value.supplies.purchased)} supplies not in net`
+            : undefined,
     });
-    const prevNet = prevProfitTotal.value !== null && prevExpenseTotal.value !== null
-        ? prevProfitTotal.value - prevExpenseTotal.value
+    const prevNet = prevProfitTotal.value !== null && prevProfitDeduction.value !== null
+        ? prevProfitTotal.value - prevProfitDeduction.value
         : null;
+    const supplies = expenseSummary.value.supplies;
     kpis.push({
         id: 'net-after',
         label: 'Net after expenses',
         value: formatMoney(netAfterExpenses.value),
         delta: computeDelta(netAfterExpenses.value, prevNet),
+        sub: supplies.basis === 'USAGE' ? `Supplies as used: ${formatMoney(supplies.used)}` : undefined,
         negative: netAfterExpenses.value < 0,
     });
     return kpis;
@@ -1425,6 +1530,40 @@ const employeeShare = (emp: EmployeeSalesRecord) =>
     employeeSalesTotal.value > 0
         ? Math.round((emp.totalSales / employeeSalesTotal.value) * 1000) / 10
         : 0;
+
+const SUPPLY_DAYS_CRITICAL = 3;
+const SUPPLY_DAYS_LOW = 7;
+
+const supplyDaysClass = (item: SupplyUsageRecord) => {
+    if (item.currentQty <= 0) return 'out';
+    if (item.daysLeft === null) return item.isLow ? 'low' : '';
+    if (item.daysLeft <= SUPPLY_DAYS_CRITICAL) return 'critical';
+    if (item.daysLeft <= SUPPLY_DAYS_LOW || item.isLow) return 'low';
+    return '';
+};
+
+const supplyDaysLabel = (item: SupplyUsageRecord) => {
+    if (item.currentQty <= 0) return 'Out of stock';
+    if (item.daysLeft === null) return item.isLow ? 'Low stock' : '—';
+    return `${item.daysLeft} ${item.daysLeft === 1 ? 'day' : 'days'}`;
+};
+
+const supplyRunningOut = computed(() =>
+    supplyUsage.value.filter((item) => ['out', 'critical', 'low'].includes(supplyDaysClass(item)))
+);
+
+const supplyCountOverdue = computed(() => {
+    const last = supplyUsageSummary.value.lastCountAt;
+    if (!last) return supplyUsage.value.length > 0;
+    return Date.now() - new Date(last).getTime() > 7 * 24 * 60 * 60 * 1000;
+});
+
+const formatShortDate = (value: string) =>
+    new Date(value).toLocaleDateString(undefined, {
+        month: 'short',
+        day: 'numeric',
+        timeZone: storeContext.currentStore?.timezone || 'Asia/Manila',
+    });
 
 const stockSeverity = (item: LowStockItem): { label: string; cls: string } => {
     if (item.currentQty <= 0) return { label: 'Out of stock', cls: 'out' };
@@ -2869,6 +3008,14 @@ watch(
     background: #f8fafc;
     border: 1px solid var(--c-border);
     border-radius: 10px;
+}
+
+.metric-sub--warn { color: #c2410c; font-weight: 600; }
+
+.card-footnote {
+    margin: 0.75rem 0 0;
+    font-size: 0.75rem;
+    color: var(--c-muted);
 }
 
 .metric-card--skeleton {
