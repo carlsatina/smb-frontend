@@ -620,8 +620,8 @@ export const helpSections: HelpSection[] = [
                 blocks: [
                     { type: 'p', text: 'The MCP server lets AI apps such as Claude Desktop, Claude Code and Cursor read and manage your catalog. You can then ask things like "Which products have a margin under 30%?" or "Add these 20 ingredients from my supplier\'s price list."' },
                     { type: 'fields', title: 'What AI apps can access', items: [
-                        { name: 'Shared', text: 'Store settings (read-only), ingredients, products with channel prices, and recipes.' },
-                        { name: 'Never shared', text: 'Sales and payments, team members and invites, stock levels, expenses, reports, your AI API key, and billing.' },
+                        { name: 'Shared', text: 'Store settings (read-only), ingredients, products with channel prices, recipes, and expenses.' },
+                        { name: 'Never shared', text: 'Sales and payments, team members and invites, stock levels, reports, your AI API key, and billing.' },
                     ] },
                     { type: 'steps', items: [
                         { text: 'Open **Settings → MCP server**. Only store owners see this section.' },
@@ -632,7 +632,7 @@ export const helpSections: HelpSection[] = [
                     ] },
                     { type: 'fields', title: 'Access levels', items: [
                         { name: 'Read-only', text: 'The AI can look things up and analyze them but can\'t change anything. Start here.' },
-                        { name: 'Read & write', text: 'The AI can also add and edit ingredients, products and recipes. Changes go live in the POS immediately and are recorded in the **Audit Log** with the token\'s name and the old and new values. Store settings stay read-only either way.' },
+                        { name: 'Read & write', text: 'The AI can also add and edit ingredients, products, recipes and expenses. Changes go live in the POS immediately and are recorded in the **Audit Log** with the token\'s name and the old and new values. Store settings stay read-only either way.' },
                     ] },
                     { type: 'tip', text: 'Create a separate token for each app or device. If a laptop is lost, revoke just that token and the others keep working.' },
                     { type: 'note', text: 'A token stops working when it expires, when you click **Revoke**, or when you change or reset your password (reconnect your AI apps with a new token afterwards). If you stop owning one of its stores, or a store is archived, that store drops off the token and the others keep working. While an account is read-only for non-payment, AI apps can still read but not make changes. ChatGPT and claude.ai web connectors are not supported yet.' },

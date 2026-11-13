@@ -537,6 +537,8 @@ const formatActionLabel = (action: string) => {
         MCP_PRODUCT_CREATED: 'Product Added (AI)',
         MCP_PRODUCT_UPDATED: 'Product Updated (AI)',
         MCP_RECIPE_UPDATED: 'Recipe Updated (AI)',
+        MCP_EXPENSE_CREATED: 'Expense Added (AI)',
+        MCP_EXPENSE_UPDATED: 'Expense Updated (AI)',
     };
     return labels[action] || action.replace(/_/g, ' ');
 };
@@ -560,6 +562,8 @@ const getActionIcon = (action: string) => {
         MCP_PRODUCT_CREATED: 'robot-outline',
         MCP_PRODUCT_UPDATED: 'robot-outline',
         MCP_RECIPE_UPDATED: 'robot-outline',
+        MCP_EXPENSE_CREATED: 'robot-outline',
+        MCP_EXPENSE_UPDATED: 'robot-outline',
     };
     return icons[action] || 'circle-outline';
 };

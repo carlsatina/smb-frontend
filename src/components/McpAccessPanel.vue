@@ -11,6 +11,7 @@
                     <li>Ingredients</li>
                     <li>Products &amp; channel prices</li>
                     <li>Recipes</li>
+                    <li>Expenses</li>
                 </ul>
             </div>
             <div class="mcp-scope-col">
@@ -20,7 +21,7 @@
                 <ul>
                     <li>Sales &amp; payments</li>
                     <li>Team members &amp; invites</li>
-                    <li>Stock levels, expenses &amp; reports</li>
+                    <li>Stock levels &amp; reports</li>
                     <li>Your AI API key and billing</li>
                 </ul>
             </div>
@@ -104,7 +105,7 @@
                             <input v-model="form.access" type="radio" value="READ_WRITE" />
                             <span>
                                 <strong>Read &amp; write</strong>
-                                <small>Can also add and edit ingredients, products and recipes.</small>
+                                <small>Can also add and edit ingredients, products, recipes and expenses.</small>
                             </span>
                         </label>
                     </div>
