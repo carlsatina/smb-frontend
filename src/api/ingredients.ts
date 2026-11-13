@@ -1,6 +1,6 @@
 import { apiClient } from './client';
 
-export type IngredientCategory = 'RAW_MATERIAL' | 'PACKAGING';
+export type IngredientCategory = 'RAW_MATERIAL' | 'PACKAGING' | 'SUPPLY';
 
 export type IngredientPayload = {
     name: string;

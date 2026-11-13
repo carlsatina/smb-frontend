@@ -105,12 +105,12 @@ export const helpSections: HelpSection[] = [
             {
                 id: 'create-ingredient',
                 title: 'Add an ingredient',
-                summary: 'Raw materials and packaging that recipes use up.',
+                summary: 'Raw materials, packaging, and store supplies like gloves and trash bags.',
                 blocks: [
-                    { type: 'p', text: 'Ingredients are what your recipe products are made from, such as milk, coffee beans or syrup, plus packaging like cups and lids. Each time a recipe product is sold, its ingredients are deducted from stock.' },
+                    { type: 'p', text: 'Ingredients are what your recipe products are made from, such as milk, coffee beans or syrup, plus packaging like cups and lids. Each time a recipe product is sold, its ingredients are deducted from stock. The same page also tracks **supplies** the store uses up but doesn\'t sell, such as gloves, alcohol and trash bags.' },
                     { type: 'steps', items: [
-                        { text: 'Open **Ingredients** (in the top bar or under **More**).' },
-                        { text: 'Click **New ingredient**.', image: img('ingredients-list'), caption: 'The Ingredients page.' },
+                        { text: 'Open **Items & Supplies** (in the top bar or under **More**).' },
+                        { text: 'Click **New ingredient**.', image: img('ingredients-list'), caption: 'The Items & Supplies page.' },
                         { text: 'Enter the name, choose the unit and category, and enter the cost per unit.', image: img('ingredient-modal'), caption: 'The Add ingredient form.' },
                         { text: 'If you buy it in a bigger unit than you use, fill in the **Purchase unit** section (see below).' },
                         { text: 'Click **Create ingredient**.' },
@@ -118,13 +118,13 @@ export const helpSections: HelpSection[] = [
                     { type: 'fields', items: [
                         { name: 'Name', text: 'What the ingredient is called, e.g. "Fresh milk" or "16oz cup".' },
                         { name: 'Unit', text: 'The unit you measure it in for recipes (g, ml, pc…). The list comes from **Settings → Catalog defaults**.' },
-                        { name: 'Category', text: '**Raw material** for things that go into the product. **Packaging** for cups, lids, bags and straws; only packaging can be used as takeout packaging on a product.' },
+                        { name: 'Category', text: '**Raw material** for things that go into the product. **Packaging** for cups, lids, bags and straws; only packaging can be used as takeout packaging on a product. **Supply** for things the store uses but that aren\'t part of a product, like gloves, alcohol and trash bags. Supplies are never deducted by sales and can\'t be added to a recipe or as packaging. Track them with purchase orders and stock adjustments.' },
                         { name: 'Cost per unit', text: 'What one unit costs you. Recipe costs and margins are calculated from this.' },
                         { name: 'Purchase unit (optional)', text: 'The unit you buy it in, e.g. "Gallon" or "Box".' },
                         { name: 'Units per purchase unit', text: 'How many recipe units are in one purchase unit, e.g. 3.785 L per Gallon. Purchase orders can then be entered in gallons while stock is tracked in litres.' },
                     ] },
                     { type: 'tip', text: 'New ingredients start with zero stock. Record what you have on hand with a **stock adjustment**.' },
-                    { type: 'p', text: 'Have many ingredients? Owners and admins can bulk-add them from a CSV file: on the Ingredients page, open **Import / Export** and choose **Download template**, fill it in, then choose **Import CSV**.' },
+                    { type: 'p', text: 'Have many ingredients? Owners and admins can bulk-add them from a CSV file: on the Items & Supplies page, open **Import / Export** and choose **Download template**, fill it in, then choose **Import CSV**.' },
                 ],
             },
             {

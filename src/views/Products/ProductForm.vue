@@ -1164,7 +1164,8 @@ const loadIngredients = async () => {
     ingredientsLoading.value = true;
     try {
         const data = await listIngredients(storeId);
-        ingredients.value = data.ingredients.map((ingredient) => ({
+        // Supplies (gloves, alcohol…) are used in-store, never in recipes or packaging.
+        ingredients.value = data.ingredients.filter((ingredient) => ingredient.category !== 'SUPPLY').map((ingredient) => ({
             id: ingredient.id,
             name: ingredient.name,
             unit: ingredient.unit,
@@ -1423,6 +1424,10 @@ const openIngredientModal = () => {
 };
 
 const onIngredientCreated = async (ingredient: { id: string; name: string; unit: string; category: IngredientCategory; costPerUnit: number }) => {
+    if (ingredient.category === 'SUPPLY') {
+        showToast('Supply created. Supplies can\'t be used in recipes or packaging.');
+        return;
+    }
     ingredients.value = [
         ...ingredients.value,
         {

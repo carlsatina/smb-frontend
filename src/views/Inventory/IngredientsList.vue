@@ -34,8 +34,8 @@
             <header class="ingredients-header">
                 <div class="ingredients-title">
                     <span class="ingredients-eyebrow">Inventory</span>
-                    <h1>Ingredients</h1>
-                    <p>Raw materials and packaging for {{ currentStoreLabel }}.</p>
+                    <h1>Items &amp; Supplies</h1>
+                    <p>Raw materials, packaging and store supplies for {{ currentStoreLabel }}.</p>
                 </div>
                 <div class="header-actions">
                     <template v-if="canImportExport && storeContext.currentStoreId">
@@ -74,7 +74,7 @@
 
             <template v-else>
                 <!-- STAT STRIP (doubles as filters) -->
-                <SkeletonLoader v-if="isLoading" variant="kpi" :count="3" />
+                <SkeletonLoader v-if="isLoading" variant="kpi" :count="5" />
                 <div v-else class="stat-strip" role="group" aria-label="Filter ingredients">
                     <button
                         type="button"
@@ -84,7 +84,7 @@
                         @click="clearFilters"
                     >
                         <span class="stat-value">{{ totalIngredients }}</span>
-                        <span class="stat-label">Ingredients</span>
+                        <span class="stat-label">All items</span>
                     </button>
                     <button
                         type="button"
@@ -105,6 +105,16 @@
                     >
                         <span class="stat-value">{{ packagingCount }}</span>
                         <span class="stat-label">Packaging</span>
+                    </button>
+                    <button
+                        type="button"
+                        class="stat"
+                        :class="{ 'stat--active': categoryFilter === 'SUPPLY' }"
+                        :aria-pressed="categoryFilter === 'SUPPLY'"
+                        @click="toggleCategory('SUPPLY')"
+                    >
+                        <span class="stat-value">{{ supplyCount }}</span>
+                        <span class="stat-label">Supplies</span>
                     </button>
                     <button
                         type="button"
@@ -176,7 +186,7 @@
                                             <div class="ingredient-meta">
                                                 <span
                                                     class="category-chip"
-                                                    :class="ingredient.category === 'PACKAGING' ? 'category-chip--packaging' : 'category-chip--raw'"
+                                                    :class="categoryChipClass(ingredient.category)"
                                                 >
                                                     {{ formatCategory(ingredient.category) }}
                                                 </span>
@@ -261,6 +271,7 @@ import {
     exportIngredients,
     importIngredients,
     ImportResult,
+    IngredientCategory,
     IngredientResponse,
     listIngredients,
 } from '@/api/ingredients';
@@ -281,7 +292,7 @@ const ingredients = ref<IngredientResponse[]>([]);
 const isLoading = ref(true);
 const searchQuery = ref('');
 const statusFilter = ref<'ALL' | 'INACTIVE'>('ALL');
-const categoryFilter = ref<'ALL' | 'RAW_MATERIAL' | 'PACKAGING'>('ALL');
+const categoryFilter = ref<'ALL' | IngredientCategory>('ALL');
 const page = ref(1);
 const pageSize = ref(10);
 const pageSizeOptions = [10, 20, 50];
@@ -478,7 +489,7 @@ const cancelDelete = () => {
     ingredientToDelete.value = null;
 };
 
-const toggleCategory = (category: 'RAW_MATERIAL' | 'PACKAGING') => {
+const toggleCategory = (category: IngredientCategory) => {
     categoryFilter.value = categoryFilter.value === category ? 'ALL' : category;
 };
 
@@ -509,6 +520,7 @@ const emptyMessage = computed(() => {
     if (statusFilter.value === 'INACTIVE') return 'No inactive ingredients.';
     if (categoryFilter.value === 'PACKAGING') return 'No packaging items yet.';
     if (categoryFilter.value === 'RAW_MATERIAL') return 'No raw materials yet.';
+    if (categoryFilter.value === 'SUPPLY') return 'No supplies yet. Add gloves, alcohol, trash bags and other items the store uses.';
     return 'Add your first ingredient to start building recipes.';
 });
 
@@ -530,6 +542,7 @@ const changePage = (nextPage: number) => {
 const totalIngredients = computed(() => ingredients.value.length);
 const rawMaterialCount = computed(() => ingredients.value.filter((i) => i.category === 'RAW_MATERIAL').length);
 const packagingCount = computed(() => ingredients.value.filter((i) => i.category === 'PACKAGING').length);
+const supplyCount = computed(() => ingredients.value.filter((i) => i.category === 'SUPPLY').length);
 const inactiveCount = computed(() => ingredients.value.filter((i) => !i.active).length);
 
 const currentStoreLabel = computed(() => {
@@ -541,7 +554,14 @@ const currentStoreLabel = computed(() => {
 const formatCategory = (category: string) => {
     if (category === 'RAW_MATERIAL') return 'Raw material';
     if (category === 'PACKAGING') return 'Packaging';
+    if (category === 'SUPPLY') return 'Supply';
     return category;
+};
+
+const categoryChipClass = (category: string) => {
+    if (category === 'PACKAGING') return 'category-chip--packaging';
+    if (category === 'SUPPLY') return 'category-chip--supply';
+    return 'category-chip--raw';
 };
 
 const formatIngredientName = (ingredient: Ingredient) => {
@@ -711,7 +731,7 @@ watch(
 ============================================================ */
 .stat-strip {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     background: var(--c-surface);
     border: 1px solid var(--c-border);
     border-radius: 14px;
@@ -946,6 +966,7 @@ watch(
 
 .category-chip--raw { background: #ede9fe; color: #6d28d9; }
 .category-chip--packaging { background: #e0f2fe; color: #0369a1; }
+.category-chip--supply { background: #fef3c7; color: #b45309; }
 
 .col-cost {
     white-space: nowrap;
@@ -1156,7 +1177,7 @@ watch(
     .header-actions { width: 100%; }
     .header-actions .primary-button { flex: 1; justify-content: center; }
 
-    .stat { padding: 0.75rem 0.7rem; }
+    .stat { padding: 0.75rem 0.5rem; }
     .stat-value { font-size: 1.2rem; }
     .stat-label { font-size: 0.6rem; }
 

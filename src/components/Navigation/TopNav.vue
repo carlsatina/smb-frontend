@@ -364,7 +364,7 @@ const allNavLinks = computed<NavLink[]>(() => [
     { key: 'pos', label: 'POS', icon: 'point-of-sale', route: 'pos', group: 'sell', visible: canViewPos.value },
     { key: 'products', label: 'Products', icon: 'package-variant', route: 'products', group: 'sell', visible: canViewProducts.value },
     { key: 'inventory', label: 'Inventory', icon: 'warehouse', route: 'inventory', group: 'sell', visible: canViewInventory.value },
-    { key: 'ingredients', label: 'Ingredients', icon: 'food-apple-outline', route: 'ingredients', group: 'sell', visible: canViewInventory.value },
+    { key: 'ingredients', label: 'Items & Supplies', icon: 'food-apple-outline', route: 'ingredients', group: 'sell', visible: canViewInventory.value },
     { key: 'reports', label: 'Reports', icon: 'chart-line', route: 'reports', group: 'insights', visible: canViewReports.value },
     { key: 'daily-sales', label: 'Daily Sales', icon: 'cash-register', route: 'daily-sales', group: 'insights', visible: canViewDailySales.value },
     { key: 'ai-insights', label: 'AI Insights', icon: 'robot-happy-outline', route: 'ai-insights', group: 'insights', visible: canViewAi.value },

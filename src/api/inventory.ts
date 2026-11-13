@@ -10,7 +10,7 @@ export type StockItem = {
     currentQty: number;
     lowStockThreshold: number;
     active: boolean;
-    subType: 'READY_MADE' | 'RAW_MATERIAL' | 'PACKAGING';
+    subType: 'READY_MADE' | 'RAW_MATERIAL' | 'PACKAGING' | 'SUPPLY';
 };
 
 export type MovementRecord = {

@@ -31,6 +31,7 @@
                             <select v-model="form.category">
                                 <option value="RAW_MATERIAL">Raw material</option>
                                 <option value="PACKAGING">Packaging</option>
+                                <option value="SUPPLY">Supply (gloves, alcohol, trash bags…)</option>
                             </select>
                         </label>
                         <label class="ingr-field">

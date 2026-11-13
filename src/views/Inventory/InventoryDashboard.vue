@@ -621,6 +621,7 @@ const formatSubType = (subType: string) => {
         case 'READY_MADE': return 'Ready-made';
         case 'RAW_MATERIAL': return 'Raw material';
         case 'PACKAGING': return 'Packaging';
+        case 'SUPPLY': return 'Supply';
         default: return subType;
     }
 };
